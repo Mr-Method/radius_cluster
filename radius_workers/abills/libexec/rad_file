@@ -1,0 +1,17 @@
+
+
+   NAS-Identifier = "nas4.intelekt.cv.ua"
+   Acct-Session-Id = "4492431-vlan2789-252"
+   NAS-Port = 252
+   NAS-Port-Type = Ethernet
+   Service-Type = Framed-User
+   Framed-Protocol = PPP
+   Calling-Station-Id = "00:26:b9:d0:a8:c4"
+   NAS-Port-Id = "vlan2789"
+   mpd-link = "vlan2789-252"
+   mpd-peer-ident = "MSRASV5.20 MSRAS-0-DELL E\203\014\002)\237bB\217\241\226\340\332\004\2347"
+   Tunnel-Medium-Type:0 = IEEE-802
+   Tunnel-Client-Endpoint:0 = "00:26:b9:d0:a8:c4"
+   User-Name = "sanya_balshoi"
+   User-Password = "samsung"
+

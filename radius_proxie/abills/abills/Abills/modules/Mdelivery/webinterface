@@ -1,0 +1,377 @@
+# Mail delivery
+
+my %MAIL_PRIORITY = (
+  2 => 'High',
+  3 => 'Normal',
+  4 => 'Low'
+);
+
+require "Mdelivery.pm";
+Mdelivery->import();
+my $Mdelivery = Mdelivery->new($db, $admin, \%conf);
+
+my @service_status_colors = ($_COLORS[9], $_COLORS[6], '#808080',      '#0000FF',   '#FF8000');
+my @service_status        = ("$lang{ENABLE}",    "$lang{DISABLE}",   "$lang{NOT_ACTIVE}", "$lang{HOLD_UP}", "$lang{DISABLE}: $lang{NON_PAYMENT}");
+
+#*******************************************************************
+# Mail delivery
+# mdelivery_main()
+#*******************************************************************
+sub mdelivery_main {
+  my $period = $FORM{period} || 0;
+
+  if ($FORM{sent}) {
+    $FORM{DATE} = "$FORM{date_Y}-" . ($FORM{date_M} + 1) . "-$FORM{date_D}" if ($period != 0);
+
+    $Mdelivery->add({%FORM});
+    if (!$Mdelivery->{errno}) {
+      $html->message('info', $lang{INFO}, "$lang{SENDED}");
+    }
+
+    my @ATTACHMENTS = ();
+
+    for (my $i = 1 ; $i <= 2 ; $i++) {
+      if ($FORM{ 'FILE_UPLOAD_' . $i }) {
+        $Mdelivery->attachment_add(
+          {
+            MSG_ID       => $Mdelivery->{MDELIVERY_ID},
+            CONTENT      => $FORM{ 'FILE_UPLOAD_' . $i }{Contents},
+            FILESIZE     => $FORM{ 'FILE_UPLOAD_' . $i }{Size},
+            FILENAME     => $FORM{ 'FILE_UPLOAD_' . $i }{filename},
+            CONTENT_TYPE => $FORM{ 'FILE_UPLOAD_' . $i }{'Content-Type'},
+          }
+        );
+
+        if ($Mdelivery->{errno}) {
+          $html->message('err', $lang{ERROR}, "[$Mdelivery->{errno}] $err_strs{$Mdelivery->{errno}}");
+        }
+
+        push @ATTACHMENTS,
+        {
+          ATTACHMENT_ID => $i,
+          FILENAME      => $FORM{ 'FILE_UPLOAD_' . $i }{filename},
+          CONTENT_TYPE  => $FORM{ 'FILE_UPLOAD_' . $i }{'Content-Type'},
+          FILESIZE      => $FORM{ 'FILE_UPLOAD_' . $i }{Size},
+          CONTENT       => $FORM{ 'FILE_UPLOAD_' . $i }{Contents}
+        };
+      }
+    }
+
+    if ($FORM{SEND_PREVIEW}) {
+      sendmail(($FORM{FROM}) ? $FORM{FROM} : $conf{ADMIN_MAIL}, "$conf{ADMIN_MAIL}", "$FORM{SUBJECT}", "$FORM{TEXT}", "$conf{MAIL_CHARSET}", "$FORM{PRIORITY} ($MAIL_PRIORITY{$FORM{PRIORITY}})", { ATTACHMENTS => ($#ATTACHMENTS > -1) ? \@ATTACHMENTS : undef });
+    }
+
+  }
+
+  $Mdelivery->{PERIOD_FORM}  = form_period($period);
+  $Mdelivery->{PRIORITY_SEL} = $html->form_select(
+    'PRIORITY',
+    {
+      SELECTED => $FORM{PRIORITY},
+      SEL_HASH => \%MAIL_PRIORITY
+    }
+  );
+
+  $status_sel = $html->form_select(
+    'STATUS',
+    {
+      SELECTED => $FORM{STATUS},
+      SEL_HASH => {
+        '' => "$lang{ALL}",
+        0  => $service_status[0],
+        1  => $service_status[1],
+      },
+      NO_ID => 1,
+      STYLE => \@service_status_colors,
+    }
+  );
+
+  my @rows = ([ "$lang{GROUP}: ", sel_groups() ], [ "$lang{ACCOUNT} $lang{STATUS}:", $status_sel ]);
+
+  my $table = $html->table(
+    {
+      width   => '100%',
+      caption => $lang{EXTRA},
+      rows    => \@rows
+    }
+  );
+
+  $Mdelivery->{EXTRA2} .= "<tr><th colspan=2>" . $table->show() . "</th></tr>\n";
+
+  if (in_array('Dv', \@MODULES)) {
+    use Tariffs;
+    my $tariffs = Tariffs->new($db, \%conf, $admin);
+
+    my $tp_sel = $html->form_select(
+      'TP_ID',
+      {
+        SELECTED   => $Dv->{TP_ID},
+        SEL_LIST   => $tariffs->list({ MODULE => 'Dv', COLS_NAME => 1 }),
+        SEL_KEY    => 'id',
+        SEL_VALUE  => 'name',
+        SEL_OPTIONS=> { '' => $lang{ALL} },
+      }
+    );
+
+    $status_sel = $html->form_select(
+      'DV_STATUS',
+      {
+        SELECTED => $FORM{DV_STATUS},
+        SEL_HASH => {
+          '' => "$lang{ALL}",
+          0  => $service_status[0],
+          1  => $service_status[1],
+          2  => $service_status[2],
+          3  => $service_status[3],
+          4  => $service_status[4]
+        },
+        NO_ID => 1,
+        STYLE => \@service_status_colors,
+      }
+    );
+
+    my @rows = ([ "$lang{TARIF_PLAN}: ", $tp_sel ], [ "$lang{STATUS}:", $status_sel ]);
+
+    my $table = $html->table(
+      {
+        width   => '100%',
+        caption => 'Internet',
+        rows    => \@rows
+      }
+    );
+    $Mdelivery->{EXTRA2} .= "<tr><th colspan=2>" . $table->show() . "</th></tr>\n";
+  }
+
+  if ($conf{ADDRESS_REGISTER}) {
+    $Mdelivery->{EXTRA2} .= $html->tpl_show(templates('form_address_sel'), $Mdelivery, { OUTPUT2RETURN => 1 });
+  }
+  else {
+    $Mdelivery->{EXTRA2} .= $html->tpl_show(templates('form_address'), $Mdelivery, { OUTPUT2RETURN => 1 });
+  }
+
+  $Mdelivery->{EXTRA2} .= "<tr bgcolor=$_COLORS[2]><td colspan=1>$lang{SEND} $lang{PRE}:</td><td><input type=checkbox name=SEND_PREVIEW value=1 checked> $conf{ADMIN_MAIL}</td></tr>\n";
+
+  $html->tpl_show(templates('mail_form'), $Mdelivery);
+}
+
+#*******************************************************************
+# Mail delivery
+# mdelivery_main()
+#*******************************************************************
+sub mdelivery_list {
+
+  if ($FORM{ATTACHMENT}) {
+    $Mdelivery->attachment_info({ ID => $FORM{ATTACHMENT} });
+    print "Content-Type: $Mdelivery->{CONTENT_TYPE}; filename=\"$Mdelivery->{FILENAME}\"\n" . "Content-Disposition: attachment; filename=\"$Mdelivery->{FILENAME}\"; size=$Mdelivery->{FILESIZE}" . "\n\n";
+    print "$Mdelivery->{CONTENT}";
+    return 0;
+  }
+  elsif ($FORM{reset}) {
+    $Mdelivery->reset({ ID => $FORM{reset} });
+    if (!$Mdelivery->{errno}) {
+      $html->message('info', $lang{INFO}, "$lang{RESET} [$FORM{reset}]");
+    }
+  }
+  elsif ($FORM{info}) {
+    if ($FORM{del_user}) {
+      $Mdelivery->user_list_del({ MDELIVERY_ID => $FORM{info}, UID => $FORM{del_user} });
+
+      if (!$Mdelivery->{errno}) {
+        $html->message('info', $lang{INFO}, "$lang{USER} $lang{DELETED}");
+      }
+    }
+
+    $Mdelivery->info($FORM{info});
+    if ($Mdelivery->{errno}) {
+      $html->message('err', $lang{ERROR}, "[$Mdelivery->{errno}] $err_strs{$Mdelivery->{errno}}");
+    }
+
+    $Mdelivery->{PRIORITY} = "$Mdelivery->{PRIORITY} ($MAIL_PRIORITY{$Mdelivery->{PRIORITY}})";
+
+    $Mdelivery->attachment_info({ MSG_ID => $FORM{info} });
+
+    if ($Mdelivery->{TOTAL} > 0) {
+      foreach my $line (@{ $Mdelivery->{list} }) {
+        $Mdelivery->{ATTACHMENT} .= $html->button(
+          $line->[1],
+          "qindex=$index&ATTACHMENT=$line->[0]",
+          {
+            ex_params => 'target=_new'
+          }
+        )
+        . " $lang{SIZE}: "
+        . int2byte($line->[3]) . ' / ';
+      }
+    }
+
+    $html->tpl_show(_include('mdelivery_form', 'Mdelivery'), $Mdelivery);
+
+    my $list = $Mdelivery->user_list({ %LIST_PARAMS, 
+                                       MDELIVERY_ID => $FORM{info},
+                                       COLS_NAME    => 1 });
+    my $table = $html->table(
+      {
+        width      => '100%',
+        caption    => $lang{USERS},
+        title      => [ "$lang{LOGIN}", "$lang{FIO}", "$lang{STATUS}", '-' ],
+        cols_align => [ 'left', 'left', 'center', 'center' ],
+        qs         => "&info=$FORM{info}",
+        pages      => $Mdelivery->{TOTAL},
+        ID         => 'MDELIVERY_USERS_LIST'
+      }
+    );
+
+    foreach my $line (@$list) {
+      my $delete = $html->button($lang{DEL}, "index=$index&info=$FORM{info}&del_user=$line->{uid}", { MESSAGE => "$lang{DEL} [$line->{login}]?", CLASS => 'del' });
+
+      $table->addrow(
+        $html->button($line->{login}, "index=15&UID=$line->{uid}"),
+        $line->{fio},
+        ($line->{status}) ? $lang{SENDED} : '',
+
+        $delete
+      );
+    }
+
+    print $table->show();
+
+    $table = $html->table(
+      {
+        width      => '100%',
+        cols_align => [ 'right', 'right', 'right', 'right' ],
+        rows => [ [ "$lang{TOTAL}:", "$Mdelivery->{TOTAL}" ] ]
+      }
+    );
+
+    print $table->show();
+  }
+  elsif ($FORM{del} && $FORM{is_js_confirmed}) {
+    $Mdelivery->del($FORM{del});
+    if ($Mdelivery->{errno}) {
+      $html->message('err', $lang{ERROR}, "[$Mdelivery->{errno}] $err_strs{$Mdelivery->{errno}}");
+    }
+    else {
+      $html->message('info', $lang{DELETED}, "$lang{DELETED} [$FORM{del}]");
+    }
+  }
+
+  my $list  = $Mdelivery->list({%LIST_PARAMS, COLS_NAME => 1 });
+  my $table = $html->table(
+    {
+      width      => '100%',
+      caption    => $lang{LIST},
+      title      => [ "ID", "$lang{DATE}", "$lang{SUBJECT}", "$lang{FROM}", "$lang{ADMIN}", "$lang{ADDED}", "$lang{SIZE}", "$lang{STATUS}", '-', '-', '-' ],
+      cols_align => [ 'right', 'right', 'right', 'left', 'left', 'right', 'center', 'center', 'center', 'center' ],
+      qs         => $pages_qs,
+      pages      => $Mdelivery->{TOTAL},
+      ID         => 'MDELIVERY_LIST'
+    }
+  );
+
+  foreach my $line (@$list) {
+    my $delete = $html->button($lang{DEL}, "index=$index&del=$line->{id}", { MESSAGE => "$lang{DEL} [$line->{id}]?", CLASS => 'del' });
+
+    $table->{rowcolor} = ($FORM{info} && $FORM{info} == $line->{id}) ? $_COLORS[0] : undef;
+
+    $table->addrow(
+      $line->{id}, 
+      $line->{date}, 
+      $line->{subject}, 
+      $line->{sender}, 
+      $line->{admin_login}, 
+      $line->{added}, 
+      $line->{message_text},
+      ($line->{status}) ? $lang{SENDED} : '',
+      $html->button($lang{RESET}, "index=$index&reset=$line->{id}", { BUTTON => 1, MESSAGE => "$lang{RESET}  [$line->{id}]?" }),
+      $html->button($lang{INFO},  "index=$index&info=$line->{id}",  { CLASS  => 'show' }), $delete
+    );
+  }
+  print $table->show();
+
+  $table = $html->table(
+    {
+      width      => '100%',
+      cols_align => [ 'right', 'right', 'right', 'right' ],
+      rows       => [ [ "$lang{TOTAL}:", "$Mdelivery->{TOTAL}" ] ]
+    }
+  );
+  print $table->show();
+}
+
+#*******************************************************************
+# Mail delivery
+# mdelivery_main()
+#*******************************************************************
+sub mdelivery_periodic {
+  my ($attr) = @_;
+
+  my $debug = $attr->{DEBUG} || 0;
+  my $debug_output = '';
+  $debug_output .= "Mdelivery\n" if ($debug > 1);
+
+  use Users;
+  my $users = Users->new($db, $admin, \%conf);
+  $ADMIN_REPORT{DATE} = $DATE          if (!$ADMIN_REPORT{DATE});
+  $LIST_PARAMS{LOGIN} = $attr->{LOGIN} if ($attr->{LOGIN});
+  $LIST_PARAMS{STATUS} = 0;
+  $LIST_PARAMS{DATE}   = "<=$ADMIN_REPORT{DATE}";
+
+  my $list = $Mdelivery->list({%LIST_PARAMS, COLS_NAME => 1});
+  my @ids;
+  foreach my $line (@$list) {
+    push @ids, $line->{id};
+  }
+
+  foreach my $mdelivery_id (@ids) {
+    $Mdelivery->info($mdelivery_id);
+    $LIST_PARAMS{PAGE_ROWS}    = 1000000;
+    $LIST_PARAMS{MDELIVERY_ID} = $mdelivery_id;
+
+    $Mdelivery->attachment_info({ MSG_ID => $mdelivery_id, COLS_NAME => 1 });
+
+    my @ATTACHMENTS = ();
+
+    if ($Mdelivery->{TOTAL} > 0) {
+      foreach my $line (@{ $Mdelivery->{list} }) {
+        push @ATTACHMENTS,
+        {
+          ATTACHMENT_ID => $line->{attachment_id},
+          FILENAME      => $line->{filename},
+          CONTENT_TYPE  => $line->{content_type},
+          FILESIZE      => $line->{filesize},
+          CONTENT       => $line->{content}
+        };
+      }
+    }
+
+    my $user_list = $Mdelivery->user_list({ %LIST_PARAMS, 
+                                            STATUS    => 0,
+                                            COLS_NAME => 1 });
+    my @users_ids = ();
+
+    foreach $u (@$user_list) {
+      my $email = ($u->{email} && $u->{email} ne '') ? $u->{email} : ($conf{USERS_MAIL_DOMAIN}) ? $u->{login} . '@' . $conf{USERS_MAIL_DOMAIN} : '';
+      if (!$email || $email eq '') {
+        print "Login: $u->{login} Don't have mail address. Skip...\n";
+        next;
+      }
+
+      $Mdelivery->{SENDER} = ($Mdelivery->{SENDER} ne '') ? $Mdelivery->{SENDER} : $conf{ADMIN_MAIL};
+      $debug_output .= "LOGIN: $u->{login} E-mail: $email $Mdelivery->{SUBJECT}\n" if ($debug > 0);
+      push @users_ids, $u->{uid};
+
+      sendmail("$Mdelivery->{SENDER}", "$email", "$Mdelivery->{SUBJECT}", "$Mdelivery->{TEXT}", "$conf{MAIL_CHARSET}", "$Mdelivery->{PRIORITY} ($MAIL_PRIORITY{$Mdelivery->{PRIORITY}})", { ATTACHMENTS => ($#ATTACHMENTS > -1) ? \@ATTACHMENTS : undef });
+    }
+
+    if (!$LIST_PARAMS{LOGIN}) {
+      $Mdelivery->user_list_change({ MDELIVERY_ID => $mdelivery_id, UID => join(';', @users_ids) });
+      $Mdelivery->change({ ID => $mdelivery_id });
+    }
+  }
+
+  $DEBUG .= $debug_output;
+  return $debug_output;
+}
+
+1
+

@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS `reports_wizard` (
+  `id` INT(11) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(100) NOT NULL DEFAULT '',
+  `gid` SMALLINT NOT NULL DEFAULT 0,
+  `comments` TEXT NOT NULL,
+  `query` TEXT NOT NULL,
+  `fields` TEXT NOT NULL,
+  `date` DATE NOT NULL DEFAULT '0000-00-00',
+  `aid` SMALLINT(11) UNSIGNED NOT NULL DEFAULT '0',
+  `query_total` TEXT NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `name` (`name`)
+)
+  COMMENT = 'Reports Wizard';
+
+CREATE TABLE IF NOT EXISTS `reports_groups` (
+  `id` SMALLINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(40) NOT NULL DEFAULT '',
+  `comments` TEXT NOT NULL,
+  PRIMARY KEY (`id`)
+)
+  COMMENT = 'Reports Groups';

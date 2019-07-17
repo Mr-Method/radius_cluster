@@ -1,0 +1,3276 @@
+#!perl
+use strict;
+use warnings 'FATAL' => 'all';
+use v5.16;
+
+use Abills::Base qw/_bp in_array/;
+use Abills::Experimental;
+use JSON qw/to_json from_json/;
+
+use Cablecat;
+use Maps;
+
+our ($html, %lang, %conf, $admin, $db, @CABLECAT_EXTRA_COLORS,);
+
+our Maps $Maps;
+
+if ($FORM{json}){
+  _bp('','',{ SET_ARGS => {TO_CONSOLE => 1} });
+}
+
+# DB module is available
+exit if (
+  form_purchase_module(
+    {
+      HEADER          => $user->{UID},
+      MODULE          => 'Cablecat',
+      REQUIRE_VERSION => 7.42,
+    }
+  )
+);
+
+require Equipment;
+Equipment->import();
+my $Equipment = Equipment->new($db, $admin, \%conf);
+
+my %CONNECTION_TYPES = (
+  1 => 'fiber',
+  2 => 'equipment',
+  3 => 'point_id',
+  4 => 'splitter',
+  5 => 'client'
+);
+
+if (!in_array('Equipment', \@MODULES)){
+  delete $CONNECTION_TYPES{2};
+}
+
+# Using selects from Maps module
+load_module('Maps', $html);
+if (!defined $Maps) {
+  $Maps = Maps->new($db, $admin, \%conf);
+}
+
+my Cablecat $Cablecat = Cablecat->new($db, $admin, \%conf);
+
+my @CABLECAT_COLORS = (
+  'fcfefc',    # white
+  '04fefc',    # sea
+  'fcfe04',    # yellow
+  '048204',    # green
+  '840204',    # brown
+  'fc0204',    # red
+  'fc9a04',    # orange
+  'fc9acc',    # pink
+  '848284',    # gray
+  '0402fc',    # blue
+  '840284',    # violet
+  '040204',    # black
+  '04fe04',    # yellowgreen
+  '9cce04',    # olive
+  'fcfe9c',    # beige
+  'dbefdb',    # natural
+  'fde910',    # lemon
+  '9c3232',    # cherry
+);
+
+$conf{CABLECAT_CLEAR_DEFAULT_COLORS} //= 0;
+$conf{CABLECAT_COLOR_SCHEME_NUMBERS} //= 0;
+
+# Allowing to add colors via config.pl
+if (@CABLECAT_EXTRA_COLORS) {
+  if ($conf{CABLECAT_CLEAR_DEFAULT_COLORS}) {
+    @CABLECAT_COLORS = @CABLECAT_EXTRA_COLORS;
+  }
+  else {
+    @CABLECAT_COLORS = (@CABLECAT_COLORS, @CABLECAT_EXTRA_COLORS);
+  }
+}
+
+my %MAP_TYPE_ID = (
+  'WELL'      => 1,
+  'WIFI'      => 2,
+  'BUILD'     => 3,
+  'ROUTE'     => 4,
+  'CONNECTER' => 5,
+  'SPLITTER'  => 6,
+  'CABLE'     => 7,
+  'EQUIPMENT' => 8,
+  'PILLAR'    => 9,
+);
+
+my %MAP_LAYER_ID = (
+  CABLE => 10,
+  WELL  => 11
+);
+
+#**********************************************************
+
+=head2 cablecat_main()
+
+=cut
+
+#**********************************************************
+sub cablecat_main {
+
+  my $menu_button = sub {
+    my ($lang_name, $function_name) = @_;
+    $html->element('li', $html->button($lang_name, "index=" . get_function_index($function_name)),
+      {
+        class => 'list-group-item'
+      }
+    );
+  };
+
+  $html->tpl_show(
+    _include('cablecat_main', 'Cablecat'),
+    {
+      COLOR_SCHEMES_BTN => $menu_button->($lang{COLOR_SCHEMES}, 'cablecat_color_schemes'),
+      CABLES_BTN        => $menu_button->($lang{CABLES},        'cablecat_cables'),
+      WELLS_BTN         => $menu_button->($lang{WELLS},         'cablecat_wells'),
+      SPLITTERS_BTN     => $menu_button->($lang{SPLITTERS},     'cablecat_splitters'),
+      CONNECTERS_BTN    => $menu_button->($lang{CONNECTERS},    'cablecat_connecters'),
+      COMMUTATIONS_BTN  => $menu_button->($lang{COMMUTATIONS}, 'cablecat_commutations')
+    }
+  );
+
+  return 1;
+}
+
+#**********************************************************
+
+=head2 cablecat_commutation()
+
+=cut
+
+#**********************************************************
+sub cablecat_commutation {
+
+#  _bp('', 'TEST');
+#  return $html->tpl_show(_include('cablecat_commutation_width', 'Cablecat'));
+  
+  my %TEMPLATE_ARGS = ();
+  my $show_add_form = $FORM{add_form} || 0;
+
+  # Handling AJAX requests
+  if ( $FORM{commutation} ) {
+    return &cablecat_commutation_ajax;
+  }
+  
+  if ($FORM{submit}){
+    if ($FORM{add_cable} && $FORM{CABLE_IDS}){
+      my $info = $Cablecat->commutations_info($FORM{COMMUTATION_ID});
+      my $current_cable_ids = [ split(',\s?', $info->{CABLE_IDS}) ];
+      
+      foreach my $cable_id (split(',\s?', $FORM{CABLE_IDS})) {
+        
+        # Already exists
+        next if (in_array($cable_id, $current_cable_ids));
+        
+        $Cablecat->commutation_cables_add({
+          CABLE_ID       => $cable_id,
+          CONNECTER_ID   => $FORM{CONNECTER_ID},
+          COMMUTATION_ID => $FORM{COMMUTATION_ID}
+        });
+        
+        show_result($Cablecat, $lang{ADDED});
+      }
+    }
+  }
+  
+  if ($FORM{operation} && $FORM{COMMUTATION_ID}) {
+  
+    my $info = $Cablecat->commutations_info($FORM{COMMUTATION_ID});
+  
+    if ( $FORM{operation} eq 'LIST_CABLES' && $FORM{WELL_ID} ) {
+      my $cables_inputs = _cablecat_well_cables_checkbox_form(
+        $FORM{WELL_ID},
+        {
+          SKIP => [ split(',\s?', $info->{CABLE_IDS}) ]
+        }
+      );
+    
+      $html->tpl_show(_include('cablecat_commutation_cable_add_modal', 'Cablecat'), {
+          CABLES_CHECKBOXES => join($FORM{json} ? ', ' : '', @{$cables_inputs}),
+          SUBMIT_BTN_NAME   => $lang{ADD},
+          SUBMIT_BTN_ACTION => 'change',
+          %FORM
+        }
+      );
+    }
+    elsif ( $FORM{operation} eq 'DELETE_CABLE' && $FORM{CABLE_ID} ) {
+    
+      $Cablecat->commutation_cables_del({ }, {
+          commutation_id => $FORM{COMMUTATION_ID},
+          connecter_id   => $FORM{CONNECTER_ID},
+          cable_id       => $FORM{CABLE_ID}
+        });
+    
+      show_result($Cablecat, $lang{CHANGED});
+    }
+    elsif ( $FORM{operation} eq 'CLEAR_COMMUTATION' ) {
+      $Cablecat->commutation_links_del({ }, {
+          COMMUTATION_ID => $FORM{COMMUTATION_ID},
+        });
+      show_result($Cablecat, "$lang{DELETED} $lang{ALL}");
+    }
+    else {
+      print "Wrong params";
+    }
+    return 1;
+  }
+  
+  if ( $FORM{ID} ) {
+    my $tp_info = $Cablecat->commutations_info($FORM{ID});
+    if ( !_error_show($Cablecat) ) {
+      %TEMPLATE_ARGS = %{$tp_info};
+      $show_add_form = 1;
+    }
+  }
+
+  return 1 if ($FORM{MESSAGE_ONLY});
+
+  my $cable_ids = $TEMPLATE_ARGS{CABLE_IDS} || $FORM{CABLE_IDS};
+
+  if ($show_add_form && $cable_ids) {
+    my @cable_ids = split(/, ?/, $cable_ids);
+    my @cable_hashes = grep { $_ ne '0' } map { _cablecat_commutation_cable_to_hash_ref($_) } @cable_ids;
+
+    if (defined $TEMPLATE_ARGS{ID}) {
+      
+      my $table = $html->table( {
+        width       => '100%',
+        caption     => '',
+        title_plain => [ '#', $lang{WELL}, $lang{CONNECTER}, $lang{ADDRESS}, $lang{CREATED} ],
+        qs          => $pages_qs,
+        ID          => 'CABLECAT_COMMUTATION_INFO_ID',
+      } );
+      
+      if ($TEMPLATE_ARGS{WELL_ID}){
+          $TEMPLATE_ARGS{ADDRESS} = _cablecat_address_for_well_id($TEMPLATE_ARGS{WELL_ID});
+      }
+      
+      $table->addrow(
+        $TEMPLATE_ARGS{ID},
+        _cablecat_result_former_named_chg_link_filter($TEMPLATE_ARGS{WELL}, {
+            VALUES => {
+              FUNCTION   => 'cablecat_wells',
+              PARAM_NAME => 'WELL_ID',
+              WELL_ID    => $TEMPLATE_ARGS{WELL_ID}
+            }
+          }),
+        _cablecat_result_former_named_chg_link_filter($TEMPLATE_ARGS{CONNECTER}, {
+            VALUES => {
+              FUNCTION     => 'cablecat_connecters',
+              PARAM_NAME   => 'CONNECTER_ID',
+              CONNECTER_ID => $TEMPLATE_ARGS{CONNECTER_ID}
+            }
+          }),
+        $TEMPLATE_ARGS{ADDRESS} || '',
+        $TEMPLATE_ARGS{CREATED} || '!',
+      );
+      
+      $TEMPLATE_ARGS{INFO_TABLE} = $table->show();
+      
+      my $links_list = $Cablecat->commutation_links_list({
+        CABLE_IDS        => \@cable_ids,
+        SHOW_ALL_COLUMNS => 1,
+        COLS_UPPER       => 0,
+        PAGE_ROWS        => 500000
+      });
+      _error_show($Cablecat);
+      
+      $TEMPLATE_ARGS{LINKS} = to_json($links_list);
+    }
+    
+    $TEMPLATE_ARGS{CABLES} = join(';', to_json(\@cable_hashes));
+
+    $html->tpl_show(_include('cablecat_commutation', 'Cablecat'), \%TEMPLATE_ARGS);
+  }
+
+  return 1;
+}
+
+#**********************************************************
+
+=head2 cablecat_commutation_ajax()
+
+=cut
+
+#**********************************************************
+sub cablecat_commutation_ajax {
+  return unless $FORM{commutation};
+
+  # Add link
+  if ($FORM{add}) {
+    my $link_num = $Cablecat->commutation_links_add(\%FORM);
+    show_result($Cablecat, $lang{ADDED}, '', { ID => $link_num });
+  }
+  
+  if ($FORM{del}) {
+    $Cablecat->commutation_links_del({ ID => $FORM{del} });
+    show_result($Cablecat, $lang{DEL});
+  }
+  
+  if ($FORM{change}) {
+    $Cablecat->commutation_links_change({%FORM, ID => $FORM{change} });
+    show_result($Cablecat, $lang{CHANGED});
+  }
+  
+
+  return 1;
+}
+
+#**********************************************************
+=head2 cablecat_cables()
+
+=cut
+#**********************************************************
+sub cablecat_cables {
+  my %TEMPLATE_ARGS = ();
+  my $show_add_form = $FORM{add_form} || 0;
+  
+  my $sub_create_cable_point = sub {
+    my $cable_id = shift;
+    my $new_external_object_id = maps_add_external_object($MAP_TYPE_ID{CABLE}, \%FORM);
+    $Cablecat->cables_change({ ID => $cable_id, POINT_ID => $new_external_object_id });
+    _error_show($Cablecat);
+    
+    # Return
+    $new_external_object_id;
+  };
+  
+  if ( $FORM{add} ) {
+    $FORM{NAME} ||= do {
+      $lang{CABLE} . '_' . ($Cablecat->connecters_count() + 1);
+    };
+    my $new_cable_id = $Cablecat->cables_add({ %FORM });
+    
+    if ( !_error_show($Cablecat) ) {
+        my $new_external_object_id = $sub_create_cable_point->($new_cable_id);
+      
+        my $preview_btn =  $html->button("$lang{OPEN}", "index=$index&chg=$new_cable_id" , {BUTTON => 1});
+        my $add_more_button = $html->button($lang{VIEW}, "index=$index&add_form=1" , {BUTTON => 1});
+        $html->message('info', "$lang{ADDED} $lang{CABLE}", $preview_btn . $add_more_button, { ID => $new_external_object_id });
+    }
+    else {
+      $show_add_form = 1;
+    };
+  }
+  elsif ( $FORM{change} ) {
+    $Cablecat->cables_change({ %FORM });
+    show_result($Cablecat, $lang{CHANGED});
+  }
+  elsif ( $FORM{chg} ) {
+    if ($FORM{CREATE_OBJECT}){
+      $sub_create_cable_point->($FORM{chg});
+    }
+    
+    my $tp_info = $Cablecat->cables_info($FORM{chg});
+    
+    if ( !_error_show($Cablecat) ) {
+      %TEMPLATE_ARGS = %{$tp_info};
+      $show_add_form = 1;
+      
+    }
+  }
+  elsif ( $FORM{del} ) {
+    $Cablecat->cables_del({ ID => $FORM{del} });
+    show_result($Cablecat, $lang{DELETED});
+  }
+  
+  return 1 if ($FORM{MESSAGE_ONLY});
+  
+  if ( $show_add_form ) {
+    $TEMPLATE_ARGS{WELL_1_SELECT} = _cablecat_wells_select({ SELECTED => $TEMPLATE_ARGS{WELL_1_ID}, NAME => 'WELL_1' });
+    $TEMPLATE_ARGS{WELL_2_SELECT} = _cablecat_wells_select({ SELECTED => $TEMPLATE_ARGS{WELL_2_ID}, NAME => 'WELL_2' });
+    $TEMPLATE_ARGS{NAME} ||= do {
+      $lang{CABLE} . '_' . ($Cablecat->cables_count() + 1);
+    };
+    
+    $TEMPLATE_ARGS{OBJECT_INFO} = cablecat_make_point_info($TEMPLATE_ARGS{POINT_ID});
+  
+    $html->tpl_show(
+      _include('cablecat_cable', 'Cablecat'),
+      {
+        %TEMPLATE_ARGS,
+        CABLE_TYPE_SELECT => _cablecat_cable_type_select({ SELECTED => $TEMPLATE_ARGS{TYPE_ID}, NAME => 'TYPE_ID' }),
+        SUBMIT_BTN_ACTION => ($FORM{chg}) ? 'change' : 'add',
+        SUBMIT_BTN_NAME   => ($FORM{chg}) ? $lang{CHANGE} : $lang{ADD},
+      }
+    );
+  }
+  
+  return 1 if ($FORM{TEMPLATE_ONLY});
+  
+  if ($TEMPLATE_ARGS{ID}) {
+    print cablecat_cable_links_table($TEMPLATE_ARGS{ID});
+  }
+  
+  my Abills::HTML $table;
+  ($table) = result_former(
+    {
+      INPUT_DATA      => $Cablecat,
+      FUNCTION        => 'cables_list',
+      BASE_FIELDS     => 0,
+      DEFAULT_FIELDS  => 'ID,NAME,CABLE_TYPE,COMMENTS, CREATED',
+      FUNCTION_FIELDS => 'change,del',
+      SKIP_USER_TITLE => 1,
+      EXT_FIELDS      => 0,
+      EXT_TITLES      => {
+        id         => '#',
+        name       => $lang{NAME},
+        cable_type => $lang{CABLE_TYPE},
+        comments   => $lang{COMMENTS},
+        created    => $lang{CREATED}
+      },
+      FILTER_COLS     => {
+        
+        #        type_name => '_translate',
+      },
+      TABLE           => {
+        width   => '100%',
+        caption => $lang{CABLES},
+        ID      => 'CABLES_TABLE',
+        EXPORT  => 1,
+        MENU    => "$lang{ADD}:index=$index&add_form=1:add"
+      },
+      MAKE_ROWS       => 1,
+      SEARCH_FORMER   => 1,
+      MODULE          => 'Cablecat',
+    }
+  );
+  
+  print $table->show();
+  
+  return 1;
+}
+
+#**********************************************************
+
+=head2 cablecat_cable_types()
+
+=cut
+
+#**********************************************************
+sub cablecat_cable_types {
+  my %TEMPLATE_TYPE = ();
+  my $show_add_form = $FORM{add_form} || 0;
+
+  if ($FORM{add}) {
+    $Cablecat->cable_types_add({%FORM});
+    $show_add_form = !show_result($Cablecat, $lang{ADDED});
+  }
+  elsif ($FORM{change}) {
+    $Cablecat->cable_types_change({%FORM});
+    show_result($Cablecat, $lang{CHANGED});
+
+    # Return to chg with new values
+    %TEMPLATE_TYPE = %FORM;
+    $FORM{chg} = 1;
+
+    $show_add_form = 1;
+  }
+  elsif ($FORM{chg}) {
+    my $tp_info = $Cablecat->cable_types_info($FORM{chg});
+    if (!_error_show($Cablecat)) {
+      %TEMPLATE_TYPE = %{$tp_info};
+      $show_add_form = 1;
+    }
+  }
+  elsif ($FORM{del}) {
+    $Cablecat->cable_types_del({ ID => $FORM{del} });
+    show_result($Cablecat, $lang{DELETED});
+  }
+
+  if ($show_add_form) {
+    my $fibers_colors_select = _cablecat_color_scheme_select({ SELECTED => $TEMPLATE_TYPE{COLOR_SCHEME_ID} });
+    my $modules_colors_select = _cablecat_color_scheme_select(
+      {
+        NAME     => 'MODULES_COLOR_SCHEME_ID',
+        SELECTED => $TEMPLATE_TYPE{MODULES_COLOR_SCHEME_ID}
+      }
+    );
+
+    $TEMPLATE_TYPE{OUTER_COLOR} //= '#000000';
+    
+    $html->tpl_show(
+      _include('cablecat_cable_type', 'Cablecat'),
+      {
+        %TEMPLATE_TYPE,
+        COLOR_SCHEME_ID_SELECT         => $fibers_colors_select,
+        MODULES_COLOR_SCHEME_ID_SELECT => $modules_colors_select,
+        SUBMIT_BTN_ACTION              => ($FORM{chg}) ? 'change' : 'add',
+        SUBMIT_BTN_NAME                => ($FORM{chg}) ? $lang{CHANGE} : $lang{ADD},
+      }
+    );
+  }
+
+  my Abills::HTML $table; ($table) = result_former(
+    {
+      INPUT_DATA      => $Cablecat,
+      FUNCTION        => 'cable_types_list',
+      BASE_FIELDS     => 0,
+      DEFAULT_FIELDS  => 'ID,NAME,COLOR_SCHEME,COMMENTS',
+      FUNCTION_FIELDS => 'change,del',
+      SKIP_USER_TITLE => 1,
+      EXT_FIELDS      => 0,
+      EXT_TITLES      => {
+        id           => '#',
+        name         => $lang{NAME},
+        color_scheme => $lang{COLOR_SCHEME},
+        comments     => $lang{COMMENTS},
+      },
+#      FILTER_COLS => {
+#
+#        #        type_name => '_translate',
+#      },
+      TABLE => {
+        width   => '100%',
+        caption => $lang{CABLE_TYPES},
+        ID      => 'CABLE_TYPES_TABLE',
+        EXPORT  => 1,
+        MENU    => "$lang{ADD}:index=$index&add_form=1:add"
+      },
+      MAKE_ROWS     => 1,
+      SEARCH_FORMER => 1,
+      MODULE        => 'Cablecat',
+    }
+  );
+
+  print $table->show();
+
+  return 1;
+}
+
+#**********************************************************
+
+=head2 cablecat_color_schemes()
+
+=cut
+
+#**********************************************************
+sub cablecat_color_schemes {
+  my %TEMPLATE_SCHEME = ();
+  my $show_add_form = $FORM{add_form} || 0;
+
+  if ($FORM{add}) {
+    $Cablecat->color_schemes_add({%FORM});
+    $show_add_form = !show_result($Cablecat, $lang{ADDED});
+  }
+  elsif ($FORM{change}) {
+    $Cablecat->color_schemes_change({%FORM});
+    show_result($Cablecat, $lang{CHANGED});
+
+    # Return to chg with new values
+    %TEMPLATE_SCHEME = %FORM;
+    $FORM{chg} = 1;
+
+    $show_add_form = 1;
+  }
+  elsif ($FORM{chg}) {
+    my $tp_info = $Cablecat->color_schemes_info($FORM{chg});
+    if (!_error_show($Cablecat)) {
+      %TEMPLATE_SCHEME = %{$tp_info};
+      $show_add_form   = 1;
+    }
+  }
+  elsif ($FORM{del}) {
+    $Cablecat->color_schemes_del({ ID => $FORM{del} });
+    show_result($Cablecat, $lang{DELETED});
+  }
+
+  if ($show_add_form) {
+
+    $html->tpl_show(
+      _include('cablecat_color_scheme', 'Cablecat'),
+      {
+        %TEMPLATE_SCHEME,
+        %FORM,
+        CABLECAT_COLORS => join(',', map { ($_, $_ . '+') } @CABLECAT_COLORS),
+        SUBMIT_BTN_ACTION => ($FORM{chg}) ? 'change'      : 'add',
+        SUBMIT_BTN_NAME   => ($FORM{chg}) ? $lang{CHANGE} : $lang{ADD},
+      }
+    );
+  }
+
+  my Abills::HTML $table; ($table) = result_former(
+    {
+      INPUT_DATA      => $Cablecat,
+      FUNCTION        => 'color_schemes_list',
+      BASE_FIELDS     => 0,
+      DEFAULT_FIELDS  => 'ID,NAME,COLORS',
+      FUNCTION_FIELDS => 'cablecat_color_schemes:$lang{COPY}:colors:&add_form=1,' . 'change,del',
+      SKIP_USER_TITLE => 1,
+      EXT_FIELDS      => 0,
+      EXT_TITLES      => {
+        id     => '#',
+        name   => $lang{NAME},
+        colors => $lang{COLOR_SCHEME},
+      },
+      FILTER_COLS => { colors => '_cablecat_result_former_color_scheme_filter' },
+      TABLE       => {
+        width   => '100%',
+        caption => $lang{COLOR_SCHEMES},
+        ID      => 'COLOR_SCHEMES_TABLE',
+        EXPORT  => 1,
+        MENU    => "$lang{ADD}:index=$index&add_form=1:add"
+      },
+      MAKE_ROWS     => 1,
+      SEARCH_FORMER => 1,
+      MODULE        => 'Cablecat',
+    }
+  );
+
+  print $table->show();
+
+  return 1;
+}
+
+#**********************************************************
+
+=head2 cablecat_wells()
+
+=cut
+
+#**********************************************************
+sub cablecat_wells {
+  my %TEMPLATE_ARGS = ();
+  my $show_add_form = $FORM{add_form} || 0;
+
+  if ($FORM{add}) {
+    my $new_point_id = maps_add_external_object($MAP_TYPE_ID{WELL}, \%FORM);
+    show_result($Maps, $lang{ADDED} . ' ' . $lang{OBJECT});
+    $FORM{POINT_ID} = $new_point_id;
+
+    my $inserted_well_id = $Cablecat->wells_add(\%FORM);
+    _error_show($Cablecat);
+    if ($inserted_well_id && $FORM{INSERT_ON_CABLE}){
+      my $result = _cablecat_break_cable_in_two_parts($FORM{INSERT_ON_CABLE}, $inserted_well_id);
+      if ($result ne '1'){
+        $html->message('err', $lang{ERROR}, $result);
+        return 0;
+      }
+    }
+    $show_add_form = !show_result($Cablecat, $lang{ADDED}, $lang{WELL});
+  }
+  elsif ($FORM{change}) {
+    $Cablecat->wells_change({%FORM});
+    
+    # Update underlying object
+    if ($FORM{POINT_ID} && $FORM{POINT_ID} ne '0'){
+      $Maps->points_change({ %FORM,  ID => $FORM{POINT_ID} });
+    }
+    
+    show_result($Cablecat, $lang{CHANGED});
+  }
+  elsif ($FORM{chg}) {
+    my $tp_info = $Cablecat->wells_info($FORM{chg});
+    if (!_error_show($Cablecat)) {
+      %TEMPLATE_ARGS = %{$tp_info};
+      $show_add_form = 1;
+      
+      $TEMPLATE_ARGS{LINKED} = _cablecat_well_cable_links($TEMPLATE_ARGS{ID}) || '';
+      $TEMPLATE_ARGS{HAS_LINKED} = $TEMPLATE_ARGS{LINKED} ne '';
+
+      $TEMPLATE_ARGS{CONNECTERS} = _cablecat_well_connecters($TEMPLATE_ARGS{ID});
+      $TEMPLATE_ARGS{CONNECTERS_VISIBLE} = $TEMPLATE_ARGS{CONNECTERS} ne '';
+  
+      $TEMPLATE_ARGS{ADD_OBJECT_VISIBLE} = '0';
+  
+      if (defined $TEMPLATE_ARGS{POINT_ID}){
+        $TEMPLATE_ARGS{OBJECT_INFO} = cablecat_make_point_info($TEMPLATE_ARGS{POINT_ID});
+      }
+    }
+  }
+  elsif ($FORM{del}) {
+    $Cablecat->wells_del({ ID => $FORM{del} });
+    show_result($Cablecat, $lang{DELETED});
+  }
+
+  return 1 if ($FORM{MESSAGE_ONLY});
+  
+  if ($show_add_form) {
+    $TEMPLATE_ARGS{POINT_ID_SELECT} = _cablecat_point_id_select(
+      {
+        SELECTED => $TEMPLATE_ARGS{POINT_ID},
+        ENTITY   => 'WELL'
+      }
+    );
+    $TEMPLATE_ARGS{PARENT_ID_SELECT} = _cablecat_wells_select(
+      {
+        SELECTED => $TEMPLATE_ARGS{PARENT_ID},
+        NAME     => 'PARENT_ID'
+      }
+    );
+    $TEMPLATE_ARGS{TYPE_ID_SELECT} = _cablecat_well_types_select(
+      {
+        SELECTED => $TEMPLATE_ARGS{TYPE_ID},
+        NAME     => 'TYPE_ID'
+      }
+    );
+    $TEMPLATE_ARGS{NAME} ||= do {
+      $lang{WELL} . '_' . ($Cablecat->wells_count() + 1);
+    };
+    
+    # Maps related
+    if ($FORM{INSERT_ON_CABLE}){
+      $TEMPLATE_ARGS{EXTRA_INPUTS} = $html->form_input('INSERT_ON_CABLE', $FORM{INSERT_ON_CABLE}, { TYPE => 'hidden' });
+    }
+  
+    $TEMPLATE_ARGS{ADD_OBJECT_VISIBLE} //= 1;
+    
+    $html->tpl_show(
+      _include('cablecat_well', 'Cablecat'),
+      {
+        %TEMPLATE_ARGS,
+        %FORM,
+        CONNECTERS_VISIBLE => !$FORM{TEMPLATE_ONLY} && $TEMPLATE_ARGS{CONNECTERS_VISIBLE},
+        MAIN_FORM_SIZE     => $FORM{TEMPLATE_ONLY} ? 'col-md-12' : 'col-md-6',
+        SUBMIT_BTN_ACTION  => ($FORM{chg}) ? 'change' : 'add',
+        SUBMIT_BTN_NAME    => ($FORM{chg}) ? $lang{CHANGE} : $lang{ADD},
+      }
+    );
+  
+    if ( $TEMPLATE_ARGS{ID} ) {
+      load_module('Info', $html);
+      info_comments_show('cablecat_wells', $TEMPLATE_ARGS{ID});
+    }
+  }
+  
+  return 1 if ($FORM{TEMPLATE_ONLY});
+
+  my Abills::HTML $table; ($table) = result_former(
+    {
+      INPUT_DATA      => $Cablecat,
+      FUNCTION        => 'wells_list',
+      BASE_FIELDS     => 0,
+      DEFAULT_FIELDS  => 'ID,NAME,TYPE,INSTALLED,PLANNED,POINT_ID,PARENT_ID',
+      FUNCTION_FIELDS => 'change,del',
+      SKIP_USER_TITLE => 1,
+      EXT_FIELDS      => 0,
+      EXT_TITLES      => {
+        id        => '#',
+        name      => $lang{NAME},
+        type      => $lang{TYPE},
+        installed => $lang{INSTALLED},
+        planned   => $lang{PLANNED},
+        point_id  => $lang{LOCATION},
+        parent_id => "$lang{PARENT_M} $lang{WELL}"
+      },
+      FILTER_COLS => {
+        point_id  => '_cablecat_result_former_point_id_filter:' . $MAP_LAYER_ID{WELL},
+        parent_id => '_cablecat_result_former_parent_id_filter',
+        type      => '_translate',
+      },
+      TABLE => {
+        width   => '100%',
+        caption => $lang{WELLS},
+        ID      => 'WELLS_TABLE',
+        EXPORT  => 1,
+        MENU    => "$lang{ADD}:index=$index&add_form=1:add"
+      },
+      MAKE_ROWS     => 1,
+      SEARCH_FORMER => 1,
+      MODULE        => 'Cablecat',
+    }
+  );
+
+  print $table->show();
+
+  return 1;
+}
+
+#**********************************************************
+=head2 cablecat_well_types()
+
+=cut
+#**********************************************************
+sub cablecat_well_types {
+  my %TEMPLATE_ARGS = ();
+  my $show_add_form = $FORM{add_form} || 0;
+  
+  if ( $FORM{add} ) {
+    $Cablecat->well_types_add({ %FORM });
+    $show_add_form = show_result($Cablecat, $lang{ADDED});
+  }
+  elsif ( $FORM{change} ) {
+    $Cablecat->well_types_change({ %FORM });
+    show_result($Cablecat, $lang{CHANGED});
+    $show_add_form = 1;
+  }
+  elsif ( $FORM{chg} ) {
+    my $tp_info = $Cablecat->well_types_info($FORM{chg});
+    if ( !_error_show($Cablecat) ) {
+      %TEMPLATE_ARGS = %{$tp_info};
+      $show_add_form = 1;
+    }
+  }
+  elsif ( $FORM{del} && $FORM{COMMENTS} ) {
+    $Cablecat->well_types_del({ ID => $FORM{del}, COMMENTS => $FORM{COMMENTS} });
+    show_result($Cablecat, $lang{DELETED});
+  }
+  
+  if ( $show_add_form ) {
+    
+    $TEMPLATE_ARGS{ICON_SELECT} = _maps_icon_filename_select({NAME => 'ICON', NO_EXTENSION => 1});
+    
+    $html->tpl_show(
+      _include('cablecat_well_types', 'Cablecat'),
+      {
+        %TEMPLATE_ARGS,
+        %FORM,
+        SUBMIT_BTN_ACTION => ($FORM{chg}) ? 'change' : 'add',
+        SUBMIT_BTN_NAME   => ($FORM{chg}) ? $lang{CHANGE} : $lang{ADD},
+      }
+    );
+  }
+  
+  my Abills::HTML $table; ($table) = result_former(
+    {
+      INPUT_DATA      => $Cablecat,
+      FUNCTION        => 'well_types_list',
+      BASE_FIELDS     => 0,
+      DEFAULT_FIELDS  => 'ID,NAME,ICON,COMMENTS',
+      FUNCTION_FIELDS => 'change,del',
+      SKIP_USER_TITLE => 1,
+      EXT_FIELDS      => 0,
+      EXT_TITLES      => {
+        id         => '#',
+        name       => $lang{NAME},
+        icon   => $lang{ICON},
+        comments => $lang{COMMENTS}
+      },
+      FILTER_COLS => {
+        icon    => '_cablecat_result_former_icon_filter',
+        name    => '_translate',
+      },
+      TABLE => {
+        width   => '100%',
+        caption => "$lang{WELL} $lang{TYPE}",
+        ID      => 'WELLS_TYPE_TABLE',
+        EXPORT  => 1,
+        MENU    => "$lang{ADD}:index=$index&add_form=1:add"
+      },
+      MAKE_ROWS     => 1,
+      SEARCH_FORMER => 1,
+      MODULE        => 'Cablecat',
+    }
+  );
+  
+  print $table->show();
+  
+  return 1;
+}
+
+#**********************************************************
+=head2 cablecat_connecter_types()
+
+=cut
+#**********************************************************
+sub cablecat_connecter_types {
+  my %TEMPLATE_ARGS = ();
+  my $show_add_form = $FORM{add_form} || 0;
+
+  if ($FORM{add}) {
+    $Cablecat->connecter_types_add({%FORM});
+    $show_add_form = !show_result($Cablecat, $lang{ADDED});
+  }
+  elsif ($FORM{change}) {
+    $Cablecat->connecter_types_change({%FORM});
+    show_result($Cablecat, $lang{CHANGED});
+    $show_add_form = 1;
+  }
+  elsif ($FORM{chg}) {
+    my $tp_info = $Cablecat->connecter_types_info($FORM{chg});
+    if (!_error_show($Cablecat)) {
+      %TEMPLATE_ARGS = %{$tp_info};
+      $show_add_form = 1;
+    }
+  }
+  elsif ($FORM{del}) {
+    $Cablecat->connecter_types_del({ ID => $FORM{del} });
+    show_result($Cablecat, $lang{DELETED});
+  }
+
+  if ($show_add_form) {
+    $html->tpl_show(
+      _include('cablecat_connecter_type', 'Cablecat'),
+      {
+        %TEMPLATE_ARGS,
+        SUBMIT_BTN_ACTION => ($FORM{chg}) ? 'change'      : 'add',
+        SUBMIT_BTN_NAME   => ($FORM{chg}) ? $lang{CHANGE} : $lang{ADD},
+      }
+    );
+  }
+
+  my Abills::HTML $table; ($table) = result_former(
+    {
+      INPUT_DATA      => $Cablecat,
+      FUNCTION        => 'connecter_types_list',
+      BASE_FIELDS     => 0,
+      DEFAULT_FIELDS  => 'ID,NAME,CARTRIDGES,COMMENTS',
+      FUNCTION_FIELDS => 'change,del',
+      SKIP_USER_TITLE => 1,
+      EXT_FIELDS      => 0,
+      EXT_TITLES      => {
+        id         => '#',
+        name       => $lang{NAME},
+        comments   => $lang{COMMENTS},
+        cartridges => $lang{CARTRIDGES}
+      },
+      FILTER_COLS => {
+
+        #        type_name => '_translate',
+      },
+      TABLE => {
+        width   => '100%',
+        caption => $lang{CONNECTER_TYPE},
+        ID      => 'CONNECTER_TYPE_TABLE',
+        EXPORT  => 1,
+        MENU    => "$lang{ADD}:index=$index&add_form=1:add"
+      },
+      MAKE_ROWS     => 1,
+      SEARCH_FORMER => 1,
+      MODULE        => 'Cablecat',
+    }
+  );
+
+  print $table->show();
+
+  return 1;
+}
+
+#**********************************************************
+
+=head2 cablecat_connecters()
+
+=cut
+
+#**********************************************************
+sub cablecat_connecters {
+  my %TEMPLATE_ARGS = ();
+  my $show_add_form = $FORM{add_form} || 0;
+
+  if ($FORM{add}) {
+    $FORM{NAME} ||= do {
+      $lang{CONNECTER} . '_' . ($Cablecat->connecters_next());
+    };
+    
+    my $new_point_id = maps_add_external_object($MAP_TYPE_ID{SPLITTER}, \%FORM);
+    show_result($Maps, $lang{ADDED} . ' ' . $lang{OBJECT});
+    $FORM{POINT_ID} = $new_point_id;
+    
+    $Cablecat->connecters_add({%FORM});
+    $show_add_form = !show_result($Cablecat, $lang{ADDED});
+  }
+  elsif ($FORM{change}) {
+    $Cablecat->connecters_change({%FORM});
+    show_result($Cablecat, $lang{CHANGED});
+    $show_add_form = 1;
+  }
+  elsif ($FORM{chg}) {
+    my $connecter = $Cablecat->connecters_info($FORM{chg});
+    if (!_error_show($Cablecat)) {
+      %TEMPLATE_ARGS = %{$connecter};
+      $show_add_form = 1;
+
+      if (defined $connecter->{well_id}) {
+
+        # Make commutation box visible
+        $TEMPLATE_ARGS{COMMUTATION_FORM} = _cablecat_connecter_commutation_list($connecter->{id}, $connecter->{well_id}) || '';
+        if ($TEMPLATE_ARGS{COMMUTATION_FORM} ne '') {
+          $TEMPLATE_ARGS{HAS_COMMUTATION_FORM} = 1;
+          $TEMPLATE_ARGS{CLASS_FOR_MAIN_FORM}  = 'col-md-6';
+        }
+
+        $TEMPLATE_ARGS{LINKED} = _cablecat_connecter_linked_connecters($TEMPLATE_ARGS{ID}) || '';
+        if ($TEMPLATE_ARGS{LINKED} ne '') {
+          $TEMPLATE_ARGS{HAS_LINKED}          = 1;
+          $TEMPLATE_ARGS{CLASS_FOR_MAIN_FORM} = 'col-md-6';
+        }
+
+      }
+  
+      if (defined $TEMPLATE_ARGS{POINT_ID}){
+        $TEMPLATE_ARGS{OBJECT_INFO} = cablecat_make_point_info($TEMPLATE_ARGS{POINT_ID});
+      }
+      
+    }
+  }
+  elsif ($FORM{del}) {
+    $Cablecat->connecters_del({ ID => $FORM{del} });
+    show_result($Cablecat, $lang{DELETED});
+  }
+  
+  return 1 if $FORM{MESSAGE_ONLY};
+
+  if ($show_add_form) {
+    $TEMPLATE_ARGS{CLASS_FOR_MAIN_FORM} //= 'col-md-6 col-md-offset-3';
+
+    $TEMPLATE_ARGS{TYPE_ID_SELECT} = _cablecat_connecter_type_select(
+      {
+        SELECTED => $TEMPLATE_ARGS{TYPE_ID},
+        REQUIRED => 1
+      }
+    );
+    $TEMPLATE_ARGS{WELL_ID_SELECT} = _cablecat_wells_select(
+      {
+        SELECTED => $TEMPLATE_ARGS{WELL_ID} || $FORM{WELL_ID},
+        NAME     => 'WELL_ID',
+        REQUIRED => 1
+      }
+    );
+    $TEMPLATE_ARGS{NAME} //= do {
+      $lang{CONNECTER} . '_' . ($Cablecat->connecters_next());
+    };
+    
+    $html->tpl_show(
+      _include('cablecat_connecter', 'Cablecat'),
+      {
+        %TEMPLATE_ARGS,
+        %FORM,
+        SUBMIT_BTN_ACTION => ($FORM{chg}) ? 'change'      : 'add',
+        SUBMIT_BTN_NAME   => ($FORM{chg}) ? $lang{CHANGE} : $lang{ADD},
+      }
+    );
+  
+    if ( $TEMPLATE_ARGS{ID} ) {
+      load_module('Info', $html);
+      info_documents_show('cablecat_connecters', $TEMPLATE_ARGS{ID});
+    }
+  }
+  
+  return 1 if ($FORM{TEMPLATE_ONLY});
+  
+  my Abills::HTML $table; ($table) = result_former(
+    {
+      INPUT_DATA      => $Cablecat,
+      FUNCTION        => 'connecters_list',
+      BASE_FIELDS     => 0,
+      DEFAULT_FIELDS  => 'ID,NAME,TYPE,INSTALLED,PLANNED,POINT_ID',
+      FUNCTION_FIELDS => 'change,del',
+      SKIP_USER_TITLE => 1,
+      EXT_FIELDS      => 0,
+      EXT_TITLES      => {
+        id        => '#',
+        name      => $lang{NAME},
+        type      => $lang{TYPE},
+        installed => $lang{INSTALLED},
+        planned   => $lang{PLANNED},
+        point_id  => $lang{LOCATION},
+      },
+      FILTER_COLS => {
+        point_id => '_cablecat_result_former_point_id_filter:' . $MAP_TYPE_ID{CONNECTER},
+
+        #        type_name => '_translate',
+      },
+      TABLE => {
+        width   => '100%',
+        caption => $lang{CONNECTERS},
+        ID      => 'CONNECTERS_TABLE',
+        EXPORT  => 1,
+        MENU    => "$lang{ADD}:index=$index&add_form=1:add"
+      },
+      MAKE_ROWS     => 1,
+      SEARCH_FORMER => 1,
+      MODULE        => 'Cablecat',
+    }
+  );
+
+  print $table->show();
+
+  return 1;
+}
+
+#**********************************************************
+=head2 cablecat_make_point_info()
+
+=cut
+#**********************************************************
+sub cablecat_make_point_info {
+  my ($point_id, $attr) = @_;
+  
+  if (!$point_id){
+  
+    if ($FORM{chg}){
+      # Return create object btn
+      return $html->button("$lang{CREATE} $lang{OBJECT}", "index=$index&chg=$FORM{chg}&CREATE_OBJECT=1" );
+    }
+    elsif($FORM{add_form}){
+      return $html->tpl_show(_include('cablecat_point', 'Cablecat'), {}, {OUTPUT2RETURN => 1});
+    }
+    
+    return 0;
+  }
+  
+  my $point_info = $Maps->points_info($point_id);
+  
+  if ($point_info->{COORD_ID}){
+    $point_info->{SHOW_MAP_BTN} = 1;
+    $point_info->{MAP_BTN} = maps_show_object_button($point_info->{LAYER_ID}, $point_info->{OBJECT_ID}, { NAME => $lang{SHOW}});
+  }
+  
+  if ($point_info->{LOCATION_ID}){
+    $point_info->{ADDRESS_NAME} = full_address_name($point_info->{LOCATION_ID});
+  }
+  
+  $point_info->{PLANNED_NAMED} = ($point_info->{PLANNED})
+    ? $lang{YES}
+    : $lang{NO};
+  
+  return $html->tpl_show(_include('cablecat_point_info_block', 'Cablecat'), $point_info, { OUTPUT2RETURN => 1 });
+}
+
+#**********************************************************
+
+=head2 cablecat_splitter_types()
+
+=cut
+
+#**********************************************************
+sub cablecat_splitter_types {
+  my %TEMPLATE_ARGS = ();
+  my $show_add_form = $FORM{add_form} || 0;
+
+  if ($FORM{add}) {
+    $Cablecat->splitter_types_add({%FORM});
+    $show_add_form = !show_result($Cablecat, $lang{ADDED});
+  }
+  elsif ($FORM{change}) {
+    $Cablecat->splitter_types_change({%FORM});
+    show_result($Cablecat, $lang{CHANGED});
+    $show_add_form = 1;
+  }
+  elsif ($FORM{chg}) {
+    my $tp_info = $Cablecat->splitter_types_info($FORM{chg});
+    if (!_error_show($Cablecat)) {
+      %TEMPLATE_ARGS = %{$tp_info};
+      $show_add_form = 1;
+    }
+  }
+  elsif ($FORM{del}) {
+    $Cablecat->splitter_types_del({ ID => $FORM{del} });
+    show_result($Cablecat, $lang{DELETED});
+  }
+
+  if ($show_add_form) {
+
+    $html->tpl_show(
+      _include('cablecat_splitter_type', 'Cablecat'),
+      {
+        %TEMPLATE_ARGS,
+        %FORM,
+        SUBMIT_BTN_ACTION => ($FORM{chg}) ? 'change'      : 'add',
+        SUBMIT_BTN_NAME   => ($FORM{chg}) ? $lang{CHANGE} : $lang{ADD},
+      }
+    );
+  }
+
+  my Abills::HTML $table; ($table) = result_former(
+    {
+      INPUT_DATA      => $Cablecat,
+      FUNCTION        => 'splitter_types_list',
+      BASE_FIELDS     => 0,
+      DEFAULT_FIELDS  => 'ID,NAME,FIBERS_IN,FIBERS_OUT',
+      FUNCTION_FIELDS => 'change,del',
+      SKIP_USER_TITLE => 1,
+      EXT_FIELDS      => 0,
+      EXT_TITLES      => {
+        id         => '#',
+        name       => $lang{NAME},
+        fibers_in  => $lang{FIBERS_IN},
+        fibers_out => $lang{FIBERS_OUT},
+      },
+      FILTER_COLS => {
+
+        #        type_name => '_translate',
+      },
+      TABLE => {
+        width   => '100%',
+        caption => $lang{SPLITTER_TYPES},
+        ID      => 'SPLITTER_TYPE_TABLE',
+        EXPORT  => 1,
+        MENU    => "$lang{ADD}:index=$index&add_form=1:add"
+      },
+      MAKE_ROWS     => 1,
+      SEARCH_FORMER => 1,
+      MODULE        => 'Cablecat',
+    }
+  );
+
+  print $table->show();
+
+  return 1;
+}
+
+#**********************************************************
+
+=head2 cablecat_splitters()
+
+=cut
+
+#**********************************************************
+sub cablecat_splitters {
+  my %TEMPLATE_ARGS = ();
+  my $show_add_form = $FORM{add_form} || 0;
+
+  if ($FORM{add}) {
+    my $new_point_id = maps_add_external_object($MAP_TYPE_ID{SPLITTER}, \%FORM);
+    show_result($Maps, $lang{ADDED} . ' ' . $lang{OBJECT});
+    $FORM{POINT_ID} = $new_point_id;
+    
+    $Cablecat->splitters_add({%FORM});
+    $show_add_form = !show_result($Cablecat, $lang{ADDED});
+  }
+  elsif ($FORM{change}) {
+    $Cablecat->splitters_change({%FORM});
+    show_result($Cablecat, $lang{CHANGED});
+    $show_add_form = 1;
+  }
+  elsif ($FORM{chg}) {
+    my $tp_info = $Cablecat->splitters_info($FORM{chg});
+    if (!_error_show($Cablecat)) {
+      %TEMPLATE_ARGS = %{$tp_info};
+      $show_add_form = 1;
+  
+      if (defined $TEMPLATE_ARGS{POINT_ID}){
+        $TEMPLATE_ARGS{OBJECT_INFO} = cablecat_make_point_info($TEMPLATE_ARGS{POINT_ID});
+      }
+    }
+  }
+  elsif ($FORM{del}) {
+    $Cablecat->splitters_del({ ID => $FORM{del} });
+    show_result($Cablecat, $lang{DELETED});
+  }
+
+  if ($show_add_form) {
+    $TEMPLATE_ARGS{TYPE_ID_SELECT} = _cablecat_splitter_types_select(
+      {
+        SELECTED => $TEMPLATE_ARGS{TYPE_ID},
+        NAME     => 'TYPE_ID'
+      }
+    );
+    $TEMPLATE_ARGS{WELL_ID_SELECT} = _cablecat_wells_select(
+      {
+        SELECTED => $TEMPLATE_ARGS{WELL_ID},
+        NAME     => 'WELL_ID'
+      }
+    );
+
+    $html->tpl_show(
+      _include('cablecat_splitter', 'Cablecat'),
+      {
+        %TEMPLATE_ARGS,
+        %FORM,
+        SUBMIT_BTN_ACTION => ($FORM{chg}) ? 'change'      : 'add',
+        SUBMIT_BTN_NAME   => ($FORM{chg}) ? $lang{CHANGE} : $lang{ADD},
+      }
+    );
+  }
+
+  my Abills::HTML $table; ($table) = result_former(
+    {
+      INPUT_DATA      => $Cablecat,
+      FUNCTION        => 'splitters_list',
+      BASE_FIELDS     => 0,
+      DEFAULT_FIELDS  => 'ID,TYPE,INSTALLED,PLANNED,POINT_ID',
+      FUNCTION_FIELDS => 'change,del',
+      SKIP_USER_TITLE => 1,
+      EXT_FIELDS      => 0,
+      EXT_TITLES      => {
+        id        => '#',
+        type      => $lang{TYPE},
+        installed => $lang{INSTALLED},
+        planned   => $lang{PLANNED},
+        point_id  => $lang{LOCATION},
+      },
+      FILTER_COLS => {
+        point_id => '_cablecat_result_former_point_id_filter:' . $MAP_TYPE_ID{SPLITTER},
+
+        #        type_name => '_translate',
+      },
+      TABLE => {
+        width   => '100%',
+        caption => $lang{SPLITTERS},
+        ID      => 'SPLITTERS_TABLE',
+        EXPORT  => 1,
+        MENU    => "$lang{ADD}:index=$index&add_form=1:add"
+      },
+      MAKE_ROWS     => 1,
+      SEARCH_FORMER => 1,
+      MODULE        => 'Cablecat',
+    }
+  );
+
+  print $table->show();
+
+  return 1;
+}
+
+#**********************************************************
+=head2 cablecat_commutations()
+
+=cut
+#**********************************************************
+sub cablecat_commutations {
+  my $show_add_form = $FORM{add_form} || 0;
+  
+  if ($FORM{add}) {
+    $Cablecat->commutations_add({%FORM});
+    $show_add_form = show_result($Cablecat, $lang{ADDED});
+  }
+  elsif ($FORM{change}) {
+    $Cablecat->commutations_change({%FORM});
+    show_result($Cablecat, $lang{CHANGED});
+    $show_add_form = 1;
+  }
+  elsif ($FORM{chg}) {
+    
+    # Redirect to scheme page
+    
+    my $commutation_preview_index = get_function_index('cablecat_commutation');
+    $index = $commutation_preview_index;
+    return cablecat_commutation();
+  }
+  elsif ($FORM{del}) {
+    $Cablecat->commutations_del({ ID => $FORM{del} });
+    show_result($Cablecat, $lang{DELETED});
+  }
+  
+  if ($show_add_form){
+    
+  }
+  
+  my Abills::HTML $table; ($table) = result_former(
+    {
+      INPUT_DATA      => $Cablecat,
+      FUNCTION        => 'commutations_list',
+      BASE_FIELDS     => 0,
+      DEFAULT_FIELDS  => 'ID,CREATED,CONNECTER,CABLES,WELL',
+      HIDDEN_FIELDS   => 'CONNECTER_ID,CABLE_IDS,WELL_ID',
+      FUNCTION_FIELDS => 'cablecat_commutation:change:id:,del',
+      SKIP_USER_TITLE => 1,
+      EXT_FIELDS      => 0,
+      EXT_TITLES      => {
+        id        => '#',
+        cables    => $lang{CABLES},
+        created   => $lang{CREATED},
+        connecter => $lang{CONNECTER},
+        well      => $lang{WELL},
+        type      => $lang{TYPE},
+        planned   => $lang{PLANNED},
+        point_id  => $lang{LOCATION},
+      },
+      FILTER_COLS => {
+#        connecter => '_cablecat_result_former_point_id_filter:' . $MAP_TYPE_ID{SPLITTER},
+        connecter => '_cablecat_result_former_named_chg_link_filter::PARAM_NAME=connecter_id,FUNCTION=cablecat_connecters,CONNECTER_ID',
+        cables => '_cablecat_result_former_named_chg_link_filter::PARAM_NAME=cable_ids,FUNCTION=cablecat_cables,CABLE_IDS',
+        well => '_cablecat_result_former_named_chg_link_filter::PARAM_NAME=well_id,FUNCTION=cablecat_wells,WELL_ID',
+        
+        #        type_name => '_translate',
+      },
+      TABLE => {
+        width   => '100%',
+        caption => $lang{COMMUTATIONS},
+        ID      => 'COMMUTATIONS_TABLE',
+        EXPORT  => 1,
+        MENU    => "$lang{ADD}:index=$index&add_form=1:add"
+      },
+      MAKE_ROWS     => 1,
+      SEARCH_FORMER => 1,
+      MODULE        => 'Cablecat',
+    }
+  );
+  
+  print $table->show();
+  
+  return 1;
+  
+}
+
+#**********************************************************
+=head2 cablecat_maps_layers()
+
+=cut
+#**********************************************************
+sub cablecat_maps_layers {
+  return {
+    LAYERS      => [
+      {
+        id            => 10,
+        name          => 'CABLES',
+        lang_name     => $lang{CABLES},
+        module        => 'Cablecat',
+        structure     => 'POLYLINE',
+        clustering    => 0,
+        add_func      => 'cablecat_cables',
+        custom_params => { OBJECT_TYPE_ID => $MAP_TYPE_ID{CABLE}, SAVE_AS_GEOMETRY => 1 }
+      }, {
+        id            => 11,
+        name          => 'WELLS',
+        lang_name     => $lang{WELLS},
+        module        => 'Cablecat',
+        structure     => 'MARKER',
+        clustering    => 1,
+        add_func      => 'cablecat_wells',
+        custom_params => { OBJECT_TYPE_ID => $MAP_TYPE_ID{WELL} }
+      }
+    ],
+    SCRIPTS => ['/styles/default_adm/js/maps/modules/cablecat.js'],
+    EXPORT_FUNC => {
+      10 => 'cablecat_maps_cables',
+      11 => 'cablecat_maps_wells',
+    }
+  }
+}
+
+#**********************************************************
+=head2 cablecat_maps_cables()
+
+=cut
+#**********************************************************
+sub cablecat_maps_cables {
+  
+  my $cables_list = $Cablecat->cables_list({
+    POINT_ID          => $FORM{OBJECT_ID} || $FORM{POINT_ID} || '!',
+    NAME              => '_SHOW',
+    CABLE_TYPE        => '_SHOW',
+    WELL_1            => '_SHOW',
+    WELL_2            => '_SHOW',
+    WELL_1_ID         => '_SHOW',
+    WELL_2_ID         => '_SHOW',
+    OUTER_COLOR       => '_SHOW',
+    LINE_WIDTH        => '_SHOW',
+    LENGTH            => '_SHOW',
+    LENGTH_CALCULATED => '_SHOW',
+    COMMENTS          => '_SHOW',
+    PAGE_ROWS         => 10000
+  });
+  _error_show($Cablecat);
+  
+  # Get all current active objects that cables are linked to
+  my @object_ids = map { +$_->{point_id} } @{$cables_list};
+  
+  # Joining for DB searching
+  my $point_ids = join(';', @object_ids);
+  
+  my $points_list = $Maps->points_list({ ID => $point_ids, SHOW_ALL_COLUMNS => 1, EXTERNAL => 1, PAGE_ROWS => 10000 });
+  my $layer_objects = _maps_get_layer_objects(10, { OBJECT_ID => $point_ids });
+    
+  # Sorting to hashes
+  my $points_by_id = sort_array_to_hash($points_list, 'id');
+  my $cable_by_point_id = sort_array_to_hash($cables_list, 'point_id');
+  my $layer_objects_by_point_id = sort_array_to_hash($layer_objects, 'OBJECT_ID');
+  
+  # Caching indexes
+  my $well_index = get_function_index('cablecat_wells');
+  my $cables_index = get_function_index('cablecat_cables');
+  
+  my @objects_to_show = ();
+  # Apply cable_info to geometric figures
+  foreach ( @object_ids ) {
+    my $cable = $cable_by_point_id->{$_};
+    next if (!$cable->{point_id} || !$cable->{id});
+    
+    my $polyline  = $layer_objects_by_point_id->{$_}{POLYLINE};
+    next if (!$polyline->{id});
+    
+    my $point = $points_by_id->{$_};
+    next if (!$point);
+  
+    $layer_objects_by_point_id->{$_}{OBJECT_ID} = $point->{id};
+    
+    my $line_info = arrays_array2table([
+     [ $lang{CABLE},    $html->button($cable->{name}, "index=$cables_index&chg=$cable->{id}", {target => '_blank'})     ],
+     [ $lang{CABLE_TYPE}, $cable->{cable_type}],
+     [ "$lang{WELL} 1", ($cable->{well_1} && $cable->{well_1_id})
+        ? $html->button($cable->{well_1}, "index=$well_index&chg=$cable->{well_1_id}", {target => '_blank'})
+          . maps_show_object_button(11, $cable->{well_1_id})
+        : $lang{NO}
+     ],
+     [ "$lang{WELL} 2", ($cable->{well_2} && $cable->{well_2_id})
+         ? $html->button($cable->{well_2}, "index=$well_index&chg=$cable->{well_2_id}", {target => '_blank'})
+           . maps_show_object_button(11, $cable->{well_2_id})
+         : $lang{NO}
+     ],
+     [ $lang{LENGTH}, "$cable->{length}, ( $cable->{length_calculated} )"],
+     [ $lang{COMMENTS}, $point->{comments} ],
+    ]);
+    
+    if ($point->{planned}){
+      $polyline->{strokeOpacity} = '0.5';
+    }
+    
+    $layer_objects_by_point_id->{$_}{ID} = $cable->{id};
+    
+    #TODO: check which case is required
+    $polyline->{id} = $cable->{id};
+    $polyline->{ID} = $cable->{id};
+    
+    $polyline->{name} = $cable->{name} || '';
+    
+    $polyline->{strokeColor} = $cable->{outer_color};
+    $polyline->{strokeWeight} = $cable->{line_width} || 1;
+    
+    #TODO: localize split btn
+    my $edit_buttons = qq{
+      <button class="btn btn-default" title="$lang{ADD} $lang{WELL}" onclick="insert_well_on_cable($cable->{id})">
+        <span class="glyphicon glyphicon-sound-stereo"></span>
+      </button>
+      <button class="btn btn-default btn-sm" title="Split cable" onclick="split_cable($cable->{id})">
+        <div class="text-small">
+          <span class="glyphicon glyphicon-arrow-left"></span>
+          <span class="glyphicon glyphicon-arrow-right"></span>
+        </div>
+      </button>
+      <button class="btn btn-danger" onclick="showRemoveConfirmModal({ layer_id : 10, id : $polyline->{object_id} })">
+        <span class="glyphicon glyphicon-remove"></span><span>$lang{DEL}</span>
+      </button>
+    };
+    
+    $polyline->{INFOWINDOW} =  $line_info . $edit_buttons;
+    
+    push @objects_to_show, $layer_objects_by_point_id->{$_};
+  }
+  
+  return join ',', map { to_json($_, { utf8 => 0 }) } @objects_to_show;
+}
+
+#**********************************************************
+=head2 cablecat_maps_wells()
+
+=cut
+#**********************************************************
+sub cablecat_maps_wells {
+  my $wells_list =  $Cablecat->wells_list({
+    POINT_ID    => $FORM{OBJECT_ID} || $FORM{POINT_ID} || '!',
+    NAME        => '_SHOW',
+    TYPE_ID     => '_SHOW',
+    ICON        => '_SHOW',
+    COMMENTS    => '_SHOW',
+    PAGE_ROWS   => 10000
+  });
+  _error_show($Cablecat);
+  
+  my @object_ids = map { $_->{point_id} } @{$wells_list};
+  
+  my $point_ids = join(';', @object_ids);
+  _error_show($Maps);
+  
+  my $points_list = $Maps->points_list({
+    ID               => $point_ids,
+    SHOW_ALL_COLUMNS => 1,
+    NAME             => '_SHOW',
+    ICON             => '_SHOW',
+    TYPE             => '_SHOW',
+    TYPE_ID          => '_SHOW',
+    COORDX           => '!',
+    COORDY           => '!',
+    COLS_NAME        => 1,
+    ADDRESS_FULL     => '_SHOW',
+    EXTERNAL         => 1,
+  });
+  
+  my $points_by_id = sort_array_to_hash($points_list);
+  my $well_by_point_id = sort_array_to_hash($wells_list, 'point_id');
+  my $wells_index = get_function_index('cablecat_wells');
+  
+  my @layer_objects = ();
+    
+  # Apply cable_info to geometric figures
+  
+  foreach ( @object_ids ) {
+    my $well = $well_by_point_id->{$_};
+    my $point = $points_by_id->{$_};
+  
+    my $icon_name = $well->{icon} || $point->{icon} || 'well_green';
+  
+    next if !($point->{coordx} && $point->{coordy});
+    
+    my $marker_info = arrays_array2table([
+      [ $lang{WELL}, $html->button($well->{name}, "index=$wells_index&chg=$well->{id}", { target => '_blank' }) ],
+      [ $lang{INSTALLED}, $point->{planned} ? $lang{NO} : $lang{YES} ],
+      [ $lang{COMMENTS}, $point->{comments} ],
+    ]);
+  
+    my $edit_buttons = qq{
+      <button class="btn btn-danger" onclick="showRemoveConfirmModal({ layer_id : 11, id : $point->{id} })">
+        <span class="glyphicon glyphicon-remove"></span><span>$lang{DEL}</span>
+      </button>
+    };
+    
+    $marker_info .= $edit_buttons;
+    
+    push @layer_objects, {
+        ID        => $well->{id},
+        OBJECT_ID => $point->{id},
+        MARKER    => {
+          OBJECT_ID => $point->{id},
+          NAME      => $well->{name},
+          ID        => $well->{id},
+          COORDX    => $point->{coordy},
+          COORDY    => $point->{coordx},
+          INFO      => "$marker_info",
+          TYPE      => "$icon_name",
+#          SIZE      => [37, 37],
+          CENTERED  => 1,
+        },
+        LAYER_ID  => 11
+      }
+  }
+  
+  return join (',', map { to_json($_, { utf8 => 0 }) } @layer_objects);
+}
+
+#**********************************************************
+=head2 cablecat_maps_ajax()
+
+=cut
+#**********************************************************
+sub cablecat_maps_ajax {
+  
+  if ($FORM{SPLIT_CABLE} && $FORM{CABLE_ID}){
+    push (@{$html->{JSON_OUTPUT}},
+      {
+        result => _cablecat_break_cable_in_two_parts($FORM{CABLE_ID})
+      }
+    );
+  }
+  
+  return 1;
+}
+
+#**********************************************************
+=head2 cablecat_cable_reports()
+
+=cut
+#**********************************************************
+sub cablecat_cable_reports {
+  
+  ## Filter panel
+  my $cable_types = $Cablecat->cable_types_list({
+    ID   => '_SHOW',
+    NAME => '_SHOW'
+  });
+  
+  my $date_picker = $html->form_daterangepicker({ NAME => 'CREATED' });
+  my $cable_types_select = $html->form_select('TYPE_ID', {
+      SELECTED   => $FORM{TYPE_ID},
+      SEL_LIST   => $cable_types,
+      EX_PARAMS => "title=\"$lang{TYPE}\"",
+      AUTOSUBMIT => 'form'
+    });
+  
+  print $html->element('div', $html->form_main({
+      CONTENT       =>
+      $html->element('div', $date_picker, { class => 'form-group' })
+        . $html->element('div', $cable_types_select, { class => 'form-group' }),
+      HIDDEN        => {
+        'index' => $index
+      },
+      SUBMIT        => {
+        show => $lang{SHOW},
+      },
+      METHOD        => 'GET',
+      OUTPUT2RETURN => 1,
+      class         => 'form form-inline'
+    }), { class => 'well well-sm text-right' });
+  
+  our %LIST_PARAMS;
+  $LIST_PARAMS{TYPE_ID} = $FORM{TYPE_ID} || '_SHOW';
+  $LIST_PARAMS{CREATED} = $FORM{CREATED} || '_SHOW';
+  
+  ## Table
+  my Abills::HTML $table;
+  my $cables_list;
+  ($table, $cables_list) = result_former(
+    {
+      INPUT_DATA      => $Cablecat,
+      FUNCTION        => 'cables_list',
+      BASE_FIELDS     => 0,
+      DEFAULT_FIELDS  => 'ID,NAME,CREATED,LENGTH,LENGTH_CALCULATED',
+      HIDDEN_FIELDS   => 'TYPE_ID',
+      #      FUNCTION_FIELDS => 'change,del',
+      SKIP_USER_TITLE => 1,
+      EXT_FIELDS      => 0,
+      EXT_TITLES      => {
+        id                => '#',
+        name              => $lang{NAME},
+        length            => "$lang{LENGTH} $lang{IN_FACT}",
+        length_calculated => "$lang{LENGTH} $lang{CALCULATED}",
+        created           => $lang{CREATED}
+      },
+      FILTER_COLS     => {
+        
+        name => '_cablecat_result_former_named_chg_link_filter::PARAM_NAME=id,FUNCTION=cablecat_cables,ID',
+      },
+      TABLE           => {
+        width   => '100%',
+        caption => "Cablecat : $lang{CABLE} $lang{LENGTH}",
+        ID      => 'CABLE_REPORT_TABLE',
+        EXPORT  => 1,
+      },
+      MAKE_ROWS       => 1,
+      SEARCH_FORMER   => 1,
+      MODULE          => 'Cablecat',
+    }
+  );
+  
+  print $table->show();
+  
+  # TODO:  Add total
+  my $total_table = $html->table( {
+    title => [ '', '', '', $lang{IN_FACT}, $lang{CALCULATED} ],
+    pages => scalar @{$cables_list},
+      qs => $pages_qs,
+      ID => 'TOTAL_CABLE_ID'
+  } );
+  
+  my ($length_sum, $length_calc) = (0, 0);
+  foreach ( @{$cables_list} ) {
+    $length_sum += $_->{length} // 0;
+    $length_calc += $_->{length_calculated} // 0;
+  }
+  $total_table->addrow($lang{TOTAL}, '', '', $length_sum, $length_calc);
+  print $total_table->show();
+  
+  return 1;
+}
+
+#**********************************************************
+=head2 cablecat_link_info()
+
+=cut
+#**********************************************************
+sub cablecat_link_info {
+  my ($cable_id, $fiber_num, $direction) = @FORM{'CABLE_ID', 'FIBER_NUM', 'DIRECTION'};
+  
+  if ($FORM{renew}){
+   my $res = _cablecat_external_link_info($cable_id, $fiber_num, $direction);
+    print _cablecat_link_info_cell($cable_id, $fiber_num, $direction, $res);
+    return 1;
+  }
+  elsif ($FORM{add} && $FORM{TYPE}){
+    
+    if ($FORM{TYPE} == 1 ){
+      # Add fiber link
+      $Cablecat->commutation_links_add({
+        COMMUTATION_ID => $FORM{TO_COMMUTATION},
+        CABLE_ID_1     => ($FORM{DIRECTION} ? $FORM{CABLE_ID} : $FORM{TO_CABLE_ID}),
+        FIBER_NUM_1    => ($FORM{DIRECTION} ? $FORM{FIBER_NUM_1} : $FORM{TO_FIBER}),
+        CABLE_ID_2     => ($FORM{DIRECTION} ? $FORM{TO_CABLE_ID} : $FORM{CABLE_ID}),
+        FIBER_NUM_2    => ($FORM{DIRECTION} ? $FORM{TO_FIBER} : $FORM{FIBER_NUM_1}),
+        DIRECTION      => $FORM{DIRECTION}
+      });
+    }
+    else {
+      $Cablecat->links_add(\%FORM);
+    }
+    
+    show_result($Cablecat, "$lang{FIBER} $lang{LINK} $lang{ADDED}");
+    return 1;
+  }
+  elsif ($FORM{del} && $cable_id && $fiber_num && defined $direction){
+    # Deleting is normally done via id, so passing 'undef' to use exended params del
+    $Cablecat->links_del(undef, {
+      CABLE_ID         => $cable_id,
+      FIBER_NUM        => $fiber_num,
+      DIRECTION        => $direction,
+    });
+    show_result($Cablecat, "$lang{FIBER} $lang{LINK} $lang{DELETED}");
+  }
+  elsif ( $FORM{request} && $FORM{TYPE} && exists $CONNECTION_TYPES{$FORM{TYPE}} ) {
+  
+    load_pmodule('JSON');
+    
+    #*****************************************************
+    # sub_make_select_options - form select options from list
+    #
+    #*****************************************************
+    my $sub_make_select_options = sub {
+      my ($list, $key_name, $value_name ) = @_;
+    
+      my @options = ({ name => '--', value => '--' });
+    
+      push (@options, map { { name => $_->{$key_name}, value => $_->{$value_name} } } @{$list});
+    
+      # Return
+      \@options;
+    };
+    
+    #*****************************************************
+    # select_next_option - return JSON select to extend search form
+    #
+    #*****************************************************
+    my $select_next_option = sub {
+      my ($name, $label, $list, $attr) = @_;
+      my %res = ();
+      
+      if ( !$list || ref $list ne 'ARRAY' || !scalar @{$list}) {
+        $res{text} = qq{ "$label : $lang{NO_DATA}" };
+      }
+      else {
+        if ($attr->{has_next}){
+          $attr->{next} = { load => 1 };
+        }
+        
+        %res = ( select => to_json({
+            name    => $name,
+            label   => $label,
+            options => $sub_make_select_options->($list, $attr->{name_key} || 'name', $attr->{id_key} || 'id'),
+            %{ $attr ? $attr : { } }
+          })
+        )
+      }
+      
+      push @{$html->{JSON_OUTPUT}}, \%res;
+      1;
+    };
+  
+    #*****************************************************
+    # input_next_option - return JSON input field to extend search form
+    #
+    #*****************************************************
+    my $input_next_option = sub {
+      my ($name, $label, $attr) = @_;
+      
+      my %res = (
+          input => to_json({
+            name    => $name,
+            label   => $label,
+            %{ $attr ? $attr : { } }
+          })
+      );
+          
+      push @{$html->{JSON_OUTPUT}}, \%res;
+      1;
+    };
+  
+    my $type = $CONNECTION_TYPES{$FORM{TYPE}};
+  
+    if ( $type eq 'fiber' ) {
+    
+      if (! $FORM{TO_COMMUTATION}){
+        # Get all commutations where this cable is involved
+        my $commutations_for_cable_list = $Cablecat->commutations_list({
+          ID        => '_SHOW',
+          CABLE_IDS => $cable_id,
+          PAGE_ROWS => 10000
+        });
+        _error_show($Cablecat);
+  
+        my @commutations = map {
+          {
+            name => "$lang{COMMUTATION}#$_->{id}",
+            id   => $_->{id}
+          }
+        } @{$commutations_for_cable_list};
+        
+        return $select_next_option->('TO_COMMUTATION', $lang{COMMUTATION}, \@commutations, { has_next => 1});
+      }
+      # Cable
+      if ( !$FORM{TO_CABLE_ID} ) {
+        
+        my $commutations = $Cablecat->commutations_list({
+          ID        => $FORM{TO_COMMUTATION},
+          CABLE_IDS => '_SHOW',
+          CABLES    => '_SHOW',
+          PAGE_ROWS => 10000
+        });
+        _error_show($Cablecat);
+        
+        my %unique_cables = ();
+        foreach ( @{$commutations} ) {
+          my @cable_ids = split(',\s?', $_->{cable_ids});
+          my @cable_names = split(',\s?', $_->{cables});
+        
+          for( 0 .. $#cable_ids ) {
+            $unique_cables{$cable_ids[$_]} = $cable_names[$_];
+          }
+        }
+        # Delete this cable from list
+        delete $unique_cables{$cable_id};
+      
+        my @unique_list = map {
+          {
+            id   => $_,
+            name => $unique_cables{$_}
+          }
+        } sort keys (%unique_cables);
+        
+        return $select_next_option->('TO_CABLE_ID', $lang{CABLE}, \@unique_list, { has_next => 1});
+      }
+      elsif ( !$FORM{TO_FIBER} ) {
+        my $cable_id_to_connect = $FORM{TO_CABLE_ID};
+      
+        my $cable_info = $Cablecat->cables_info($cable_id_to_connect, {
+            FIBERS_COUNT     => '_SHOW',
+            SHOW_ALL_COLUMNS => 0,
+            COLS_UPPER       => 0
+          });
+      
+        my $fibers_list = [ map { { id => $_, name => $_ } } (1 .. $cable_info->{fibers_count}) ];
+      
+        return $select_next_option->('TO_FIBER', "$lang{FIBER} #", $fibers_list);
+      }
+    }
+    elsif ( $type eq 'equipment' ) {
+
+      # Equipment_select
+      if ( !$FORM{EQUIPMENT_ID} ) {
+        my $equipment_list = $Equipment->_list({ COLS_NAME => 1, NAS_NAME => '_SHOW', PAGE_ROWS => 10000 });
+    
+        return $select_next_option->('EQUIPMENT_ID', $lang{EQUIPMENT}, $equipment_list, {
+            name_key => 'nas_name',
+            id_key   => 'nas_id',
+            has_next => 1
+          });
+      }
+      elsif ( $FORM{EQUIPMENT_ID} ) {
+        
+        my $equipment_info = $Equipment->_info($FORM{EQUIPMENT_ID});
+        
+        my $ports_count = $equipment_info->{PORTS};
+        
+        my @options_list = map {
+          {id => $_, name => $_}
+        } ( 1 ... $ports_count );
+        
+        return $select_next_option->('EQUIPMENT_PORT', $lang{PORT}, \@options_list);
+      }
+    }
+    elsif ( $type eq 'point_id' ) {
+      if ( !$FORM{POINT_TYPE_ID} ) {
+        my $point_types_list = $Maps->point_types_list({
+          ID         => '_SHOW',
+          NAME       => '_SHOW',
+          PAGE_ROWS  => 10000,
+          COLS_UPPER => 0
+        });
+        _error_show($Maps);
+      
+        return $select_next_option->('POINT_TYPE_ID', $lang{BY_TYPE}, translate_list($point_types_list), {has_next => 1});
+      }
+      # point select
+      elsif ( !$FORM{POINT_ID} ) {
+        my $points_for_type_list = $Maps->points_list({
+          ID         => '_SHOW',
+          NAME       => '_SHOW',
+          TYPE_ID    => $FORM{POINT_TYPE_ID},
+          PAGE_ROWS  => 10000,
+          COLS_UPPER => 0
+        });
+        _error_show($Maps);
+        
+        # Port select
+        return $select_next_option->('POINT_ID', $lang{OBJECT}, $points_for_type_list);
+      }
+    }
+    elsif ( $type eq 'splitter' ) {
+      if ( !$FORM{WELL_ID} ) {
+        my $wells_list = $Cablecat->wells_list({
+          ID         => '_SHOW',
+          NAME       => '_SHOW',
+          COLS_UPPER => 0,
+          PAGE_ROWS  => 10000
+        });
+        _error_show($Cablecat);
+      
+        # connecter select
+        return $select_next_option->('WELL_ID', $lang{WELL}, $wells_list, {has_next => 1});
+      }
+      elsif ( !$FORM{SPLITTER_ID} ) {
+        my $splitters_list = $Cablecat->splitters_list({
+          ID           => '_SHOW',
+          TYPE         => '_SHOW',
+          WELL_ID      => $FORM{WELL_ID},
+          COLS_UPPER   => 0,
+          PAGE_ROWS    => 10000
+        });
+        _error_show($Cablecat);
+      
+        # Generating name
+        @$splitters_list = map { $_->{name} = $_->{type} . '_' . $_->{id}; $_ } @$splitters_list;
+        
+        # connecter select
+        return $select_next_option->('SPLITTER_ID', $lang{SPLITTER}, $splitters_list, {has_next => 1});
+      }
+      if ( !$FORM{SPLITTER_DIRECTION} ) {
+        
+        my @splitter_directions = (
+          { name => $lang{ENTER}, id => 1 },
+          { name => $lang{OUTER}, id => 2 }
+        );
+      
+        # splitter direction select
+        return $select_next_option->('SPLITTER_DIRECTION', $lang{DIRECTION}, \@splitter_directions, {has_next => 1});
+      }
+      if ( !$FORM{SPLITTER_PORT} ) {
+        my $splitter_info = $Cablecat->splitters_info($FORM{SPLITTER_ID});
+        
+        my $max_number = $splitter_info->{ $FORM{SPLITTER_DIRECTION} == 1 ? 'fibers_in' : 'fibers_out' };
+        
+        my @options = map {
+          { id => $_, name => $_}
+        } (1 ... $max_number);
+        
+        return $select_next_option->('SPLITTER_PORT', $lang{PORT}, \@options);
+      }
+    }
+    elsif ( $type eq 'client' ) {
+      my %search_types = (
+        1 => 'ADDRESS',
+        2 => 'TAGS',
+        3 => 'GROUP'
+      );
+    
+      if ( !in_array('Tags', \@MODULES) ) {
+        delete $search_types{2};
+      }
+    
+      my %SEARCH_PARAMS = ();
+    
+      if ( !$FORM{SEARCH_BY} ) {
+      
+        my @search_options = map {
+          {
+            id   => $_,
+            name => _translate('$lang{' . $search_types{$_} . '}')
+          }
+        } sort keys %search_types;
+      
+        # search type select
+        return $select_next_option->('SEARCH_BY', $lang{SEARCH}, \@search_options, {has_next => 1});
+      }
+      elsif ( $FORM{SEARCH_BY} == 1 ) {
+        # Address
+        require Address;
+        my $Address = Address->new($db, $admin, \%conf);
+      
+        # District select
+        if ( !$FORM{DISTRICT_ID} ) {
+          my $districts_list = $Address->district_list({
+            COLS_NAME  => 1,
+            COLS_UPPER => 0,
+            PAGE_ROWS  => 10000
+          });
+        
+          return $select_next_option->('DISTRICT_ID', $lang{DISTRICT}, $districts_list, {has_next => 1});
+        }
+        elsif ( !$FORM{STREET_ID} ) {
+          my $streets_list = $Address->street_list({
+            DISTRICT_ID => $FORM{DISTRICT_ID},
+            STREET_NAME => '_SHOW',
+            COLS_NAME   => 1,
+            COLS_UPPER  => 0,
+            PAGE_ROWS   => 10000
+          });
+  
+          return $select_next_option->('STREET_ID', $lang{STREET}, $streets_list, {
+              name_key => 'street_name',
+              id_key   => 'street_id',
+              has_next => 1
+            });
+        }
+        elsif ( !$FORM{LOCATION_ID} ) {
+          my $builds_list = $Address->build_list({
+            STREET_ID  => $FORM{STREET_ID},
+            COLS_NAME  => 1,
+            COLS_UPPER => 0,
+            PAGE_ROWS  => 10000
+          });
+  
+          return $select_next_option->('LOCATION_ID', $lang{BUILD}, $builds_list, {name_key => 'number', has_next => 1});
+        }
+        else {
+          $SEARCH_PARAMS{LOCATION_ID} = $FORM{LOCATION_ID};
+        }
+      }
+      elsif ( $FORM{SEARCH_BY} == 2 ) {
+        # Tags
+        require Tags;
+        my $Tags = Tags->new($db, $admin, \%conf);
+        if ( !$FORM{TAG_ID} ) {
+        
+          # Tag select
+          my $tags_list = $Tags->list({
+            NAME       => '_SHOW',
+            ID         => '_SHOW',
+            COLS_NAME  => 1,
+            COLS_UPPER => 0,
+            PAGE_ROWS  => 10000
+          });
+        
+          return $select_next_option->('TAG_ID', $lang{TAGS}, $tags_list, {has_next => 1});
+        }
+      
+        # Tags uses his own user search logic
+        my $users_list = $Tags->tags_list({
+          TAG_ID    => $FORM{TAG_ID},
+          LOGIN     => '_SHOW',
+          COLS_NAME => 1,
+          PAGE_ROWS => 10000,
+        });
+      
+        return $select_next_option->('UID', $lang{USER}, $users_list, {
+            name_key => 'login',
+            id_key   => 'uid'
+          });
+      }
+      elsif ( $FORM{SEARCH_BY} == 3 ) { # Group
+        if ( !$FORM{GROUP_ID} ) {
+          my $groups_list = $users->groups_list({
+            NAME      => '_SHOW',
+            ID        => '_SHOW',
+            COLS_NAME => 1,
+            PAGE_ROWS => 10000
+          });
+        
+          # Group select
+          return $select_next_option->('GROUP_ID', $lang{GROUP}, $groups_list, {
+              id_key => 'gid',
+              has_next => 1
+          });
+        }
+        else {
+          $SEARCH_PARAMS{GID} = $FORM{GROUP_ID};
+        }
+      }
+    
+      # Search by selected type
+    
+      my $users_list = $users->list({
+        UID       => '_SHOW',
+        LOGIN     => '_SHOW',
+        %SEARCH_PARAMS,
+        COLS_NAME => 1,
+        PAGE_ROWS => 10000
+      });
+    
+      return $select_next_option->('UID', $lang{USER}, $users_list, {
+          name_key => 'login',
+          id_key   => 'uid'
+        });
+    }
+  
+  }
+  
+  push @{$html->{JSON_OUPUT}},
+    {
+      text => $lang{ERROR}
+    };
+  
+  return 1;
+}
+
+#**********************************************************
+=head2 cablecat_cable_links_table()
+
+=cut
+#**********************************************************
+sub cablecat_cable_links_table {
+  my ($cable_id) = @_;
+  
+  my %cable = ();
+  # Allow to pass DB row
+  if ( !ref $cable_id ) {
+    my $cable_info = $Cablecat->cables_info($cable_id);
+    return 0 if (_error_show($Cablecat));
+    
+    %cable = %{$cable_info};
+  }
+  else {
+    %cable = %{$cable_id};
+    $cable_id = $cable{id};
+  }
+  
+  my $fibers_count = $cable{fibers_count};
+  my $modules_count = $cable{modules_count};
+  my $fibers_in_module = int($fibers_count / $modules_count);
+  
+  my @colors = split(',', $cable{fibers_colors});
+  my @module_colors = split(',', $cable{modules_colors});
+  
+  # Get commutations for this cable
+  my $commutations = $Cablecat->commutations_list({
+    CABLE_IDS        => $cable_id,
+    SHOW_ALL_COLUMNS => 1,
+    PAGE_ROWS        => 10000
+  });
+  
+  return 0 if (_error_show($Cablecat));
+  my @commutation_ids = map { $_->{id} } @{$commutations};
+  
+  my $links = $Cablecat->commutation_links_list({
+    COMMUTATION_ID   => join(';', @commutation_ids),
+    SHOW_ALL_COLUMNS => 1,
+    PAGE_ROWS        => 10000
+  });
+  return 0 if (_error_show($Cablecat));
+  
+  # Links where this cable is cable_id_2
+  my @this_cable_left_links = grep { $_->{cable_id_1} == $cable_id } @{$links};
+  my @this_cable_right_links = grep { $_->{cable_id_2} == $cable_id } @{$links};
+  
+  my $fibers_for_left = sort_array_to_hash(\@this_cable_left_links, 'fiber_num_1');
+  my $fibers_for_right = sort_array_to_hash(\@this_cable_right_links, 'fiber_num_2');
+  
+  my $links_info = $Cablecat->links_list({
+    CABLE_ID         => $cable_id,
+    SHOW_ALL_COLUMNS => 1,
+    PAGE_ROWS        => 10000
+  });
+  return 0 if (_error_show($Cablecat));
+  
+  my @links_for_left = grep { $_->{direction} == 0 } @$links_info;
+  my @links_for_right = grep { $_->{direction} == 1 } @$links_info;
+  
+  my $left_link_info = sort_array_to_hash(\@links_for_left, 'fiber_num');
+  my $right_link_info = sort_array_to_hash(\@links_for_right, 'fiber_num');
+  
+  my $sub_get_info_for_fiber = sub {
+    my ($f_num, $is_right) = @_;
+    my $res = '';
+  
+    my $info_hash = ($is_right) ? $fibers_for_right : $fibers_for_left;
+    my $links_hash = ($is_right) ? $right_link_info : $left_link_info;
+  
+    my $pos_id = ($is_right) ? 1 : 2;
+  
+    my $is_fiber_link = 0;
+    if ( exists $info_hash->{$f_num} ) {
+      my $info = $info_hash->{$f_num};
+      $is_fiber_link = 1;
+    
+      my $commutation_btn = $html->button(
+        $lang{COMMUTATION} . '#' . $info->{commutation_id},
+        'get_index=cablecat_commutation&full=1&ID=' . $info->{commutation_id}
+      );
+      my $cable_btn = _cablecat_get_cable_link($info->{'cable_id_' . $pos_id});
+      my $br = $html->br;
+    
+      $res .= "$cable_btn : $lang{FIBER}# " . $html->b($info->{'fiber_num_' . $pos_id}) . $br;
+      $res .= "$commutation_btn $br";
+    
+      $res .= ($info->{attenuation})
+        ? "$lang{ATTENUATION} :  $info->{attenuation} $br"
+        : '';
+    
+      $res .= ($info->{comments})
+        ? "$lang{COMMENTS} :  $info->{comments} $br"
+        : '';
+    }
+    elsif ( exists $links_hash->{$f_num} ) {
+      $res = _cablecat_external_link_info($cable_id, $f_num, $pos_id == 2, $links_hash->{$f_num} );
+      
+      return _cablecat_link_info_cell($cable_id, $f_num, $pos_id == 2, $res);
+    }
+    else {
+      return $html->button('', '', {
+          class     => 'add',
+          ICON      => 'glyphicon glyphicon-plus',
+          BUTTON    => 1,
+          SKIP_HREF => 1,
+          ex_params => "onClick='addLinkInfo($cable_id, $f_num, $is_right)'"
+        })
+    }
+    return $res;
+  };
+  
+  # Table will consist of two columns, and $fibers_num rows
+  my @rows = ();
+  foreach my $fiber_num ( 0 .. $fibers_count - 1 ) {
+    my $module_num = int($fiber_num / $fibers_in_module);
+    
+    my $fiber_color = $colors[$fiber_num % $fibers_in_module];
+    my $module_color = $module_colors[ $module_num ];
+    #
+    my $info_left = $sub_get_info_for_fiber->(int ($fiber_num + 1), 0);
+    my $info_right = $sub_get_info_for_fiber->(int ($fiber_num + 1), 1);
+    
+    push (@rows,
+      [
+        $html->element('div', '&nbsp;', {
+            style => 'background-color : #' . $module_color,
+            class => 'colored-block module-color'
+          })
+          . $html->element('div', '&nbsp;', {
+            style => 'background-color : #' . $fiber_color,
+            class => 'colored-block fiber-color'
+          })
+          . ($module_num + 1) . ':' . ($fiber_num + 1),
+        $info_left, $info_right
+      ]
+    );
+  }
+  
+  my $table = $html->table( {
+    caption     => "$lang{INFO} : $cable{name}",
+    #    HIDE_TABLE => 1,
+    #    EXPORT => 1,
+    title_plain => [ "$lang{MODULE}:$lang{FIBER}", $lang{ENTER}, $lang{OUTER} ],
+    ID          => 'CABLECAT_CABLE_LINKS_ID',
+    rows        => \@rows
+  } );
+  
+  # SHOULD BE THE SAME IN cablecat_link_info
+  my %connection_type_lang = (
+    1 => 'FIBER',
+    2 => 'PORT',
+    3 => 'OBJECT',
+    4 => 'SPLITTER',
+    5 => 'USER'
+  );
+  
+  my @connection_type_modal_select_options = ( {name => '--', value => '--'}, map {
+      {
+        name => _translate('$lang{' . $connection_type_lang{$_} . '}'),
+        value => $_
+      };
+    } sort keys %CONNECTION_TYPES
+  );
+  
+  $html->tpl_show(_include('cablecat_cable_links_info', 'Cablecat'),
+    {
+      LINK_TYPE_OPTIONS => to_json(\@connection_type_modal_select_options),
+      CABLE_ID          => $cable_id
+    }
+  );
+  
+  return $table->show();
+}
+
+
+#**********************************************************
+=head2 _cablecat_break_cable_in_two_parts()
+
+=cut
+#**********************************************************
+sub _cablecat_break_cable_in_two_parts {
+  my ($break_cable_id, $inserted_well_id) = @_;
+  return unless ($break_cable_id);
+
+  # Insert well, breaks cable
+  my $add_result = $Cablecat->break_cable($break_cable_id, $inserted_well_id);
+  if (!$add_result || ref $add_result ne 'ARRAY'){
+    _error_show($Cablecat);
+    return qq{Can\'t insert well : $add_result };
+  };
+
+  my ( $deleted_cable, $cable_id_1, $cable_id_2 ) = @$add_result;
+  
+  # Should also break polyline for this cables
+  my $break_result = $Maps->break_polyline(
+    $deleted_cable->{point_id},
+    {
+      COORDX => $FORM{COORDX},
+      COORDY => $FORM{COORDY}
+    }
+  );
+  
+  if (!$break_result || ref $break_result ne 'ARRAY'){
+    _error_show($Maps);
+    return qq{Can\'t break polyline : $break_result }
+  };
+  
+  my ($new_object1_id, $new_object2_id ) = @{$break_result};
+  
+  # Update cables info
+  #FIXME: check object adding order
+  $Cablecat->cables_change({ ID => $cable_id_1, POINT_ID => $new_object2_id });
+  $Cablecat->cables_change({ ID => $cable_id_2, POINT_ID => $new_object1_id });
+  
+  return 1;
+}
+    
+#**********************************************************
+
+=head2 _cablecat_color_scheme_select()
+
+=cut
+
+#**********************************************************
+sub _cablecat_color_scheme_select {
+  my ($attr) = shift || {};
+  return $html->form_select(
+    $attr->{NAME} || 'COLOR_SCHEME_ID',
+    {
+      SELECTED => $attr->{SELECTED} || $FORM{ $attr->{NAME} || 'COLOR_SCHEME_ID' } || '',
+      SEL_LIST  => $Cablecat->color_schemes_list({ ID => '_SHOW', NAME => '_SHOW' }),
+      NO_ID     => 1,
+      MAIN_MENU => get_function_index('cablecat_color_schemes'),
+      %{$attr},
+    }
+  );
+}
+
+#**********************************************************
+
+=head2 _cablecat_cable_type_select($attr)
+
+=cut
+
+#**********************************************************
+sub _cablecat_cable_type_select {
+  my ($attr) = shift || {};
+  my $name = $attr->{NAME} || 'CABLE_TYPE_ID';
+  my $selected = $attr->{SELECTED} || $FORM{$name} || '';
+  
+  return $html->form_select(
+    $name,
+    {
+      SELECTED       => $selected,
+      SEL_LIST       => $Cablecat->cable_types_list({ ID => '_SHOW', NAME => '_SHOW' }),
+      NO_ID          => 1,
+      EX_PARAMS      => 'required="required"',
+      MAIN_MENU      => get_function_index('cablecat_cable_types'),
+      MAIN_MENU_ARGV => $selected ? 'chg=' . $selected : '',
+      %{$attr},
+    }
+  );
+}
+
+#**********************************************************
+
+=head2 _cablecat_point_id_select($attr)
+
+=cut
+
+#**********************************************************
+sub _cablecat_point_id_select {
+  my $attr = shift || {};
+  my $selected = $attr->{SELECTED} || $FORM{POINT_ID} || '';
+  
+  if ($selected && $attr->{ENTITY}){
+#    $attr->{PARAMS}->[0]
+    $attr->{EXT_BUTTON} = _cablecat_result_former_point_id_filter($selected, { PARAMS => [ $MAP_LAYER_ID{$attr->{ENTITY}} ] });
+  }
+    
+  return $html->form_select(
+    'POINT_ID',
+    {
+      SELECTED => $selected,
+      SEL_LIST => $Maps->points_list(
+        {
+          ID   => '_SHOW',
+          NAME => '_SHOW',
+          %{ $attr->{FILTER} ? $attr->{FILTER} : {} },
+          PAGE_ROWS => 10000
+        }
+      ),
+      NO_ID       => 1,
+      SEL_OPTIONS => { '' => '' },
+      EX_PARAMS   => ($attr->{REQUIRED}) ? 'required="required"' : '',
+
+      MAIN_MENU      => get_function_index('maps_objects_main'),
+      MAIN_MENU_ARGV => $selected ? 'chg=' . $selected : '',
+      %{$attr},
+    }
+  );
+}
+
+#**********************************************************
+
+=head2 _cablecat_wells_select($attr)
+
+=cut
+
+#**********************************************************
+sub _cablecat_wells_select {
+  my ($attr) = shift || {};
+  my $name = $attr->{NAME} || 'WELL_ID';
+
+  my $selected = $attr->{SELECTED} || $FORM{$name} || '';
+
+  return $html->form_select(
+    $name,
+    {
+      SELECTED => $selected,
+      SEL_LIST => $Cablecat->wells_list({ ID => '_SHOW', NAME => '_SHOW', PAGE_ROWS => 10000 }),
+      NO_ID    => 1,
+      SEL_OPTIONS => { '' => '' },
+      EX_PARAMS => ($attr->{REQUIRED}) ? 'required="required"' : '',
+      MAIN_MENU => get_function_index('cablecat_wells'),
+      MAIN_MENU_ARGV => $selected ? 'chg=' . $selected : '',
+      %{$attr},
+    }
+  );
+}
+
+#**********************************************************
+
+=head2 _cablecat_connecter_types_select($attr)
+
+=cut
+
+#**********************************************************
+sub _cablecat_connecter_type_select {
+  my ($attr) = shift || {};
+  my $selected = $attr->{SELECTED} || $FORM{TYPE_ID} || '';
+
+  return $html->form_select(
+    ($attr->{NAME} || 'TYPE_ID'),
+    {
+      SELECTED       => $selected,
+      SEL_LIST       => $Cablecat->connecter_types_list({ ID => '_SHOW', NAME => '_SHOW', PAGE_ROWS => 10000 }),
+      NO_ID          => 1,
+      SEL_OPTIONS    => { '' => '' },
+      EX_PARAMS      => ($attr->{REQUIRED}) ? 'required="required"' : '',
+      MAIN_MENU      => get_function_index('cablecat_connecter_types'),
+      MAIN_MENU_ARGV => $selected ? 'chg=' . $selected : '',
+      %{$attr},
+    }
+  );
+}
+
+#**********************************************************
+
+=head2 _cablecat_splitter_types_select($attr)
+
+=cut
+
+#**********************************************************
+sub _cablecat_splitter_types_select {
+  my ($attr) = shift || {};
+  my $selected = $attr->{SELECTED} || $FORM{TYPE_ID} || '';
+
+  return $html->form_select(
+    'TYPE_ID',
+    {
+      SELECTED       => $selected,
+      SEL_LIST       => $Cablecat->splitter_types_list({ ID => '_SHOW', NAME => '_SHOW', PAGE_ROWS => 10000 }),
+      NO_ID          => 1,
+      SEL_OPTIONS    => { '' => '' },
+      EX_PARAMS      => ($attr->{REQUIRED}) ? 'required="required"' : '',
+      MAIN_MENU      => get_function_index('cablecat_splitter_types'),
+      MAIN_MENU_ARGV => $selected ? 'chg=' . $selected : '',
+      %{$attr},
+    }
+  );
+}
+
+#**********************************************************
+=head2 _cablecat_well_types_select($attr)
+
+=cut
+#**********************************************************
+sub _cablecat_well_types_select {
+  my ($attr) = shift || {};
+  my $selected = $attr->{SELECTED} || $FORM{TYPE_ID} || '';
+  
+  my $list = $Cablecat->well_types_list({ ID => '_SHOW', NAME => '_SHOW', PAGE_ROWS => 10000 });
+  
+  return $html->form_select(
+    'TYPE_ID',
+    {
+      SELECTED       => $selected,
+      SEL_LIST       => translate_list($list, 'name'),
+      NO_ID          => 1,
+      SEL_OPTIONS    => { '' => '' },
+      EX_PARAMS      => ($attr->{REQUIRED}) ? 'required="required"' : '',
+      MAIN_MENU      => get_function_index('cablecat_well_types'),
+      MAIN_MENU_ARGV => $selected ? 'chg=' . $selected : '',
+      %{$attr},
+    }
+  );
+}
+
+#**********************************************************
+
+=head2 _cablecat_connecter_commutation_list($connecter_id, $well_id)
+
+  Arguments:
+    $connecter_id - int, Cablecat connecter id
+    $well_id      - int, Cablecat well id
+
+  Returns:
+    string - HTML, form to create new commutation
+    
+=cut
+
+#**********************************************************
+sub _cablecat_connecter_commutation_list {
+  my ($connecter_id, $well_id) = @_;
+  return '' if (!$connecter_id || ref $connecter_id) || (!$well_id || ref $well_id);
+  my $commutation_index = get_function_index('cablecat_commutations');
+  my $commutation_view_index = get_function_index('cablecat_commutation');
+
+  my $commutations_list = $Cablecat->commutations_list({ CONNECTER_ID => $connecter_id, CREATED => '_SHOW', CABLE_IDS => '_SHOW' });
+  my $table = $html->table(
+    {
+      width               => '100%',
+      caption             => $lang{COMMUTATION},
+      border              => 1,
+      title               => [ '#', $lang{NAME}, $lang{CREATED}, '' ],
+      qs                  => $pages_qs,
+      ID                  => 'CONNECTER_COMMUTATION_TABLE_ID',
+      REFRESH             => 1,
+      HAS_FUNCTION_FIELDS => 1
+    }
+  );
+
+  foreach (@$commutations_list) {
+    my $name = "$lang{COMMUTATION}#$_->{id}";
+    $table->addrow(
+      $_->{id},
+      $html->button($name, "index=$commutation_view_index&ID=$_->{id}", { TITLE => "$lang{CABLES} $_->{cable_ids} " }),
+      $_->{created},
+      $html->button(
+        '',
+        "qindex=$commutation_index&del=$_->{id}",
+        {
+          class   => 'del',
+          MESSAGE => "$lang{DEL} $name",
+          AJAX    => 'CABLECAT_CREATE_COMMUTATION_FORM'
+        }
+      ),
+    );
+  }
+  
+  my $cables_checkboxes_form = _cablecat_well_cables_checkbox_form($well_id);
+  
+  my $create_form = $html->form_main(
+    {
+      ID      => 'CABLECAT_CREATE_COMMUTATION_FORM',
+      class   => 'form form-horizontal ajax-submit-form',
+      CONTENT => join($FORM{json} ? ', ' : '', @$cables_checkboxes_form),
+      HIDDEN  => {
+        add          => 1,
+        index        => $commutation_index,
+        CONNECTER_ID => $connecter_id,
+      },
+      SUBMIT => { add => $lang{NEW} . ' ' . $lang{COMMUTATION}, }
+    }
+  );
+  
+  return join($FORM{json} ? ', ' : '', ($table->show(), $create_form));
+  
+}
+
+#**********************************************************
+=head2 _cablecat_well_cables_checkbox_form($well_id)
+
+=cut
+#**********************************************************
+sub _cablecat_well_cables_checkbox_form {
+  my ($well_id, $attr) = @_;
+  
+  $attr //= {};
+  
+  my $checked = ($attr->{CHECKED}) ? $attr->{CHECKED} : [];
+  my $skip = ($attr->{SKIP}) ? $attr->{SKIP} : [];
+  
+  my $cables_list = $Cablecat->get_cables_for_well({ WELL_ID => $well_id });
+  
+  if (!_error_show($Cablecat) && scalar @{$cables_list}) {
+    
+    $cables_list = [ grep { !in_array($_->{id}, $skip) } @{$cables_list}  ] if $attr->{SKIP};
+    
+    # Render list of checkboxes
+    my $wells_index  = get_function_index('cablecat_wells');
+    my @cable_inputs = map {
+      my ($id, $name, $well_1_id, $well_2_id) = ($_->{id}, $_->{name}, $_->{well_1_id}, $_->{well_2_id});
+      
+      # Cable have two ends.
+      # Here we are determining which one does'nt belong to this connecter's well
+      my $is_second_well_id = ($well_1_id == $well_id) ? 1            : 0;
+      my $other_end_id      = $is_second_well_id       ? $well_2_id   : $well_1_id;
+      my $other_end_name    = $is_second_well_id       ? $_->{well_2} : $_->{well_1};
+      
+      $name .= " ( " . $html->button($other_end_name, "index=$wells_index&chg=$other_end_id") . " )";
+      
+      $html->tpl_show(
+        templates('form_row_checkbox'),
+        {
+          INPUT => $html->form_input('CABLE_IDS', $id, { TYPE => 'checkbox', STATE => $attr->{CHECKED} ? in_array($id, $checked) : 0 } ),
+          NAME  => $name
+        },
+        { OUTPUT2RETURN => 1 }
+      );
+    } @{$cables_list};
+    
+    return \@cable_inputs;
+  }
+  else {
+    return [ 'No cables' ];
+  }
+  
+  return [];
+}
+
+#**********************************************************
+
+=head2 _cablecat_connecter_linked_connecters($connecter_id)
+
+  Arguments:
+    $connecter_id - int, Cablecat connecter id
+
+  Returns:
+    string - HTML, list of links
+
+=cut
+
+#**********************************************************
+sub _cablecat_connecter_linked_connecters {
+  my ($connecter_id) = @_;
+  return if (!$connecter_id || ref $connecter_id);
+
+  my $links_out = $Cablecat->connecters_links_list(
+    {
+      CONNECTER_1_ID => $connecter_id,
+      CONNECTER_2_ID => '>0',
+      CONNECTER_1    => '_SHOW',
+      CONNECTER_2    => '_SHOW',
+      PAGE_ROWS      => 10000
+    }
+  );
+  _error_show($Cablecat);
+
+  my $links_in = $Cablecat->connecters_links_list(
+    {
+      CONNECTER_1_ID => '>0',
+      CONNECTER_2_ID => $connecter_id,
+      CONNECTER_1    => '_SHOW',
+      CONNECTER_2    => '_SHOW',
+      PAGE_ROWS      => 10000
+    }
+  );
+  _error_show($Cablecat);
+
+  if (scalar @{$links_in} || scalar @{$links_out}) {
+    my @links_for_connecter = ();
+    push(@links_for_connecter, map { $html->button($_->{connecter_1}, "index=$index&chg=$_->{connecter_1_id}") } @{$links_in});
+
+    push(@links_for_connecter, map { $html->button($_->{connecter_2}, "index=$index&chg=$_->{connecter_2_id}") } @{$links_out});
+
+    return join($html->br(), @links_for_connecter);
+  }
+
+  return '';
+}
+
+#**********************************************************
+
+=head2 _cablecat_well_connecters($well_id)
+  
+  Arguments:
+    $well_id - int, Cablecat well id
+
+  Returns:
+    string - HTML - list of links
+
+=cut
+
+#**********************************************************
+sub _cablecat_well_connecters {
+  my ($well_id) = @_;
+  return if (!$well_id || ref $well_id);
+
+  my $connecters_inside = $Cablecat->connecters_list(
+    {
+      WELL_ID => $well_id,
+      TYPE    => '_SHOW',
+      NAME    => '_SHOW'
+    }
+  );
+
+  if (!_error_show($Cablecat)) {
+    my $connecters_index = get_function_index('cablecat_connecters');
+
+    my @connecters_links = map {
+      $html->button("$_->{name} (#$_->{id})", "index=$connecters_index&chg=$_->{id}")
+      . $html->button('', "qindex=$connecters_index&change=1&ID=$_->{id}&WELL_ID=0", {
+          ICON    => 'glyphicon glyphicon-remove',
+          class   => 'text-danger',
+          CONFIRM => "$lang{UNLINK}?",
+          AJAX    => 'form_CABLECAT_CONNECTERS'
+        })
+    } @{$connecters_inside};
+
+    my $connecters_list = join($html->br(), @connecters_links);
+    my $add_connecter_btn = $html->button($lang{CREATE}, "index=$connecters_index&add_form=1&WELL_ID=$well_id", {
+        ID => 'add_connecter'
+    });
+    
+    return $html->element('div', $connecters_list, {id => 'WELL_CONNECTERS_LIST'})
+      . $html->element('div', $add_connecter_btn, {id => 'WELL_CONNECTERS_ADD_BUTTON_WRAPPER'});
+  }
+
+  return '';
+}
+
+#**********************************************************
+
+=head2 _cablecat_well_cable_links($well_id)
+  
+  Arguments:
+    $well_id - int, Cablecat Well id
+
+  Returns:
+    string - HTML, list of links
+    
+=cut
+
+#**********************************************************
+sub _cablecat_well_cable_links {
+  my ($well_id) = @_;
+  return if (!$well_id || ref $well_id);
+  
+  # Can be optimized with 'well_1=%ID% OR well_2=%ID%' when possible in search former
+  my $cables_out = $Cablecat->cables_list(
+    {
+      WELL_1_ID => $well_id,
+      WELL_2_ID => '_SHOW',
+      NAME      => '_SHOW',
+      POINT_ID  => '_SHOW',
+      WELL_1    => '_SHOW',
+      WELL_2    => '_SHOW',
+    }
+  );
+  _error_show($Cablecat);
+  
+  my $cables_in = $Cablecat->cables_list(
+    {
+      WELL_2_ID => $well_id,
+      WELL_1_ID => '_SHOW',
+      NAME      => '_SHOW',
+      POINT_ID  => '_SHOW',
+      WELL_1    => '_SHOW',
+      WELL_2    => '_SHOW',
+    }
+  );
+  _error_show($Cablecat);
+  
+  my $cables_index = get_function_index('cablecat_cables');
+  
+  my $well_cable_row = sub {
+   my ($cable, $linked_well_name, $linked_well_id) = @_;
+    maps_show_object_button(
+      $MAP_LAYER_ID{CABLE},
+      $cable->{id},
+      { GO_TO_MAP => 1, POINT_ID => $cable->{point_id}, SINGLE => $cable->{point_id} }
+    )
+      . '&nbsp;' . $html->button($cable->{name}, "index=$cables_index&chg=$cable->{id}")
+      . ' -> '
+      . ($linked_well_id
+        ? $html->button($linked_well_name, "index=$index&chg=$linked_well_id")
+        : $lang{NO})
+  };
+  
+  my @cables_for_well = ();
+  if ( scalar @{$cables_in} ) {
+    push(@cables_for_well,
+      map {
+        $well_cable_row->($_, $_->{well_1}, $_->{well_1_id});
+      } @{$cables_in});
+  }
+  if ( scalar @{$cables_out} ) {
+    push(@cables_for_well,
+      map {
+        $well_cable_row->($_, $_->{well_2}, $_->{well_2_id});
+      } @{$cables_out});
+  }
+  
+  return join($html->br(), @cables_for_well);
+  
+  return '';
+}
+
+#**********************************************************
+
+=head2 _cablecat_commutation_cable_to_hash_ref($cable_id) - get cable info, and return JSON string ref
+
+  Arguments:
+    $cable_id - int, Cablecat cable id
+    
+  Returns:
+    hash_ref - JSON like structure for cable with information about links
+
+=cut
+
+#**********************************************************
+sub _cablecat_commutation_cable_to_hash_ref {
+  my ($cable_id) = @_;
+  return if (!$cable_id || ref $cable_id);
+
+  my @positions = ('left', 'right', 'top', 'bottom');
+
+  # Will return new position for each next cable;
+  # State variable is defined only once
+  # Next times this row will be ignored
+  state $position_num = 0;
+  
+  # Iteration over existing array elements
+  
+  my $this_cable_pos = $position_num++;
+  if ($this_cable_pos > $#positions){
+    $html->message('warn', $lang{ERROR}, "Can't contain more than 4 cables $this_cable_pos");
+    return 0;
+  }
+  my $position = $positions[ $this_cable_pos ];
+    
+  my $cable = $Cablecat->cables_info($cable_id, { COLS_UPPER => 0 });
+  _error_show($Cablecat);
+    
+  if (!defined $cable->{modules_count} || !defined $cable->{fibers_count}){
+    my $cable_link = _cablecat_get_cable_link($cable->{id});
+    $html->message('warn', $lang{ERROR}, "Modules or fibers count is not defined. Can't display cable $cable_link");
+    
+    return 0;
+  }
+
+  my $links_list = $Cablecat->links_list(
+    {
+      CABLE_ID  => $cable_id,
+      FIBER_NUM => '!',
+      LENGTH    => '_SHOW',
+      NAME      => '_SHOW',
+    }
+  );
+  _error_show($Cablecat);
+  
+  
+  # Fill linked fibers
+  my %fibers = map {
+    + $_->{fiber_num} => {
+      id        => "$cable->{id}_$_->{fiber_num}",
+      connected => {
+        name   => "$_->{name}",
+        length => "$_->{length}"
+      }
+    }
+  } @{$links_list};
+  
+  # Fill empty space
+  for (1 .. $cable->{fibers_count}) {
+    next if (exists $fibers{$_});
+    $fibers{$_} = { id => "$cable->{id}_$_" };
+  }
+
+  $cable->{outer_color} //= '#000000';
+  return {
+    id        => + $cable->{id},
+    image     => {
+      modules              => + $cable->{modules_count},
+      fibers               => + $cable->{fibers_count},
+      color                => $cable->{outer_color},
+      color_scheme         => [ map { '#' . $_} split ',', $cable->{fibers_colors} ],
+      modules_color_scheme => [ map { '#' . $_} split ',', $cable->{modules_colors} ],
+    },
+    meta      => {
+      name     => "$cable->{name}",
+      position => $position,
+      fibers   => \%fibers,
+      vertical => ($this_cable_pos > 1) ? 0 : 1,
+      well_1_id => $cable->{well_1_id},
+      well_2_id => $cable->{well_2_id},
+      well_1    => $cable->{well_1},
+      well_2    => $cable->{well_2},
+      map_btn  => maps_show_object_button(
+        $MAP_LAYER_ID{CABLE},
+        $cable->{id}, {
+          GO_TO_MAP   => 1,
+          POINT_ID    => $cable->{point_id},
+          SINGLE      => $cable->{point_id},
+          RETURN_HREF => 1
+        }
+      ),
+    }
+  };
+}
+
+#**********************************************************
+=head2 _cablecat_external_link_info($cable_id, $fiber_num, $direction, $info)
+
+=cut
+#**********************************************************
+sub _cablecat_external_link_info {
+  my ($cable_id, $fiber_num, $direction, $info) = @_;
+  
+  if (!$info) {
+    
+    # Search former will not include 'false' direction in query unless it's a string
+    $direction = '0' if (!$direction);
+    my $list = $Cablecat->links_list({
+      CABLE_ID         => $cable_id,
+      FIBER_NUM        => $fiber_num,
+      DIRECTION        => $direction,
+      SHOW_ALL_COLUMNS => 1
+    });
+    _error_show($Cablecat);
+  
+    $info = $list->[0];
+  }
+  
+  if ($info->{uid}){
+    my $user_info = $users->info($info->{uid});
+    return user_ext_menu($user_info->{UID}, $user_info->{LOGIN});
+  }
+  elsif ($info->{equipment_id}) {
+    
+    
+    my $equipment_info = $Equipment->_info($info->{equipment_id});
+    
+    return $html->b($equipment_info->{SYSTEM_ID} || '') . ' : ' . ($info->{equipment_port} || q{});
+  }
+  elsif ($info->{splitter_id}) {
+    my $splitter = $Cablecat->splitters_info($info->{splitter_id});
+    return "$lang{SPLITTER} " . $html->b("$splitter->{TYPE}#$splitter->{ID}") . ' : ' .  ($info->{splitter_port} || q{});
+  }
+  elsif ($info->{point_id}){
+    my $object = $Maps->points_info($info->{point_id});
+    my $type  = _translate($object->{TYPE});
+    
+    return "$lang{OBJECT} : $object->{NAME}($lang{TYPE} : $type)";
+  }
+  
+  return '';
+}
+
+#**********************************************************
+=head2 _cablecat_link_info_cell($cable_id, $fiber_num, $direction, $html)
+
+=cut
+#**********************************************************
+sub _cablecat_link_info_cell {
+  my ($cable_id, $fiber_num, $direction, $data) = @_;
+  
+  if (!$data) {
+    return $html->button('', '', {
+        class     => 'add',
+        ICON      => 'glyphicon glyphicon-plus',
+        BUTTON    => 1,
+        SKIP_HREF => 1,
+        ex_params => "onClick='addLinkInfo($cable_id, $fiber_num, $direction)'"
+      })
+  }
+  
+  my $del_btn = $html->button('', '', {
+      class     => 'btn btn-xs btn-danger',
+      ICON      => 'glyphicon glyphicon-remove',
+      SKIP_HREF => 1,
+      ex_params => "onClick='clearLinkInfo($cable_id, $fiber_num, $direction)'"
+    });
+  
+  return $html->element('div', $data, {class => 'col-xs-10'})
+    . $html->element('div', $del_btn, { class => 'col-xs-2'});
+  
+}
+
+
+#**********************************************************
+=head2 _cablecat_get_cable_link()
+
+=cut
+#**********************************************************
+sub _cablecat_get_cable_link {
+  my ($cable_id, $attr) = @_;
+  state $cables_info = {};
+  
+  if (!exists $cables_info->{$cable_id}){
+    $cables_info->{$cable_id} = $Cablecat->cables_info($cable_id);
+    _error_show($Cablecat);
+  }
+  
+  my $info = $cables_info->{$cable_id};
+  
+  return $html->button($info->{name}, 'get_index=cablecat_cables&full=1&chg=' . $cable_id);
+}
+
+#**********************************************************
+
+=head2 _cablecat_result_former_color_scheme_filter()
+
+=cut
+
+#**********************************************************
+sub _cablecat_result_former_color_scheme_filter {
+
+  #  my ($colors_text) = @_;
+  #  my @colors_raw = split(',', $colors_text);
+
+  my @colors_raw = split(',', shift);
+
+  my @colors = map { '#' . $_ } @colors_raw;
+
+  my $i                  = 1;
+  my $create_colored_div = sub {
+    my $text = $conf{CABLECAT_COLOR_SCHEME_NUMBERS} ? $i++ : '&nbsp;&nbsp;&nbsp;';
+    my $color = $_;
+
+    if ($_ =~ /\+$/) {
+      if ($conf{CABLECAT_COLOR_SCHEME_NUMBERS}) {
+        $text .= '+';
+      }
+      else {
+        $text = '+';
+      }
+
+      ($color) = $_ =~ /(.*)\+/;
+    }
+
+    return $html->element('div', $text, { style => "display: inline-block; padding: 3px 5px; background-color : $color; color: white" });
+  };
+
+  return join('', map { $create_colored_div->($_) } @colors);
+}
+
+#**********************************************************
+=head2 _cablecat_result_former_point_id_filter()
+
+  Arguments:
+    $point_id - Maps object id
+    $attr     - hash ref
+      PARAMS - arr ref
+        0  - layer_id
+
+=cut
+#**********************************************************
+sub _cablecat_result_former_point_id_filter {
+  my ($point_id, $attr) = @_;
+  
+  state $map_points_by_id;
+  if ( !defined $map_points_by_id ) {
+    my $points_list = $Maps->points_list({
+      COORDX    => '_SHOW',
+      COORDY    => '_SHOW',
+      EXTERNAL  => 1,
+      PAGE_ROWS => 10000
+    });
+    $map_points_by_id = sort_array_to_hash($points_list);
+  }
+  state $map_index = undef;
+  if ( !$map_index ) {
+    $map_index = get_function_index('maps_add_2');
+  }
+  
+  my $layer_id = ($attr && $attr->{PARAMS} && $attr->{PARAMS}->[0]) ? $attr->{PARAMS}->[0] : 1;
+  
+  if ( $point_id ) {
+    # If have location, we can show it on map
+    if ( $map_points_by_id->{$point_id}{coordx} && $map_points_by_id->{$point_id}{coordy} ) {
+      return $html->button('', "index=$map_index&show_layer=$layer_id&OBJECT_ID=$point_id&BY_POINT_ID=$point_id&SINGLE=1&LAYER_ID=$layer_id&POINT_ID=$point_id",
+        { ICON => 'glyphicon glyphicon-globe' })
+    }
+    # Else should change existing object
+    else {
+      return $html->button('', "index=$map_index&add=CUSTOM_POINT&OBJECT_ID=$point_id",
+        { ICON => 'glyphicon glyphicon-map-marker' })
+    }
+  }
+  # If no object defined, propose to add it
+  else {
+    return '';
+#    return $html->button('', "index=$map_index&add=CUSTOM_POINT&TYPE_ID=$type_id",
+#      { ICON => 'glyphicon glyphicon-plus' });
+  }
+  
+}
+
+#**********************************************************
+=head2 _cablecat_result_former_parent_id_filter()
+
+=cut
+#**********************************************************
+sub _cablecat_result_former_parent_id_filter {
+  my $well_id = shift;
+  return '' unless ($well_id);
+
+  # Next block should be called only once
+  state $well_by_id = undef;
+  if (!$well_by_id) {
+    my $well_list = $Cablecat->wells_list({ ID => '_SHOW', NAME => '_SHOW', COLS_NAME => 1 });
+    _error_show($Cablecat);
+
+    $well_by_id = sort_array_to_hash($well_list);
+  }
+
+  my $well = $well_by_id->{$well_id};
+  return '' unless (defined $well);
+
+  return $html->button($well->{name}, "index=" . get_function_index('cablecat_wells') . "&chg=$well->{id}", {});
+}
+
+#**********************************************************
+=head2 _cablecat_result_former_named_chg_link_filter($names, $attr)
+
+  Result former function to make links from raw name.
+   
+  Arguments:
+    $names - string or comma separated strings for button(s)_name (object name(s))
+    $attr  -
+      VALUES
+        FUNCTION     - function to go
+        PARAM_NAME   - name of VALUES key, to read id(s) from
+        %PARAM_NAME% - value(s) for id
+        
+  Returns:
+    html - link(s) to FUNCTION with chg=%ID%
+
+=cut
+#**********************************************************
+sub _cablecat_result_former_named_chg_link_filter {
+  my ($names, $attr) = @_;
+  
+  return '' unless $names;
+  
+  my %params = %{$attr->{VALUES}};
+  my $function = $params{FUNCTION};
+  
+  if (!exists $params{PARAM_NAME} || !exists $params{uc $params{PARAM_NAME}}){
+    return ''
+  }
+  
+  my @ids = split(',\s?', $params{uc $params{PARAM_NAME}});
+  my @names = split(',\s?', $names);
+  
+  my $index = get_function_index($function);
+  
+  my @links = ();
+  for ( my $i = 0; $i <= $#ids; $i++ ) {
+    push (@links, $html->button($names[$i], "index=$index&chg=$ids[$i]",{}));
+  }
+  
+  return join(', ', @links);
+}
+
+#**********************************************************
+=head2 _cablecat_result_former_icon_filter()
+
+=cut
+#**********************************************************
+sub _cablecat_result_former_icon_filter {
+  my ($icon_name) = @_;
+  
+  my $folder = '/images/maps/icons/';
+  
+  $icon_name .= '.png' if ($icon_name !~ /\.png$/);
+  
+  return "<img src='$folder$icon_name' alt='$icon_name' />";
+}
+
+#**********************************************************
+=head2 _cablecat_address_for_well_id()
+
+=cut
+#**********************************************************
+sub _cablecat_address_for_well_id {
+  my ($well_id) = @_;
+  
+  my $well_info = $Cablecat->wells_info($well_id);
+  if ($well_info->{point_id}){
+    my $point_info = $Maps->points_info($well_info->{point_id}, { ADDRESS_FULL => '_SHOW', COLS_UPPER => 0 });
+    
+    my $map_btn = _cablecat_result_former_point_id_filter($well_info->{point_id}, { PARAMS => [$MAP_LAYER_ID{WELL}] });
+    my $address = $point_info->{address_full} || '';
+    
+    return  $address . ' ' . $map_btn;
+  }
+  
+  #TODO: show 'edit/set' button
+  
+  return '';
+}
+
+1;

@@ -1,0 +1,480 @@
+#!perl
+=head1 NAME Referral
+
+  Referral system
+
+  Error ID: 41xx
+
+=cut
+
+use strict;
+use warnings FATAL => 'all';
+
+our ($db,
+  $admin,
+  %conf,
+  $html,
+  %lang);
+
+use Referral;
+my $Referral = Referral->new( $db, $admin, \%conf );
+
+#**********************************************************
+=head2 referral_settings()
+
+  Allows to manage module configuration in config table
+
+=cut
+#**********************************************************
+sub referral_settings{
+  
+  if ( $FORM{action} && $FORM{action} ne '' ){
+    $Referral->settings_set( \%FORM );
+
+    unless ( _error_show( $Referral ) ){
+      $html->message( 'info', $lang{CHANGED} );
+    };
+  }
+
+  my $settings = $Referral->settings_get();
+  $html->tpl_show( _include( 'referral_settings', "Referral" ), $settings );
+
+  return 1;
+}
+
+#**********************************************************
+=head2 referral_user()
+
+=cut
+#**********************************************************
+sub referral_user{
+  my $uid = $FORM{UID};
+
+  require Control::Users_mng;
+
+  # user_modal_search() can return numeric value when modlas is loaded
+  my $search_referrer_button = user_modal_search();
+  if ( $search_referrer_button && $search_referrer_button eq 2 ) {
+    return 1;
+  }
+
+  if ($FORM{set} && $FORM{REFERRAL_UID} && $FORM{REFERRER_UID}){
+    referral_set();
+  }
+
+  return unless $uid;
+
+  my $show_referrals_button = '';
+  my $show_referrer_content = '';
+
+  # Check if have refferer
+  my $referrer = 0;
+
+  my $referrer_info = $Referral->info( $uid );
+  _error_show( $Referral );
+
+  if ( defined $referrer_info ){
+    $referrer = $referrer_info->{referrer};
+    $show_referrer_content = _referral_referrer_show( $referrer )
+  }
+
+  # Check if have referrals
+  my ($users_list) = _get_users_list();
+  my $inverse_hash = _transform_to_hash( $users_list, { NAME_KEY => 'referrer', VALUE_KEY => 'uid' } );
+
+  if ( defined $inverse_hash->{$uid} ){
+    $show_referrals_button = referral_get_show_referrals_button( $uid );
+  }
+
+  $html->tpl_show( _include( 'referral_user', 'Referral' ),
+    {
+      SEARCH_BUTTON       => $search_referrer_button,
+      REFFERER_ROW_HIDDEN => ($show_referrer_content) ? '' : 'hidden',
+      REFERRER            => $show_referrer_content,
+      SHOW_BUTTON_HIDDEN  => ($show_referrals_button) ? '' : 'hidden',
+      SHOW_BUTTON         => $show_referrals_button
+    },
+    { ID => 'referral_user' }
+  );
+
+  return 1;
+}
+
+#**********************************************************
+=head2 referral_show()
+
+  Arguments:
+
+
+  Returns:
+
+=cut
+#**********************************************************
+sub referral_report{
+  my $uid = (defined $FORM{USER_ID} && $FORM{USER_ID} ne '') ? $FORM{USER_ID} : undef;
+
+  my ($users_list, $users_hash) = _get_users_list();
+
+  if (!defined $users_list || ref $users_list ne 'ARRAY') {
+    $users_list = [];
+  }
+
+  my $users_who_have_referrals = $Referral->get_referrers_list();
+  
+  _error_show( $Referral );
+
+  my $select = $html->form_select( 'USER_ID', {
+      SELECTED    => $uid,
+
+      SEL_LIST    => $users_who_have_referrals,
+      SEL_KEY     => 'uid',
+      SEL_VALUE   => 'id',
+
+      NO_ID       => 1,
+      SEL_OPTIONS => { '' => '' },
+
+    } );
+
+  foreach my $root_user ( @$users_who_have_referrals ){
+    $root_user->{referrer} = 0 if( !$root_user->{referrer} );
+  }
+  
+  my $tree = referral_show( undef, [ @{$users_list}, @{ $users_who_have_referrals } ], $users_hash, $uid,
+    { OUTPUT2RETURN => 1 }
+  );
+
+  $html->tpl_show( _include( 'referral_reports', 'Referral' ), {
+      USER_SELECT   => $select,
+      REFERRAL_TREE => $tree,
+    } );
+
+  return 1;
+}
+
+#**********************************************************
+=head2 referral_show($users_list, $users_hash, $uid_, $attr)
+
+  Arguments:
+    $users_list
+    $users_hash
+    $uid_
+    $attr
+      OUTPUT2RETURN
+
+  Returns:
+
+=cut
+#**********************************************************
+sub referral_show{
+  my (undef, $users_list, $users_hash, $uid_, $attr) = @_;
+
+  my $uid = $uid_ || $FORM{USER_ID} || 0;
+  
+  unless ( $users_list && $users_hash ){
+    ($users_list, $users_hash) = _get_users_list();
+  }
+
+  my $caption = $lang{REFERRALS_LIST};
+  
+  if ( $uid ){
+    my $user_info = $Referral->get_user_info( $uid );
+    my $user_name = $user_info->{id};
+
+    $caption .= " $lang{FOR} $user_name";
+
+    # Check if has referals
+    my $inverse_hash = _transform_to_hash( $users_list, { NAME_KEY => 'referrer', VALUE_KEY => 'uid' } );
+    
+    if ( !defined $inverse_hash->{$uid} ){
+      $html->message( 'err', $lang{NO_RECORD} );
+      return 1;
+    }
+  }
+
+  my $tree = $html->tree_menu( $users_list, $caption,
+    {
+      PARENT_KEY => 'referrer',
+      ID_KEY     => 'uid',
+
+      LABEL_KEY  => 'id',
+      ROOT_VALUE => $uid,
+
+      COL_SIZE   => 12,
+    } );
+
+
+  if ( $attr->{OUTPUT2RETURN} ){
+    return $tree;
+  }
+
+  print $html->element('div', $tree, { class => 'modal-body row' });
+
+  return 1;
+}
+
+#**********************************************************
+=head2 referral_user_search()
+
+  Search users
+
+  Arguments:
+
+
+  Returns:
+
+=cut
+#**********************************************************
+sub referral_form_search{
+  my $uid = $FORM{USER_ID};
+
+  if ( !$FORM{action} ){
+
+    my $search = $html->tpl_show(
+      _include( 'referral_user_search', 'Referral' ),
+      { REFERRAL_UID => $uid },
+      { OUTPUT2RETURN => 1 }
+    );
+
+    $html->tpl_show(
+      templates( 'form_popup_window' ),
+      { SUB_TEMPLATE => $search, CALLBACK_FN_NAME => 'referral_form_search' }
+    );
+  }
+  else{
+    my $script = "<script>defineSearchResultLogic()</script>";
+    my $users_list = $main::users->list(
+      {
+        %FORM,
+        FIO       => "*$FORM{FIO}*",
+        PHONE     => '*',
+        COLS_NAME => 1
+      }
+    );
+
+    if ( _error_show( $users ) ){
+      return 0;
+    }
+
+    if ( scalar @{$users_list} > 40 ){
+      $html->message( "warn", $lang{ERROR}, $lang{ERR_SEARCH_VAL_TOSMALL} );
+      return 1;
+    }
+
+    my $table = $html->table(
+      {
+        width   => '100%',
+        caption => $lang{USERS},
+        title   => [ $lang{LOGIN}, $lang{FIO}, $lang{PHONE} ],
+        qs      => $pages_qs,
+        ID      => 'SEARCH_TABLE_ID'
+      }
+    );
+    foreach my $user ( @{$users_list} ){
+
+      my $link = "?get_index=referral_set&header=2&REFERRER_UID=$user->{uid}&REFERRAL_UID=$uid";
+      my $login_str = "<button class='btn btn-default search-result' data-link='$link'>$user->{login}</button>";
+
+      $table->addrow(
+        $login_str,
+        $user->{fio} || '--',
+        $user->{phone} || '--'
+      );
+    }
+
+    print $table->show() . $script;
+  }
+
+  return 1;
+}
+
+#**********************************************************
+=head2 referral_set()
+
+  Arguments:
+    FORM
+      REFERRAL_UID
+      REFERRER_UID
+
+  Returns:
+
+=cut
+#**********************************************************
+sub referral_set{
+  my $who_is_referred = $FORM{REFERRAL_UID};
+  my $who_referred_him = $FORM{REFERRER_UID};
+
+  return 0 unless( $who_is_referred && $who_referred_him);
+
+  if ( $who_is_referred eq $who_referred_him ){
+    $html->message( 'err', $lang{ERROR},
+      " $lang{REFERRER} ($who_referred_him) == $lang{REFERRAL} ($who_is_referred) " );
+    return 0;
+  }
+
+  $Referral->add( {
+      UID      => $who_is_referred,
+      REFERRER => $who_referred_him,
+    } );
+
+  if ( !_error_show( $Referral ) ){
+    $html->message( 'info', $lang{ADDED} );
+  } else{
+    return 0;
+  }
+
+  # Show result of change
+  print $lang{REFERRER} . _referral_referrer_show( undef, $who_referred_him );
+
+  return 1;
+}
+
+#**********************************************************
+=head2 referral_referrer_show($referrer)
+
+  Arguments:
+    $referrer - UID
+
+  Returns:
+    html or empty string
+
+=cut
+#**********************************************************
+sub _referral_referrer_show{
+  my ($referrer_) = @_;
+
+  my $referrer = $referrer_ || $FORM{REFERRER_UID};
+
+  my $user_name;
+
+  my $user_info = $Referral->get_user_info( $referrer );
+  if ( defined $user_info ){
+    $user_name = $user_info->{id}
+  }
+  else{
+    return '';
+#    return $html->message( 'err', $lang{ERROR}, $lang{USER_NOT_EXIST} );
+  }
+
+  return $html->element( 'div', user_ext_menu( $referrer, $user_name ));
+}
+
+#**********************************************************
+=head2 referral_get_search_button($referral_id)
+
+  Arguments:
+    $referral_id - UID of user to choose referrer for
+
+  Returns:
+    HTML code for button
+
+=cut
+#**********************************************************
+sub referral_get_search_button{
+  my ($referral_id) = @_;
+
+  return 0 unless $referral_id;
+
+  return $html->button( '', undef,
+    {
+      class          => 'btn btn-sm btn-default',
+      JAVASCRIPT     => '',
+      SKIP_HREF      => 1,
+      NO_LINK_FORMER => 1,
+      ex_params      => qq/onclick=loadRawToModal('?get_index=referral_form_search&header=2&USER_ID=$referral_id')/,
+      ICON           => 'glyphicon glyphicon-search'
+    } );
+}
+
+#**********************************************************
+=head2 referral_get_show_referrals_button($referrer_id)
+
+  Arguments:
+    $referrer_id - UID of user to show referrals for
+
+  Returns:
+    HTML code for button
+
+=cut
+#**********************************************************
+sub referral_get_show_referrals_button{
+  my ($referrer_id) = @_;
+
+  return 0 if !$referrer_id;
+
+  return $html->button( '', undef, {
+      class          => 'btn btn-sm btn-default',
+      JAVASCRIPT     => '',
+      SKIP_HREF      => 1,
+      NO_LINK_FORMER => 1,
+      ex_params      => qq/onclick=loadToModal('?get_index=referral_show&header=2&USER_ID=$referrer_id')/,
+      ICON           => 'glyphicon glyphicon-tree-deciduous'
+    } );
+}
+
+#**********************************************************
+=head2 get_users_list()
+
+  Arguments:
+
+
+  Returns:
+    list
+      arr_ref  - DB list of users info
+      hash_ref -
+
+=cut
+#**********************************************************
+sub _get_users_list{
+
+  my $list = $Referral->list( {
+      REFERRER  => '_SHOW',
+      UID       => '_SHOW',
+      COLS_NAME => 1
+    } )->{list};
+
+  _error_show( $Referral );
+
+  my $hash = _transform_to_hash( $list, { NAME_KEY => 'uid', VALUE_KEY => 'referrer' } );
+
+  return ($list, $hash);
+}
+
+#**********************************************************
+=head2 transform_to_hash($list, $attr)
+
+  Transforms arr_ref of hash_ref to one hash_ref
+
+  Arguments:
+    $list - DB list, arr_ref of hash_ref
+    $attr
+      NAME_KEY
+      VALUE_KEY
+
+  Returns:
+    hash_ref
+
+
+=cut
+#**********************************************************
+sub _transform_to_hash{
+  my ($list, $attr) = @_;
+
+  my $name_key = $attr->{NAME_KEY};
+  my $val_key = $attr->{VALUE_KEY};
+
+  if ( !defined $list || scalar @{$list} == 0 ){
+    return { };
+  }
+
+  my $result = { };
+
+  foreach my $element ( @{$list} ){
+    next unless $element->{$name_key};
+    $result->{$element->{$name_key}} = $element->{$val_key};
+  }
+
+  return $result;
+}
+
+
+1;

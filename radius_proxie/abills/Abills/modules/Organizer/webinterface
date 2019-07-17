@@ -1,0 +1,249 @@
+#!perl
+
+=head1 NAME
+  Dom organizer - module for hous payments organizer
+
+=cut
+
+=head1 Synopsis
+  The module counts the costs for utilities
+
+  Capabilities:
+    - add data from the counters
+    - calculation of cost per month
+    - visual representation
+=cut
+
+use Organizer;
+my $Organizer = Organizer->new($db, $admin, \%conf);
+#**********************************************************
+=head2 o_main($attr)
+
+  Arguments:
+
+
+  Returns:
+
+=cut
+
+#**********************************************************
+sub o_user {
+  #my ($attr) = @_;
+  my %INFORMATION;
+  $INFORMATION{BTN_NAME} = "$lang{ADD}";
+  $INFORMATION{ACTION}   = "add";
+
+  if ($FORM{DATE} && $FORM{action} eq 'add') {
+
+    my $prev_date = $Organizer->info_user_info({COLS_NAME => 1, PREV_DATE => $FORM{DATE}, UID => $user->{UID}});
+    my $next_date = $Organizer->info_user_info({COLS_NAME => 1, NEXT_DATE => $FORM{DATE}, UID => $user->{UID}});
+
+    if($prev_date ne '' && ($prev_date->{light} > $FORM{LIGHT} || $prev_date->{gas} > $FORM{GAS} || $prev_date->{water} > $FORM{WATER})){
+      $html->message("err", "$lang{NEW_DATA_FOR} $FORM{DATE} $lang{SMALLER_THEN} $prev_date->{date}!", "$lang{CHECK_CORRECTNESS}");
+      $INFORMATION{DATE} = $FORM{DATE};
+      $INFORMATION{LIGHT} = $FORM{LIGHT};
+      $INFORMATION{GAS}   = $FORM{GAS};
+      $INFORMATION{WATER} = $FORM{WATER};
+      $INFORMATION{COMMUNAL} = $FORM{COMMUNAL};
+      $INFORMATION{COMMENTS} = $FORM{COMMENTS};
+    }
+    elsif($next_date ne '' && ($next_date->{light} < $FORM{LIGHT} || $next_date->{gas} < $FORM{GAS} || $next_date->{water} < $FORM{WATER})){
+      $html->message("err", "$lang{NEW_DATA_FOR} $FORM{DATE} $lang{GREATER_THEN} $next_date->{date}!", "$lang{CHECK_CORRECTNESS}");
+      $INFORMATION{DATE} = $FORM{DATE};
+      $INFORMATION{LIGHT} = $FORM{LIGHT};
+      $INFORMATION{GAS}   = $FORM{GAS};
+      $INFORMATION{WATER} = $FORM{WATER};
+      $INFORMATION{COMMUNAL} = $FORM{COMMUNAL};
+      $INFORMATION{COMMENTS} = $FORM{COMMENTS};
+    }
+    else{
+      $Organizer->add_user_info({ UID => $user->{UID}, %FORM });
+      if (!$Organizer->{errno}) {
+        $html->message("success", "$lang{INFO} $lang{ADDED}");
+      }
+      else {
+        $html->message("err", "$lang{INFO_ALREADY_ADDED}");
+      }
+    }
+  }
+  elsif ($FORM{action} eq 'change') {
+    my $prev_date = $Organizer->info_user_info({COLS_NAME => 1, PREV_DATE => $FORM{DATE}, UID => $user->{UID}});
+    my $next_date = $Organizer->info_user_info({COLS_NAME => 1, NEXT_DATE => $FORM{DATE}, UID => $user->{UID}});
+
+    if($prev_date ne '' && ($prev_date->{light} > $FORM{LIGHT} || $prev_date->{gas} > $FORM{GAS} || $prev_date->{water} > $FORM{WATER})){
+      $html->message("err", "$lang{NEW_DATA_FOR} $FORM{DATE} $lang{SMALLER_THEN} $prev_date->{date}!", "$lang{CHECK_CORRECTNESS}");
+      $INFORMATION{DATE} = $FORM{DATE};
+      $INFORMATION{LIGHT} = $FORM{LIGHT};
+      $INFORMATION{GAS}   = $FORM{GAS};
+      $INFORMATION{WATER} = $FORM{WATER};
+      $INFORMATION{COMMUNAL} = $FORM{COMMUNAL};
+      $INFORMATION{COMMENTS} = $FORM{COMMENTS};
+    }
+    elsif($next_date ne '' && ($next_date->{light} < $FORM{LIGHT} || $next_date->{gas} < $FORM{GAS} || $next_date->{water} < $FORM{WATER})){
+      $html->message("err", "$lang{NEW_DATA_FOR} $FORM{DATE} $lang{GREATER_THEN} $next_date->{date}!", "$lang{CHECK_CORRECTNESS}");
+      $INFORMATION{DATE} = $FORM{DATE};
+      $INFORMATION{LIGHT} = $FORM{LIGHT};
+      $INFORMATION{GAS}   = $FORM{GAS};
+      $INFORMATION{WATER} = $FORM{WATER};
+      $INFORMATION{COMMUNAL} = $FORM{COMMUNAL};
+      $INFORMATION{COMMENTS} = $FORM{COMMENTS};
+    }
+    else{
+      $Organizer->change_user_info({ ID => $FORM{ID}, %FORM });
+      if (!$Organizer->{errno}) {
+        $html->message("success", "$lang{INFO} $lang{CHANGED}");
+      }
+      else {
+        $html->message("err", "$lang{CANT_CHANGE}");
+      }
+    }
+  }
+
+  if ($FORM{chg}) {
+    my $date_info = $Organizer->info_user_info({ COLS_NAME => 1, ID => $FORM{chg} });
+    $INFORMATION{DATE}     = $date_info->{date};
+    $INFORMATION{LIGHT}    = $date_info->{light};
+    $INFORMATION{GAS}      = $date_info->{gas};
+    $INFORMATION{WATER}    = $date_info->{water};
+    $INFORMATION{COMMUNAL} = $date_info->{communal};
+    $INFORMATION{COMMENTS} = $date_info->{comments};
+    $INFORMATION{BTN_NAME} = "$lang{CHANGE}";
+    $INFORMATION{ACTION}   = "change";
+    $INFORMATION{ID}       = "$FORM{chg}";
+  }
+
+  if ($FORM{del}) {
+    $Organizer->del_user_info({ ID => $FORM{del} });
+    if (!$Organizer->{errno}) {
+      $html->message("success", "$lang{INFO} $lang{DELETED}");
+    }
+    else {
+      $html->message("err", "$lang{NOT} $lang{DELETE}");
+    }
+  }
+
+  my $info_list = $Organizer->list_user_info(
+    {
+      COLS_NAME => 1,
+      UID       => $user->{UID},
+      DATE      => '_SHOW',
+      LIGHT     => '_SHOW',
+      GAS       => '_SHOW',
+      WATER     => '_SHOW',
+      COMMUNAL  => '_SHOW',
+      COMMENTS  => '_SHOW',
+      SORT      => 'date',
+      DESC      => 'DESC',
+      LIMIT     => 25
+    }
+  );
+
+  my @dates = ();
+  my @light = ();
+  my @gas   = ();
+  my @water = ();
+
+  my @NORMAL_DATES_LIST = reverse(@$info_list);
+
+  for (my $i = 1 ; $i < scalar(@NORMAL_DATES_LIST) ; $i++) {
+    my ($first_year,  $first_month,  $first_day)  = split('-', $NORMAL_DATES_LIST[ $i - 1 ]->{date});
+    my ($second_year, $second_month, $second_day) = split('-', $NORMAL_DATES_LIST[$i]->{date});
+
+    #push (@dates, "$NORMAL_DATES_LIST[$i - 1]->{date} - $NORMAL_DATES_LIST[$i]->{date}");
+    push(@dates, "$first_day $MONTHES[--$first_month] $first_year - $second_day $MONTHES[--$second_month] $second_year");
+    push(@light, ($NORMAL_DATES_LIST[$i]->{light} - $NORMAL_DATES_LIST[ $i - 1 ]->{light}));
+    push(@gas,   ($NORMAL_DATES_LIST[$i]->{gas} - $NORMAL_DATES_LIST[ $i - 1 ]->{gas}));
+    push(@water, ($NORMAL_DATES_LIST[$i]->{water} - $NORMAL_DATES_LIST[ $i - 1 ]->{water}));
+  }
+
+  $INFORMATION{CHART} = $html->make_charts(
+    {
+      TRANSITION    => 1,
+      TYPES         => { "$lang{WATER}" => 'COLUMN', "$lang{LIGHT}" => 'COLUMN', "$lang{GAS}" => 'COLUMN' },
+      X_TEXT        => \@dates,
+      DATA          => { "$lang{LIGHT}" => \@light, "$lang{GAS}" => \@gas, "$lang{WATER}" => \@water },
+      OUTPUT2RETURN => 1,
+    }
+  );
+
+  $html->tpl_show(
+    _include('add_public_utilites', 'Organizer'),
+    {
+      DATE => $INFORMATION{DATE} || $DATE,
+      %INFORMATION
+    }
+  );
+
+  my ($table, $list) = result_former(
+    {
+      INPUT_DATA      => $Organizer,
+      LIST            => $info_list,
+      DEFAULT_FIELDS  => "date, light, gas, water, communal, comments",
+      FUNCTION_FIELDS => 'change, del',
+      EXT_TITLES      => {
+        'date'     => "$lang{DATE}",
+        'light'    => "$lang{LIGHT}, $lang{KWT}",
+        'gas'      => "$lang{GAS}, $lang{M3}",
+        'water'    => "$lang{WATER}, $lang{M3}",
+        'communal' => "$lang{COMMUNAL}" . ", $lang{GRN}",
+        'comments' => "$lang{COMMENTS}"
+      },
+      TABLE => {
+        width   => '100%',
+        caption => "$lang{ORGANIZER}",
+        qs      => $pages_qs,
+        ID      => 'USER_ORGANIZER',
+        header  => '',
+        EXPORT  => 1,
+        MENU    => "$lang{ADD}:index=" . get_function_index('o_user') . ':add' . ";",
+      },
+      MAKE_ROWS     => 1,
+      SEARCH_FORMER => 1,
+      MODULE        => 'Organizer',
+      TOTAL         => 1
+    }
+  );
+
+  return 1;
+}
+
+#**********************************************************
+
+=head2 o_add_type($attr)
+
+  Arguments:
+
+
+  Returns:
+
+=cut
+
+#**********************************************************
+# sub o_add_type {
+#   #my ($attr) = @_;
+
+#   my %DATA;
+#   $DATA{ACTION}   = 'add';
+#   $DATA{BTN_NAME} = "$lang{ADD}";
+
+#   if ($FORM{action} eq 'add') {
+
+#   }
+#   elsif ($FORM{action} eq 'change') {
+
+#   }
+
+#   if ($FORM{chg}) {
+#     $DATA{ACTION}   = 'change';
+#     $DATA{BTN_NAME} = "$lang{CHANGE}";
+#   }
+
+#   if ($FORM{del}) {
+
+#   }
+
+#   $html->tpl_show(_include('add_type', 'Organizer'), {%DATA});
+#   return 1;
+# }
+
+1;

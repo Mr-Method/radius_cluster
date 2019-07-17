@@ -1,0 +1,32 @@
+#Iner_ID : Main or Sub or if -1 user menu func list
+my $non_privileged = exists $conf{MAPS_NON_PRIVILEGED_EDIT} && $conf{MAPS_NON_PRIVILEGED_EDIT};
+my $root_index = $non_privileged ? 8 : 5;
+
+%FUNCTIONS_LIST = (
+  "01:0:$lang{MAP}:maps_show_map:"                                => 8, # Main new map
+  "02:1:$lang{BUILDS}:maps_builds_quick:"                           => 8,
+
+  "03:" . ($non_privileged ? '1' : '0') . ":$lang{MAP}:maps_edit:" => $root_index,
+  "04:3:$lang{LAYERS}:maps_layers"                                  => $root_index,
+#  "05:3:$lang{ROUTES}:null:"                                        => $root_index,
+#  "06:5:$lang{ROUTES}:maps_routes_list"                             => $root_index,
+#  "07:6:$lang{TYPE}:maps_route_types"                               => $root_index,
+#  "08:6:$lang{GROUPS}:maps_route_groups"                            => $root_index,
+  #  "09:reserved"             => 5,
+
+  "19:3::maps_show_custom_point_form:AJAX"                          => $root_index,
+  "12:3::_maps_object_types_select:AJAX"                            => $root_index,
+
+  "13:3:$lang{OBJECTS}:null"                                        => $root_index,
+  "14:13:$lang{SHOW}:maps_objects_main:"                            => $root_index,
+  "15:13:$lang{OBJECT_TYPES}:maps_point_types_main:"                => $root_index,
+  "16:13:$lang{ICONS}:maps_icons_main:"                             => $root_index,
+  "17:16::_maps_icon_ajax_upload:IN_MODAL"                          => $root_index,
+
+  "18:3:$lang{AUTO_COORDS}:maps_auto_coords"                        => $root_index,
+  "19:3::maps_auto_coords_single:AJAX"                              => $root_index,
+  "20:3::maps_load_info:AJAX"                                       => $root_index,
+  "21:4:$lang{DISTRICTS}:maps_districts_main"                       => $root_index,
+);
+
+1;

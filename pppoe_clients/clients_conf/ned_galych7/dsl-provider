@@ -1,0 +1,10 @@
+noipdefault
+defaultroute
+replacedefaultroute
+replacedefaultroute
+noauth
+persist
+plugin rp-pppoe.so
+nic-eth0
+nic-eno1
+user "ned_galych7"

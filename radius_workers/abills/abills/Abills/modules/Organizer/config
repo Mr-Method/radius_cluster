@@ -1,0 +1,6 @@
+%FUNCTIONS_LIST  = (
+        #"01:0:$lang{ORGANIZER}:null:"                  => 5,
+        #"02:1:Type:o_add_type:"                          => 5,
+);
+
+%USER_FUNCTION_LIST = ("01:0:$lang{ORGANIZER}:o_user:"        => 0);

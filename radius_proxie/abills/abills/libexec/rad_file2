@@ -1,0 +1,18 @@
+
+
+   NAS-Identifier = "nas4.intelekt.cv.ua"
+   Acct-Session-Id = "4494244-vlan2789-252"
+   NAS-Port = 252
+   NAS-Port-Type = Ethernet
+   Service-Type = Framed-User
+   Framed-Protocol = PPP
+   Calling-Station-Id = "00:26:b9:d0:a8:c4"
+   NAS-Port-Id = "vlan2789"
+   mpd-link = "vlan2789-252"
+   mpd-peer-ident = "MSRASV5.20 MSRAS-0-DELL \027\373\223\377\261\362cO\232\223+\334\005\365\024\377"
+   Tunnel-Medium-Type:0 = IEEE-802
+   Tunnel-Client-Endpoint:0 = "00:26:b9:d0:a8:c4"
+   User-Name = "sanya_balshoi"
+   CHAP-Challenge = 0xbb1e68c1b1ba6e03be4a1a63a3fb1e2d90640a6c0c12a6b8adac1e48bc6f
+   CHAP-Password = 0x01ecb4aafae37109d8838c1c646e58a029
+

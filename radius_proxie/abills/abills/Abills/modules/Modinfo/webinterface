@@ -1,0 +1,96 @@
+#!perl
+
+=head2
+  
+  Show module information
+
+=cut 
+
+use strict;
+our ($html,
+%lang);
+
+#**********************************************************
+=head modinfo_start_page_show($attr)
+
+=cut
+#**********************************************************
+sub modinfo_start_page_show {
+  #my ($attr) = @_;
+  
+  my $output = web_request('http://abills.net.ua/info.txt', { BODY_ONLY => 1 });
+  my @modules_list = ();
+
+  if ($output) {
+    @modules_list = split(/[\r]?\n/, $output);
+  }
+  else {
+    return 0;
+  }
+
+  my ($name, undef, $url) = split(/:/, $modules_list[rand($#modules_list + 1)], 3);
+
+  my $info = modinfo_show($name, $url);
+  
+  print $info if ($index);
+  
+  return $info;
+}
+
+
+#**********************************************************
+=head2 modinfo_show($module_name, $url, $attr)
+
+=cut
+#**********************************************************
+sub modinfo_show {
+  my ($module_name, $url) = @_;
+
+  if (! $url) {
+    $url = 'http://abills.net.ua/wiki/doku.php?id=abills:docs:modules:'. lc($module_name) .':ru';
+  }
+
+  #Get module info
+  my $body = web_request($url. '&do=export_raw',{ BODY_ONLY => 1 }) ;
+
+  if (! $body) {
+    return '';
+  }
+  
+  my (undef, $describe, $futures) = split(/====.+====\n/, $body);
+  $describe =~ s/\\\\/<br>/g;
+  
+  $describe =~ s/\[\[#.*\|//g;
+  $describe =~ s/\{.*\}//g;
+  $futures  =~ s/\[\[#.*\|//g;
+  $futures  =~ s/\]\]//g;
+  $futures  =~ s/\*/<br>\*/g;
+  $futures  =~ s/\\\\/<br>/g;
+  
+  $futures  =~ s/==(.+)==/<b>$1<\/b>/g;
+  $futures  =~ s/[[.+|(.+)]]/$1/g;
+  
+  my $result =  "
+<div class='jumbotron'>
+  <div class='container'>
+  <h2>$lang{MODULE} $module_name</h2>
+  <p>$describe</p>
+  <p>$futures</p>
+  <p>". $html->button($lang{DETAIL}, "$url", { ex_params => 'target=_new', BUTTON => 1, GLOBAL_URL => $url  }) ."</p>
+  </div>
+</div>";
+
+  return $result;
+}
+
+
+#***************************************************************
+#
+#***************************************************************
+sub modinfo_start_page {
+  my %START_PAGE_F = ('modinfo_start_page_show' => 'Module info' );
+
+  return \%START_PAGE_F;
+}
+
+1

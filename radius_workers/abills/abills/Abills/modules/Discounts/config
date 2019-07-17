@@ -1,0 +1,5 @@
+%FUNCTIONS_LIST = (
+      "01:0:$lang{DISCOUNTS}:null:"                                   => 5,
+      "02:1:$lang{ADD} $lang{DISCOUNTS}:discounts_add_discounts:"     => 5,
+      "03:0:$lang{DISCOUNTS}:discounts_user_service:UID"              => 20,
+);

@@ -1,0 +1,3921 @@
+#!perl
+
+=head1 NAME
+
+  Maps web interface
+
+=cut
+
+use strict;
+use warnings 'FATAL' => 'all';
+
+use v5.16;
+
+use Abills::Base qw(in_array _bp);
+
+our $db;
+our $admin;
+our %conf;
+our $html;
+our %lang;
+
+# WEB_DEBUG breaks JSON output
+$conf{TEMP_WEB_DEBUG} = $conf{WEB_DEBUG};
+$conf{WEB_DEBUG} = 0;
+
+$FORM{DEBUG} ||= 0;
+
+# Array of user defined icons in config.pl
+our @MAPS_CUSTOM_ICONS;
+
+use Nas;
+use GPS;
+use Address;
+use Abills::Experimental;
+use JSON qw/to_json from_json/;
+
+my $Nas = Nas->new($db, \%conf);
+my $Address = Address->new($db, $admin, \%conf);
+
+my $json_load_error = load_pmodule("JSON", { RETURN => 1 });
+if ( $json_load_error ) {
+  print $json_load_error;
+  return 1;
+}
+
+if ( !defined $users ) { $users = $user }
+
+if (
+  form_purchase_module(
+    {
+      HEADER          => $user->{UID},
+      MODULE          => 'Maps',
+      REQUIRE_VERSION => 7.43,
+    }
+  )
+)
+{
+  
+  exit;
+}
+
+my $Maps = Maps->new($db, $admin, \%conf);
+
+my %LAYER_ID_BY_NAME = (
+  'BUILD'        => 1,
+  'WIFI'         => 2,
+  'ROUTE'        => 3,
+  'DISTRICT'     => 4,
+  'TRAFFIC'      => 5,
+  'CUSTOM_POINT' => 6,
+  'EQUIPMENT'    => 7,
+  'GPS'          => 8,
+  'GPS_ROUTE'    => 9,
+);
+
+my %MAPS_ENABLED_LAYERS = ();
+
+my $MAPS_ICONS_DIR_WEB_PATH = '/images/maps/icons/';
+my $MAPS_ICONS_DIR = '/Abills/templates/maps/icons/';
+
+my $close_outer_modal_script = qq\
+  <script>
+    setTimeout(function(){aModal.hide()}, 2000);
+    Events.emit('modal_closed');
+  </script>
+  \;
+
+#***************************************************************
+
+=head2 _maps_get_users($attr)
+
+  Arguments:
+    $attr - hash_ref
+      LOCATION_ID     - filter results by LOCATION_ID
+      RETURN_AS_ARRAY - return raw DB list
+
+  Returns:
+    hash_ref - location_id => [ users_for_thi_location ]
+
+=cut
+
+#***************************************************************
+sub _maps_get_users {
+  my ($attr) = @_;
+  
+  #  $users->{debug}=1;
+  my $list = $users->list(
+    {
+      LOGIN         => '_SHOW',
+      FIO           => '_SHOW',
+      DEPOSIT       => '_SHOW',
+      STREET_NAME   => '_SHOW',
+      BUILD_NUMBER  => '_SHOW',
+      ADDRRESS_FLAT => '_SHOW',
+      ACTIVATE      => '_SHOW',
+      EXPIRE        => '_SHOW',
+      GID           => $FORM{GROUP_ID} || '_SHOW',
+      %LIST_PARAMS,
+      LOCATION_ID   => $attr->{LOCATION_ID} || '!',
+      PAGE_ROWS     => '1000000',
+      COLS_NAME     => 1,
+      COLS_UPPER    => 1,
+      SORT          => 'pi.address_flat',
+      UID           => undef
+    }
+  );
+  if ( $attr->{RETURN_AS_ARRAY} ) {
+    return $list;
+  }
+  my %USERS_INFO = ();
+  foreach my $line ( @{$list} ) {
+    
+    # Skip users without location
+    next if (!$line->{build_id});
+    
+    push @{ $USERS_INFO{ $line->{build_id} } }, $line;
+  }
+  
+  return \%USERS_INFO;
+}
+
+#***************************************************************
+=head2 _maps_get_online_users($attr)
+
+=cut
+##***************************************************************
+sub _maps_get_online_users {
+  my ($attr) = @_;
+  
+  require Dv_Sessions;
+  Dv_Sessions->import();
+  
+  my $Dv_sessions = Dv_Sessions->new($db, $admin, \%conf);
+  my %search_params = ($attr->{SHORT})
+  ? ()
+  : (
+      CLIENT_IP => '_SHOW',
+      USER_NAME => '_SHOW',
+      DURATION  => '_SHOW',
+    );
+  
+  
+  my $list = $Dv_sessions->online(
+    {
+      %search_params,
+      COLS_NAME => 1,
+      PAGE_ROWS => 1000000,
+    }
+  );
+  
+  my %USERS_ONLINE = ();
+  foreach my $line ( @{$list} ) {
+    push @{ $USERS_ONLINE{ $line->{uid} } }, $line;
+  }
+  return \%USERS_ONLINE;
+}
+
+#**********************************************************
+
+=head2 maps_add_2($attr) - New model interface to Maps
+
+=cut
+
+#**********************************************************
+sub maps_add_2 {
+  my ($attr) = @_;
+  
+  if ( $FORM{message} ) {
+    $html->message( 'info', $lang{INFO}, $FORM{message} );
+  }
+  
+  # NEW CODE
+  if ( $FORM{del} ) {
+    if ( $FORM{LAYER_ID} && $FORM{OBJECT_ID} ) {
+      if ( $FORM{emulate} ) {
+        
+      }
+      elsif ( $FORM{LAYER_ID} == $LAYER_ID_BY_NAME{BUILD} ) { # BUILD
+        $Address->build_change({
+          ID     => $FORM{OBJECT_ID},
+          COORDX => '0',
+          COORDY => '0',
+        } );
+      }
+      elsif ( $FORM{LAYER_ID} == $LAYER_ID_BY_NAME{WIFI} ) { # Wifi
+        $Maps->wifi_zones_del( { ID => $FORM{OBJECT_ID} } );
+      }
+      elsif ( $FORM{LAYER_ID} == $LAYER_ID_BY_NAME{ROUTE} ) { # Route
+        $Maps->routes_coords_del({ ROUTE_ID => $FORM{OBJECT_ID} })
+      }
+      elsif ( $FORM{LAYER_ID} == $LAYER_ID_BY_NAME{DISTRICT} ) { # DISTRICT
+        $Maps->districts_del( { ID => $FORM{OBJECT_ID} } );
+      }
+      elsif ( $FORM{LAYER_ID} == $LAYER_ID_BY_NAME{CUSTOM_POINT} ) { # Custom point
+        $Maps->points_del( { ID => $FORM{OBJECT_ID} } );
+      }
+      else {
+        if (!_maps_remove_layer_objects($FORM{LAYER_ID}, $FORM{OBJECT_ID})){
+          $html->message('err', $lang{ERROR});
+        }
+      }
+      
+      show_result( $Maps, $lang{DELETED} );
+      print $close_outer_modal_script;
+      return 1;
+      
+    }
+    $html->message( 'err', $lang{ERROR}, "No required parameters" );
+    return 0;
+  }
+  
+  # Every object linked to address can add new address
+  if ( $FORM{ADD_ADDRESS_BUILD} && $FORM{STREET_ID} ) {
+    # Swapping coordinates (it's a long-long story)
+    $Address->build_add( { %FORM, COORDY => $FORM{COORDX}, COORDX => $FORM{COORDY} } );
+    if ( !_error_show($Address) ) {
+      $FORM{LOCATION_ID} = $Address->{INSERT_ID};
+    }
+  }
+  
+  if ( $FORM{add} && $FORM{LAYER_ID} ) {
+    my $last_object_id = undef;
+    
+    if ( $FORM{LAYER_ID} == $LAYER_ID_BY_NAME{BUILD} ) {
+      
+      # Swapping coordinates (it's a long-long story)
+      ($FORM{COORDX}, $FORM{COORDY}) = ($FORM{COORDY}, $FORM{COORDX});
+      
+      # Builds can be changed (register coords)
+      # and created ( Adding new builds)
+      if ( $FORM{update_build} ) {
+        $Address->build_change( { %FORM, ID => $FORM{LOCATION_ID} } );
+      }
+      
+      $last_object_id = $FORM{LOCATION_ID};
+    }
+    elsif ( $FORM{LAYER_ID} == $LAYER_ID_BY_NAME{WIFI} ) {
+      $Maps->wifi_zones_add(\%FORM);
+    }
+    #    elsif ( $FORM{LAYER_ID} == $LAYER_ID_BY_NAME{ROUTE} ) {
+    #     $Maps->route_points_add(\%FORM);
+    #    }
+    elsif ( $FORM{LAYER_ID} == $LAYER_ID_BY_NAME{DISTRICT} ) {
+      $Maps->districts_add(\%FORM);
+    }
+    #    elsif ( $FORM{LAYER_ID} >= 100 ) {
+    #      my $json_to_escape = $FORM{JSON};
+    #      $json_to_escape =~ s/\\\"/\"/g;
+    #
+    #      my $json_objects = from_json($json_to_escape);
+    #
+    #      _maps_parse_and_save_layer_objects($FORM{LAYER_ID}, $json_objects)
+    #    }
+    elsif ( $FORM{LAYER_ID} == $LAYER_ID_BY_NAME{CUSTOM_POINT} ) {
+      
+      # Allow user to select from closest builds
+      if ( !$FORM{LOCATION_ID} && $FORM{CLOSEST_LOCATION_ID} ) {
+        $FORM{LOCATION_ID} = $FORM{CLOSEST_LOCATION_ID};
+      }
+      
+      $Maps->points_add(\%FORM);
+    }
+    else {
+      $html->message( 'err', $lang{ERROR}, "Wrong parameters" );
+      _bp('', \%FORM);
+      return 0;
+    }
+    
+    if ( show_result( $Maps, $lang{ADDED} ) ) {
+      # Last object id can be set by $Address add
+      $last_object_id //= $Maps->{INSERT_ID};
+      print _maps_get_new_object_dynamic_add_script($FORM{LAYER_ID}, $last_object_id);
+    }
+    return 1;
+  }
+  
+  if ($FORM{change} && $FORM{LAYER_ID}){
+    my $success = 1;
+      
+    if ($FORM{LAYER_ID} eq $LAYER_ID_BY_NAME{BUILD}){
+      $success = $Maps->build_change(\%FORM);
+    }
+    else {
+      $success = _maps_change_layer_objects($FORM{LAYER_ID}, $FORM{OBJECT_ID}, \%FORM);
+    }
+    
+    print (($success) ? "OK" : "Error");
+    return $success;
+  }
+  
+  # OLD CODE
+  if ( !$FORM{TYPE} ) {
+    $attr->{SHOW_ADD_BTN} = 1;
+    maps_show_poins($attr);
+    return 1;
+  }
+  
+  # Change District
+  #  if ( $FORM{TYPE} eq 'DISTRICT' ) {
+  #
+  #    # If have data
+  #    if ( $FORM{COORDX} ) {
+  #      $Address->district_change( $FORM{DISTRICT_ID}, { %FORM, ID => $FORM{DISTRICT_ID} } );
+  #    }
+  #
+  #    # Request data
+  #    else {
+  #      my %info = ();
+  #      $info{DISTRICT_SEL} = $html->form_select(
+  #        "DISTRICT_ID",
+  #        {
+  #          SELECTED       => $FORM{DISTRICT_ID},
+  #          SEL_LIST       => $Address->district_list( { PAGE_ROWS => 10000, COLS_NAME => 1 } ),
+  #          NO_ID          => 1,
+  #          MAIN_MENU      => get_function_index('form_districts'),
+  #          MAIN_MENU_ARGV => "chg=$FORM{DISTRICT_ID}"
+  #        }
+  #      );
+  #      $html->tpl_show( _include('maps_district_select', 'Maps'), \%info );
+  #    }
+  #    return 1;
+  #  }
+  elsif ( $FORM{TYPE} eq 'ROUTE' ) {
+    $Maps->{ACTION} = 'add_route';
+    $Maps->{ACTION_LNG} = $lang{ADD};
+    
+    $Maps->{ROUTE_ID} = $html->form_select(
+      'ROUTE_ID',
+      {
+        SELECTED  => $FORM{ROUTE_ID},
+        SEL_LIST  => $Maps->routes_list( { NAME => '_SHOW', NAS1 => '_SHOW', NAS2 => '_SHOW', COLS_NAME => 1 } ),
+        NO_ID     => 1,
+        SEL_VALUE => 'name,nas1,nas2',
+        MAIN_MENU => get_function_index('maps_routes_list'),
+      }
+    );
+    $Maps->{PARENT_ROUTE_ID} = $html->form_select(
+      'PARENT_ID',
+      {
+        SELECTED    => $FORM{PARENT_ID} || $Maps->{PARENT_ID} || '',
+        SEL_LIST    => $Maps->routes_list( { NAME => '_SHOW', NAS1 => '_SHOW', NAS2 => '_SHOW', COLS_NAME => 1 } ),
+        NO_ID       => 1,
+        SEL_VALUE   => 'name,nas1,nas2',
+        SEL_OPTIONS => { '' => '' },
+        MAIN_MENU   => get_function_index('maps_routes_list'),
+      }
+    );
+    
+    $Maps->{GROUP_ID} = $html->form_select(
+      'GROUP_ID',
+      {
+        SELECTED    => $FORM{GROUP_ID} || $Maps->{GROUP_ID} || '',
+        SEL_LIST    => $Maps->route_groups_list( { NAME => '_SHOW', COLS_NAME => 1 } ),
+        NO_ID       => 1,
+        SEL_OPTIONS => { '' => '' },
+        MAIN_MENU   => get_function_index('maps_route_groups'),
+      }
+    );
+    
+    $html->tpl_show( _include('maps_add_route_info', 'Maps'), { %FORM, %{$Maps} } );
+    return 1;
+  }
+  elsif ( $FORM{TYPE} eq 'WIFI' ) {
+    $Maps->{ACTION} = 'add_wifi';
+    $Maps->{ACTION_LNG} = $lang{ADD};
+    $html->tpl_show( _include('maps_add_wifi', 'Maps'), { %{$Maps}, %FORM } );
+    return 1;
+  }
+  elsif ( $FORM{TYPE} eq 'DISTRICT' ) {
+    $Maps->{ACTION} = 'add_district';
+    $Maps->{ACTION_LNG} = $lang{ADD};
+    $html->tpl_show( _include('maps_add_district', 'Maps'), { %{$Maps}, %FORM } );
+    return 1;
+  }
+  elsif ( $FORM{TYPE} eq 'MULTIPLE' ) {
+    my $layer_id = $FORM{LAYER_ID};
+    
+    # Need extra logic, because form_parse breaks JSON
+    my $json_to_escape = $FORM{JSON};
+    $json_to_escape =~ s/\\\"/\"/g;
+    
+    my $json_objects = from_json($json_to_escape);
+    
+    _maps_parse_and_save_layer_objects($layer_id, $json_objects, \%FORM);
+    
+    $html->message('info', $lang{SUCCESS});
+    
+    if ($FORM{OBJECT_ID}){
+      print _maps_get_new_object_dynamic_add_script($FORM{LAYER_ID}, $FORM{OBJECT_ID});
+    }
+    delete $FORM{__BUFFER};
+    print $close_outer_modal_script;
+  }
+  
+  return 1;
+}
+
+#**********************************************************
+
+=head2 maps_point_info_table($attr) - Make point info window
+
+  Arguments:
+    $attr
+      OBJECTS - Data form map Hash ref
+            [{
+              login   => 'test',
+              deposit => 1.11
+            }]
+
+      TABLE_TITLES - array_ref Location table information fields
+      MAP_FILTERS  -
+
+  Returns:
+    string - HTML table with information
+
+=cut
+
+#**********************************************************
+sub maps_point_info_table {
+  my ($attr) = @_;
+  my $point_info_object = '<table class="table table-condensed table-hover table-bordered">';
+  
+  my $objects      = $attr->{OBJECTS};
+  my $table_titles = $attr->{TABLE_TITLES};
+  
+  return q{} unless ($objects && ref $objects eq 'ARRAY' && scalar @{$objects});
+  
+  my $online_block = $html->element('span', '', {
+      class => 'glyphicon glyphicon-ok-circle text-green',
+      title => $lang{ONLINE}
+  });
+  
+  # Add headers
+  if ($attr->{TABLE_LANG_TITLES} && ref $attr->{TABLE_LANG_TITLES} eq 'ARRAY') {
+    $point_info_object .= '<tr>' . join('', map { '<th>' . ($_ || q{}) . '</th>'  } @{$attr->{TABLE_LANG_TITLES}}) . '</tr>';
+  }
+  
+  foreach my $u ( @{$objects} ) {
+    $point_info_object .= '<tr>';
+    for ( my $i = 0; $i <= $#{$table_titles}; $i++ ) {
+      my $value = $table_titles->[$i];
+      next if (!$value);
+      my $field_id = lc($table_titles->[$i]);
+      
+      if ( $table_titles->[$i] eq 'LOGIN' && $u->{uid} ) {
+        $value = $html->button($u->{$field_id}, "index=15&UID=$u->{uid}");
+      }
+      elsif ( $table_titles->[$i] eq 'DEPOSIT' && defined($u->{'deposit'})) {
+        my $deposit = sprintf("%.2f", $u->{'deposit'});
+        
+        if ( $u->{$field_id} < 0 ) {
+          $value = qq{<p class="text-danger">$deposit</p>};
+        }
+        else {
+          $value = $deposit;
+        }
+      }
+      elsif ( $table_titles->[$i] eq 'ADDRESS_FLAT' ) {
+        $value = $html->b($u->{$field_id});
+      }
+      elsif ( $table_titles->[$i] eq 'ONLINE' ){
+        $value = ($u->{$field_id})
+          ? $online_block
+          : 0;
+      }
+      elsif ( $attr->{MAP_FILTERS} && $attr->{MAP_FILTERS}->{$field_id} ) {
+        my ($filter_fn, @arr) = split(/:/, $attr->{MAP_FILTERS}->{$field_id});
+        
+        my %p_values = ();
+        if ( $arr[1] =~ /,/ ) {
+          foreach my $k ( split(/,/, $arr[1]) ) {
+            if ( $k =~ /(\S+)=(.*)/ ) {
+              my $key = $1;
+              my $val = $2;
+              
+              if ( $val =~ /\{(\S+)\}/ ) {
+                $val = $u->{ lc($1) };
+              }
+              
+              $p_values{$key} = $val;
+            }
+            elsif ( defined($u->{ lc($k) }) ) {
+              $p_values{$k} = $u->{ lc($k) };
+            }
+          }
+        }
+        
+        $value = &{ \&{$filter_fn} }($u->{$field_id}, { PARAMS => \@arr, VALUES => \%p_values });
+      }
+      else {
+        $value = (ref $u eq 'HASH' && $u->{$field_id}) ? $u->{$field_id} : '';
+        $value =~ s/[\r\n]/ /g;
+      }
+      
+      $point_info_object .= '<td>' . ($value || q{}) . '</td>';
+    }
+    
+    $point_info_object .= '</tr>';
+  }
+  
+  $point_info_object .= '</table>';
+  $point_info_object =~ s/\"/\\\"/gm;
+  
+  return $point_info_object;
+}
+
+#**********************************************************
+
+=head2 maps_show_poins($attr) - maps_show_poins
+
+  Arguments:
+   $attr -  has_ref
+     DATA             - Data form map Hash ref
+            {
+              LOCATION_ID => [{
+                               login   => 'test',
+                               deposit => 1.11
+                             }]
+            }
+
+     PAYSYS          - use Paysys data input
+     OBJECTS         =>  [
+                           { coordx => 0,
+                             coordy => 0,
+                             info   => ""
+                           },
+                           ...
+                         ]
+     OBJECTS_LIST    => Array of objects [{    }]
+     GET_USER_POSITION - Get current user position
+     POINT_TYPE     - Point image type
+     MAP_FILTERS
+     LOCATION_TABLE_FIELDS - Location table information fields _UPPERCASE_ field name
+     SMALL          - Show small map
+     ADD_FORM       - Show add form
+     NAVIGATION_BTN - Show navigation buttons
+     MAP_HEIGHT     - Map height
+     SHOW_BUILD     - Show build info
+     SHOW_TERMINALS - Show paysys terminals
+
+     CLIENT_MAP     - Map is showing in client cabinet
+
+     QUICK          - Do not display panel
+
+  Return:
+    Map object
+
+=cut
+
+#**********************************************************
+sub maps_show_poins {
+  my ($attr) = @_;
+  
+  return '' unless ($html->{TYPE} && $html->{TYPE} eq 'html');
+  
+  my $objects_info = $attr->{DATA};
+  
+  # Initialize max(min) with opposite min(max) value
+  my ($max_y, $min_y, $max_x, $min_x) = (- 100, 100, - 100, 100);
+  
+  my $tpl_obj = '';
+  
+  $FORM{MAP_TYPE} ||= ($conf{MAPS_MAP_TYPE} && in_array($conf{MAPS_MAP_TYPE}, [ 'google', 'yandex' ]))
+    ? $conf{MAPS_MAP_TYPE}
+    : 'google';
+  
+  # Simplifying checks for 'show_build'
+  $FORM{SHOW_BUILD} = $attr->{SHOW_BUILD} || $FORM{show_build} || '';
+  
+  my $show_builds_layer = !$attr->{NO_BUILDS};
+  
+  $attr->{GET_USER_POSITION} = 1 if ($FORM{MAKE_NAVIGATION_TO});
+  
+  if ( $FORM{SHOW_ADDRESS} ) {
+    $html->tpl_show(templates('form_address_build_sel'), $attr);
+    return 1;
+  }
+  elsif ( $FORM{EXPORT_LIST} ) {
+    print "Content-Type: application/json\n\n";
+    
+    if ( $FORM{EXPORT_LIST} eq 'undefined' ) {
+      print qq/[ { "MESSAGE" : "$lang{ERROR}" } ]/;
+    }
+    elsif ( $FORM{EXPORT_LIST} eq 'LAYER' && $FORM{LAYER_ID} ) {
+      my $layer_objects = _maps_get_layer_objects($FORM{LAYER_ID});
+      print to_json($layer_objects, { utf8 => 0 });
+    }
+    else {
+      my $module = $FORM{MODULE} || 'Maps';
+      my $fn = '';
+      if ( $module eq 'Maps' ) {
+        $fn = 'maps_' . $FORM{EXPORT_LIST} . '_show';
+      }
+      else {
+        load_module($module, $html);
+        $fn = $FORM{EXPORT_LIST};
+      }
+      
+      if ( defined(&{$fn}) ) {
+        my $output = &{ \&{$fn} }({ EXPORT => 'json' }) || '';
+        $output =~ s/\t/ /gm;
+        print "[ $output ]";
+      }
+      else {
+        print qq{[ { "MESSAGE" : "Don't know how show $FORM{EXPORT_LIST}" } ]};
+      }
+    }
+    
+    return 1;
+  }
+  
+  if ( $attr->{PAYSYS} ) {
+    
+    if ( $attr->{OBJECTS} ) {
+      foreach my $obj ( keys %{ $attr->{OBJECTS} } ) {
+        my ($search_word, $icon) = split(/:/, $attr->{OBJECTS}->{$obj});
+        $FORM{search_query} .= "$search_word;";
+        $FORM{ICON} = $icon;
+      }
+    }
+    
+    $attr->{NO_BUILDS} = exists($conf{MAPS_PAYSYS_NO_BUILDS}) ? $conf{MAPS_PAYSYS_NO_BUILDS} : 1;
+    
+  }
+  else {
+    
+    if ( $FORM{DISTRICT_ID} ) {
+      $LIST_PARAMS{DISTRICT_ID} = $FORM{DISTRICT_ID};
+    }
+    else {
+      my $location_id = '';
+      if ( $objects_info && ref $objects_info eq 'HASH' ) {
+        
+        if ( scalar keys %{$objects_info} == 0 ) {
+          $html->message('warn', $lang{ERROR}, "$lang{USER}-$lang{BUILD_NOT_FOUND}");
+        }
+        else {
+          $location_id = join(';', sort keys %{$objects_info});
+        }
+      }
+      elsif ( $FORM{SHOW_BUILD} ) {
+        $objects_info = _maps_get_users({ LOCATION_ID => $FORM{show_build} });
+        $attr->{LOCATION_TABLE_FIELDS} = 'ADDRESS_FLAT,LOGIN,DEPOSIT,FIO';
+        $location_id = $FORM{show_build};
+        $FORM{SINGLE} = 1;
+      }
+      
+      $LIST_PARAMS{LOCATION_ID} = $location_id;
+    }
+    
+    my $objects_list = [ ];
+    
+    #get map points
+    if ( $attr->{OBJECTS_LIST} ) {
+      $objects_list = $attr->{OBJECTS_LIST};
+    }
+    
+    my @table_titles = split(/,\s?/, $attr->{LOCATION_TABLE_FIELDS} || '');
+    
+    # Get max
+    #    my $count = _maps_points_count($objects_list, $objects_info);
+    
+    foreach my $line ( @{$objects_list} ) {
+      my $point_count = 0;
+      
+      # Update bounds
+      $max_y = $line->{coordy} if ($line->{coordy} > $max_y);
+      $max_x = $line->{coordx} if ($line->{coordx} > $max_x);
+      $min_y = $line->{coordy} if (!$min_y || $line->{coordy} < $min_y);
+      $min_x = $line->{coordx} if (!$min_x || $line->{coordx} < $min_x);
+      
+      my $user_info = '';
+      
+      if ( $line->{id} && $objects_info->{ $line->{id} } ) {
+        $point_count = $#{ $objects_info->{ $line->{id} } } + 1;
+        $user_info = maps_point_info_table(
+          {
+            %{$attr},
+            OBJECTS      => $objects_info->{ $line->{id} },
+            TABLE_TITLES => \@table_titles,
+          }
+        );
+      }
+      else {
+        
+        if ( !$line->{info} ) {
+          if ( $attr->{CLIENT_MAP} ) {
+            $line->{info} = $line->{public_comments} || '';
+          }
+          else {
+            my $location_info = maps_load_info({ LOCATION_ID => $line->{id}, TYPE => 'BUILD' });
+            $line->{info} = $location_info->{HTML};
+            $line->{point_count} = $location_info->{COUNT};
+            $line->{color} = $location_info->{COLOR};
+          }
+        }
+        $user_info = $line->{info} || '';
+      }
+      
+      my $street_build = ($line->{street_name} || q{}) . ', ' . ($line->{number} || q{});
+      my $address_full = ($line->{district_name} || q{}) . ", $street_build";
+      my $district_id = $line->{district_id} || 0;
+      
+      my $info = "<h5>$street_build</h5><table class=table> $user_info </table>";
+      my $type = $attr->{POINT_TYPE} || 'build';
+      my $color = $line->{color} || 'green';
+      #Make location point
+      $tpl_obj .= qq{
+        ObjectsArray[ObjectsArray.length] = {
+          "MARKER" : {
+            "ID"       : $line->{id},
+            "NAME"     : "$address_full",
+            "COORDX"   : $line->{coordy},
+            "COORDY"   : $line->{coordx},
+            "TYPE"     : "$type\_$color",
+            "INFO"     : "$info",
+            "COUNT"    : $point_count
+          },
+          "ADDRESS"  : "$address_full",
+          "DISTRICT" : $district_id,
+          "LAYER_ID" : $LAYER_ID_BY_NAME{BUILD}
+        };
+      };
+      
+    }
+  }
+  
+  if ( !$attr->{QUICK} ) {
+    
+    #Make menu
+    my @panel_menu = (sel_groups());
+    
+    push @panel_menu,
+      $html->form_select(
+        "DISTRICT_ID",
+        {
+          SELECTED       => $FORM{DISTRICT_ID} || '',
+          SEL_LIST       => [ @{ $Address->district_list({ PAGE_ROWS => 10000, COLS_NAME => 1 }) } ],
+          NO_ID          => 1,
+          MAIN_MENU      => get_function_index('form_districts'),
+          MAIN_MENU_ARGV => "chg=" . ($FORM{DISTRICT_ID} || ''),
+          ID             => 'PANEL_DISTRICT_ID',
+          SEL_OPTIONS    => { '' => '' }
+        }
+      );
+    
+    push @panel_menu, $html->form_select(
+        "MAP_TYPE",
+        {
+          SELECTED => $FORM{MAP_TYPE} || 0,
+          SEL_HASH => {
+            'google' => 'Google ',
+            'yandex' => 'Yandex ',
+            
+            #            'bitmap' => 'Bitmap '
+          },
+          NO_ID    => 1
+        }
+      );
+    
+    push @panel_menu,
+      $html->form_select(
+        'INFO_MODULE',
+        {
+          SELECTED  => $FORM{INFO_MODULE} || 'Maps',
+          SEL_ARRAY => maps_info_modules_list(),
+          NO_ID     => 1
+        }
+      );
+    
+    my %info = ();
+    foreach my $val ( @panel_menu ) {
+      $info{FILTER_ROWS} .= $html->element('div', $val, { class => 'form-group' });
+    }
+    
+    $html->tpl_show(_include('maps_panel', 'Maps'), \%info);
+  }
+  
+  my $map_ = "maps_$FORM{MAP_TYPE}_" . (($attr->{SMALL}) ? "small" : "main");
+  
+  my $zoon_coef = $max_y - $min_x;
+  my $zoom = int($zoon_coef / 3);
+  
+  if ( $FORM{DEBUG} ) {
+    _bp({ SHOW =>
+      " ( ($max_x) ? ($max_x + $min_x) / 2 : 38) . ', ' . ( ($max_y) ? ($max_y + $min_y) / 2 : 46) ZOOM: $zoon_coef // $zoom " });
+  }
+  
+  #check if have to show GPS layer
+  #  my $GPS_enabled       = in_array('GPS',       \@MODULES);
+  #  my $Equipment_enabled = in_array('Equipment', \@MODULES);
+  
+  if ( !$tpl_obj ) {
+    $attr->{GET_USER_POSITION} = 1;
+  }
+  
+  # Trying to auto resolve center
+  my $center_x = ($max_x) ? ($max_x + $min_x) / 2 : 30;
+  my $center_y = ($max_y) ? ($max_y + $min_y) / 2 : 50;
+  my $map_center = (!$attr->{GET_USER_POSITION})
+    # Reversing coordinates;
+    ? "$center_y, $center_x, " . ($attr->{MAP_ZOOM} || $zoom)
+    : '';
+  
+  if ( $FORM{SHOW_BUILD} ) {
+      $FORM{show_layer} = $LAYER_ID_BY_NAME{BUILD};
+      $FORM{LAYER_ID} = $LAYER_ID_BY_NAME{BUILD};
+      $FORM{SINGLE} = 1;
+      $FORM{OBJECT_ID} = $FORM{SHOW_BUILD};
+  }
+  
+  my $javascript_vars = $html->tpl_show(
+    _include('maps_js_variables', 'Maps'),
+    maps_get_js_variables(
+      %{$attr},
+      %FORM,
+      MAP_VIEW      => $conf{MAP_VIEW},
+      MAP_INDEX     => get_function_index("maps_show_poins"),
+      SHOW_NAS      => $attr->{SHOW_NAS},
+      SHOW_USERS    => $attr->{SHOW_USERS},
+      MAP_TYPE      => $FORM{MAP_TYPE},
+      MAPSETCENTER  => $map_center,
+      SHOW_CONTROLS => ($attr->{QUICK}) ? '' : 1,
+      #      HAS_GPS_LAYER       => $GPS_enabled,
+      #      HAS_EQUIPMENT_LAYER => $Equipment_enabled,
+    ),
+    { OUTPUT2RETURN => 1 }
+  );
+  
+  # If has builds defined by templates, do not show layer defined
+  $show_builds_layer = !$tpl_obj;
+  if ( $FORM{show} ) {
+    $FORM{SHOW_CUSTOM_POINTS} = 1 if ($FORM{show} eq 'CUSTOM_POINT');
+  }
+  
+  $tpl_obj .= join(';',
+      ($attr->{SHOW_BUILDS}) ? maps_builds_show({ CLIENT_MAP => $attr->{CLIENT_MAP} }) : '',
+      ($FORM{SHOW_ROUTE}) ? maps_routes_show() : '',
+      ($FORM{SHOW_WIFI}) ? maps_wifis_show() : '',
+      ($FORM{SHOW_CUSTOM_POINTS}) ? maps_objects_show() : '',
+      ($attr->{PAYSYS}) ? maps_terminals_show() : '',
+  );
+  
+  my $map_show = $html->tpl_show(
+    _include($map_, 'Maps'),
+    {
+      JS_VARIABLES       => $javascript_vars,
+      OBJECTS            => $tpl_obj,
+      NAVIGATION_VISIBLE => $attr->{NAVIGATION_BTN},
+      MAP_HEIGHT         => $attr->{MAP_HEIGHT},
+    },
+    { OUTPUT2RETURN => 1 }
+  );
+  
+  if ( $attr->{OUTPUT2RETURN} ) {
+    return $map_show;
+  }
+  
+  print $map_show;
+  
+  return 1;
+}
+
+#**********************************************************
+
+=head2 maps_get_js_variables() - adds javascript variables
+
+=cut
+
+#**********************************************************
+sub maps_get_js_variables {
+  my (%parent_attr) = @_;
+  
+  #  $Maps->{debug} = 1;
+  
+  my $layers_list = _maps_layers_list();
+#  return {
+#   LAYERS        => $layers_list,
+#   EXTRA_SCRIPTS => $extra_scripts,
+#   EXPORT_REFS   => \%layer_export_list_name_refs,
+#  }
+#
+  
+  my $default_layer_ids = to_json( \%LAYER_ID_BY_NAME, { utf8 => 0 } );
+  my $layers = to_json( $layers_list->{LAYERS}, { utf8 => 0 } );
+  my $layer_list_refs = to_json( $layers_list->{EXPORT_REFS}, { utf8 => 0 } );
+  
+  delete $parent_attr{USER_INFO};
+  delete $parent_attr{__BUFFER};
+  delete $FORM{__BUFFER};
+  my $form = to_json( { %FORM, %parent_attr }, { utf8 => 0 } );
+    
+  my $maps_api_key_name = uc('MAPS_' . $FORM{MAP_TYPE}) . '_API_KEY';
+  my $api_key_name = uc($FORM{MAP_TYPE}) . '_API_KEY';
+  
+    my $map_api_key = (exists $conf{$maps_api_key_name} && $conf{$maps_api_key_name})
+      ? $conf{$maps_api_key_name}
+      : (exists $conf{$api_key_name} && $conf{$api_key_name})
+        ? $conf{$maps_api_key_name}
+        : '';
+  
+    my $options = to_json( {
+      SHOW_ADD_BTN => $parent_attr{SHOW_ADD_BTN} || 0,
+      ICONS_DIR    => $MAPS_ICONS_DIR_WEB_PATH,
+    }, { utf8 => 0 });
+  
+  return {
+    LAYERS           => $layers,
+    LAYER_LIST_REFS  => $layer_list_refs,
+    LAYER_ID_BY_NAME => $default_layer_ids,
+    FORM             => $form,
+    OPTIONS          => $options,
+    EXTRA_SCRIPTS    => $layers_list->{EXTRA_SCRIPTS},
+    MAP_API_KEY      => $map_api_key,
+    %parent_attr,
+  };
+}
+
+#**********************************************************
+=head2 maps_show_custom_point_form() - Show form for adding point
+
+=cut
+#**********************************************************
+sub maps_show_custom_point_form {
+  my %attrs = ();
+  my $max_id_hash = $Maps->points_max_ids_for_types();
+  
+  if ( $FORM{CLOSEST_BUILDS} ) {
+    $attrs{HAS_CLOSEST} = 1;
+    my $closest_builds_list = $Address->build_list( {
+      LOCATION_ID   => $FORM{CLOSEST_BUILDS},
+      DISTRICT_NAME => '_SHOW',
+      STREET_NAME   => '_SHOW',
+      COLS_NAME     => 1,
+    } );
+    _error_show($Address);
+    
+    my @address_list = ();
+    for my $build ( @{$closest_builds_list} ) {
+      my $full_address = qq{ $build->{district_name}, $build->{street_name}, $build->{number} };
+      push @address_list, { id => $build->{id}, name => $full_address };
+    }
+    
+    $attrs{CLOSEST_SELECT} = $html->form_select( 'CLOSEST_LOCATION_ID', {
+        SEL_LIST    => \@address_list,
+        NO_ID       => 1,
+        SEL_OPTIONS => { '' => '' }
+      } )
+  }
+  
+  my $address_sel = $html->tpl_show( templates('form_show_hide'), {
+      NAME    => $lang{ADDRESS},
+      CONTENT => $html->tpl_show( templates('form_address_build_sel'), { }, { OUTPUT2RETURN => 1 } ),
+      PARAMS  => $attrs{HAS_CLOSEST} ? 'collapsed-box' : ''
+    }, { OUTPUT2RETURN => 1 });
+  
+  $html->tpl_show(
+    _include('maps_add_custom_point', 'Maps'),
+    {
+      LAST_IDS        => to_json($max_id_hash, { utf8 => 0 }),
+      TYPE_ID_SELECT  => _maps_object_types_select({ OUTPUT2RETURN => 1 }),
+      COORDX          => $FORM{COORDX},
+      COORDY          => $FORM{COORDY},
+      TYPES_PAGE_HREF => $SELF_URL . '?index=' . get_function_index('maps_point_types_main'),
+      ADDRESS_SEL     => $address_sel,
+      %attrs
+    }
+  );
+  #  }
+  
+  return 1;
+}
+
+#**********************************************************
+=head2 maps_districts_main()
+
+=cut
+#**********************************************************
+sub maps_districts_main {
+  my %TEMPLATE_ARGS = ();
+  my $show_add_form = $FORM{add_form} || 0;
+  
+  if ($FORM{add}) {
+    my $new_point_id = maps_add_external_object($LAYER_ID_BY_NAME{DISTRICT}, \%FORM);
+    show_result($Maps, $lang{ADDED} . ' ' . $lang{OBJECT});
+    $FORM{OBJECT_ID} = $new_point_id;
+    
+    $Maps->districts_add({%FORM});
+    $show_add_form = show_result($Maps, $lang{ADDED});
+    
+    if ($FORM{RETURN_FORM} && $html->{TYPE} eq 'json'){
+      foreach (split(',\s?', $FORM{RETURN_FORM})){
+        push (@{ $html->{JSON_OUTPUT} }, {
+            $_ => '"' . ( $FORM{$_} || q{} ) . '"'
+          });
+      }
+    }
+  }
+  elsif ($FORM{change}) {
+    $Maps->districts_change({%FORM});
+    show_result($Maps, $lang{CHANGED});
+    $show_add_form = 1;
+  }
+  elsif ($FORM{del}) {
+    $Maps->districts_del({ ID => $FORM{del} });
+    show_result($Maps, $lang{DELETED});
+  }
+  elsif ($FORM{chg}) {
+    my $tp_info = $Maps->districts_info($FORM{chg});
+    if (!_error_show($Maps)) {
+      %TEMPLATE_ARGS = %{$tp_info};
+      $show_add_form = 1;
+    }
+  }
+  
+  return 1 if ($FORM{MESSAGE_ONLY});
+  
+  if ($show_add_form) {
+    $TEMPLATE_ARGS{DISTRICT_ID_SELECT} = sel_districts({ DISTRICT_ID => $TEMPLATE_ARGS{DISTRICT_ID} });
+    $TEMPLATE_ARGS{COLOR} ||= '#ffffff';
+    
+    $html->tpl_show(
+      _include('maps_district', 'Maps'),
+      {
+        %TEMPLATE_ARGS,
+        %FORM,
+        SUBMIT_BTN_ACTION => ($FORM{chg}) ? 'change' : 'add',
+        SUBMIT_BTN_NAME   => ($FORM{chg}) ? $lang{CHANGE} : $lang{ADD},
+      }
+    );
+  }
+  
+  return 1 if ($FORM{TEMPLATE_ONLY});
+  
+  my ($table) = result_former({
+    INPUT_DATA      => $Maps,
+    FUNCTION        => 'districts_list',
+    BASE_FIELDS     => 0,
+    DEFAULT_FIELDS  => 'DISTRICT_ID,DISTRICT',
+    FUNCTION_FIELDS => 'change,del',
+    SKIP_USER_TITLE => 1,
+    EXT_FIELDS      => 0,
+    EXT_TITLES      => {
+      district_id       => '#',
+      district     => $lang{DISTRICT},
+      object_id     => $lang{MAP},
+    },
+    FILTER_COLS     => {
+#      type   => '_translate',
+#      point_id => '_maps_result_former_show_custom_point_on_map_btn:ID:ID,COORDX'
+    },
+    TABLE           => {
+      width   => '100%',
+      caption => $lang{DISTRICTS},
+      ID      => 'DISTRICTS_TABLE'
+    },
+    MAKE_ROWS       => 1,
+    SEARCH_FORMER   => 1,
+    MODULE          => 'Maps',
+  });
+  
+  print $table->show();
+  
+  return 1;
+}
+
+#**********************************************************
+=head2 maps_objects_main()
+
+=cut
+#**********************************************************
+sub maps_objects_main {
+  
+  my %TEMPLATE_ARGS = ();
+  my $show_add_form = $FORM{add_form} || 0;
+  my $qs = '';
+  
+  if ( $FORM{add} ) {
+    if ( $FORM{PLANNED} ) {
+      $FORM{CREATED} = '0000-00-00 00:00:00';
+    }
+    $Maps->points_add( { %FORM } );
+    $show_add_form = !show_result( $Maps, $lang{ADDED} );
+  }
+  elsif ( $FORM{change} ) {
+    $Maps->points_change( { %FORM } );
+    show_result( $Maps, $lang{CHANGED} );
+    $show_add_form = 1;
+  }
+  elsif ( $FORM{chg} ) {
+    my $tp_info = $Maps->points_info( $FORM{chg} );
+    if ( !_error_show($Maps) ) {
+      
+      # Get all linked objects
+      my $children = $Maps->points_list({
+        PARENT_ID => $FORM{chg},
+        TYPE      => '_SHOW',
+        NAME      => '_SHOW',
+      });
+      _error_show($Maps);
+      my @links = map {
+        $html->button($_->{name}, "index=$index&chg=$_->{id}", { });
+      } @{$children};
+      
+      # Quick add link
+      $tp_info->{id} //= '';
+      $tp_info->{name} //= '';
+      $tp_info->{location_id} //= '';
+      my $params_to_send = join('&',
+        "PARENT_ID=$tp_info->{id}",
+        "LOCATION_ID=$tp_info->{location_id}",
+      );
+      
+      push(@links, $html->button( $lang{ADD}, "index=$index&add_form=1&$params_to_send" ));
+      
+      my $map_btn = _maps_result_former_show_custom_point_on_map_btn( undef, {
+          VALUES => { ID => $tp_info->{id} }
+        });
+      
+      %TEMPLATE_ARGS = %{$tp_info};
+      $TEMPLATE_ARGS{CHILDREN_LINKS} = join('<br/>', @links);
+      $TEMPLATE_ARGS{SHOW_MAP_BTN} = 1;
+      $TEMPLATE_ARGS{MAP_BTN} = $map_btn;
+      
+      # Inverting 'planned' to show 'installed'
+      $TEMPLATE_ARGS{PLANNED_SELECT} = $html->form_select('PLANNED', {
+        SELECTED => $tp_info->{planned},
+        SEL_HASH => {
+          0 => $lang{YES},
+          1 => $lang{NO}
+        },
+          NO_ID => 1
+       });
+  
+  
+      $show_add_form = 1;
+    }
+  }
+  elsif ( $FORM{del} ) {
+    $Maps->points_del( { ID => $FORM{del} } );
+    show_result( $Maps, $lang{DELETED} );
+  }
+  
+  if ( $FORM{MESSAGE_ONLY} ) {
+    if ( $FORM{IN_MODAL} ) {
+      print $close_outer_modal_script;
+    }
+    return 1;
+  }
+  
+  if ( $show_add_form || $FORM{search_form} ) {
+    $TEMPLATE_ARGS{TYPE_ID_SELECT} = _maps_object_types_select({ SELECTED => $TEMPLATE_ARGS{TYPE_ID}, OUTPUT2RETURN => 1 });
+    
+    $TEMPLATE_ARGS{PARENT_ID_SELECT} = _maps_parent_object_select({
+      PARENT_ID   => $TEMPLATE_ARGS{PARENT_ID},
+      LOCATION_ID => $TEMPLATE_ARGS{LOCATION_ID} || '_SHOW',
+      
+      # Exclude this object id from selection as parent
+      ID          => ($TEMPLATE_ARGS{ID} ? ('!' . $TEMPLATE_ARGS{ID}) : '_SHOW'),
+    });
+  }
+  
+  if ( $show_add_form ) {
+    
+    my %address_params = ();
+    if ( $TEMPLATE_ARGS{LOCATION_ID} || $FORM{LOCATION_ID} ) {
+      my $build_list = $Address->build_list( {
+        LOCATION_ID   => $TEMPLATE_ARGS{LOCATION_ID} || $FORM{LOCATION_ID},
+        DISTRICT_NAME => '_SHOW',
+        DISTRICT_ID   => '_SHOW',
+        STREET_NAME   => '_SHOW',
+        STREET_ID     => '_SHOW',
+        COLS_UPPER    => 1,
+        COLS_NAME     => 1
+      } );
+      _error_show($Address);
+      
+      %address_params = (
+        %{$build_list->[0]},
+        ADDRESS_DISTRICT => $build_list->[0]->{DISTRICT_NAME},
+        ADDRESS_STREET   => $build_list->[0]->{STREET_NAME},
+        ADDRESS_BUILD    => $build_list->[0]->{NUMBER}
+      );
+    }
+    
+    $TEMPLATE_ARGS{LAST_IDS} = to_json($Maps->points_max_ids_for_types(), { utf8 => 0 }),
+      
+      $html->tpl_show( _include('maps_object', 'Maps'), {
+          %TEMPLATE_ARGS,
+          ADDRESS_SEL       => $html->tpl_show(templates('form_address_build_sel'), \%address_params,
+            { OUTPUT2RETURN => 1, ID => 'form_address_build_sel' }),
+          SUBMIT_BTN_ACTION => ($FORM{chg}) ? 'change' : 'add',
+          SUBMIT_BTN_NAME   => ($FORM{chg}) ? $lang{CHANGE} : $lang{ADD},
+        }
+      );
+  }
+  elsif ( $FORM{search_form} ) {
+    form_search({ SEARCH_FORM => $html->tpl_show(_include('maps_object_search', 'Maps'),
+        { %FORM, %TEMPLATE_ARGS, },
+        { OUTPUT2RETURN => 1 }),
+      ADDRESS_FORM            => 1,
+      PLAIN_SEARCH_FORM       => 1
+    });
+  }
+  else {
+    my $type_select = _maps_object_types_select({
+      AUTOSUBMIT    => 'form',
+      SEL_OPTIONS   => { '' => $lang{ALL} },
+      EX_PARAMS     => '',
+      OUTPUT2RETURN => 1,
+    });
+    
+    my $planned_input = $html->form_input( 'PLANNED', 1, {
+        TYPE      => 'checkbox',
+        STATE     => $FORM{PLANNED},
+        ex_params => 'data-return="1"',
+      } );
+    
+    $html->tpl_show( _include('maps_objects_filter_panel', 'Maps'), {
+        TYPE_SELECT      => $type_select,
+        PLANNED_CHECKBOX => $planned_input
+      } );
+    
+    if ( $FORM{TYPE_ID} ) {
+      $LIST_PARAMS{TYPE_ID} = $FORM{TYPE_ID};
+      $qs .= "&TYPE_ID=$FORM{TYPE_ID}";
+    }
+    
+    if ( $FORM{PLANNED} ) {
+      $LIST_PARAMS{CREATED} = '0000-00-00 00:00:00';
+      $qs .= "&PLANNED=$FORM{PLANNED}";
+    }
+  }
+  
+  my ($table) = result_former({
+    INPUT_DATA      => $Maps,
+    FUNCTION        => 'points_list',
+    BASE_FIELDS     => 0,
+    DEFAULT_FIELDS  => 'ID,NAME,TYPE,CREATED,COORDX,COMMENTS',
+    FUNCTION_FIELDS => 'change,del',
+    SKIP_USER_TITLE => 1,
+    EXT_FIELDS      => 0,
+    EXT_TITLES      => {
+      id       => '#',
+      name     => $lang{NAME},
+      type     => $lang{TYPE},
+      comments => $lang{COMMENTS},
+      created  => $lang{CREATED},
+      coordx   => $lang{MAP},
+    },
+    FILTER_COLS     => {
+      type   => '_translate',
+      coordx => '_maps_result_former_show_custom_point_on_map_btn:ID:ID,COORDX'
+    },
+    TABLE           => {
+      width   => '100%',
+      caption => $lang{OBJECTS},
+      ID      => 'OBJECTS_TABLE',
+      qs      => $qs,
+      EXPORT  => 1,
+      MENU    => "$lang{ADD}:index=$index&add_form=1:add" . ";$lang{SEARCH}:index=$index&search_form=1:search"
+    },
+    MAKE_ROWS       => 1,
+    SEARCH_FORMER   => 1,
+    MODULE          => 'Maps',
+  });
+  
+  print $table->show();
+  
+  return 1;
+}
+
+#**********************************************************
+=head2 filter_panel($attr)
+
+  Arguments:
+    $attr - hash_ref
+      TITLES     - hash_ref of COLUMN_NAMES and TYPES
+      EXT_TITLES - hash_ref of column_names and translation
+
+  Returns:
+    $html
+    
+  Example:
+
+  filter_panel({
+      COLUMNS => {
+        ID        => 'INT',
+        NAME      => 'STR',
+        TYPE_NAME => [ '$lang{BUILD}', '$lang{ROUTE}', '$lang{USER}' ],
+        CREATED   => 'DATE',
+      },
+      EXT_TITLES => {
+        id        => 'ID',
+        name      => $lang{NAME},
+        type_name => $lang{TYPE},
+        comments  => $lang{COMMENTS},
+        created   => $lang{CREATED},
+      }
+    });
+    
+=cut
+#**********************************************************
+sub filter_panel {
+  my ($attr) = @_;
+  
+  my @titles = sort keys %{$attr->{COLUMNS}};
+  my @translated_titles = map { $attr->{EXT_TITLES}->{lc $_} } @titles;
+  
+  my $select = $html->form_select('filter_columns', {
+      SEL_ARRAY    => \@translated_titles,
+      ARRAY_NUM_ID => 1,
+    });
+  
+  my $filter_json = to_json( $attr->{COLUMNS}, { utf8 => 0 } );
+  
+  $html->tpl_show( templates('form_filter_panel'), {
+      SELECT       => $select,
+      FILTERS_JSON => $filter_json
+    } );
+  
+  return 1;
+}
+
+#**********************************************************
+=head2 maps_point_types_main()
+
+=cut
+#**********************************************************
+sub maps_point_types_main {
+  
+  my $show_template = 0;
+  my $Maps_obj = { };
+  
+  if ( $FORM{show_add_form} ) {
+    $show_template = 1;
+  }
+  elsif ( $FORM{chg} ) {
+    $Maps_obj = $Maps->point_types_info($FORM{chg});
+    _error_show($Maps);
+    $Maps_obj->{CHANGE_ID} = "ID";
+    $show_template = 1;
+  }
+  elsif ( $FORM{add} ) {
+    $Maps->point_types_add(\%FORM);
+    show_result($Maps, $lang{ADDED});
+  }
+  elsif ( $FORM{change} ) {
+    $Maps->point_types_change(\%FORM);
+    show_result($Maps, $lang{CHANGED});
+  }
+  elsif ( $FORM{del} ) {
+    $Maps->point_types_del({ ID => $FORM{del} });
+    _error_show($Maps);
+    
+    show_result( $Maps, $lang{DELETED} );
+  }
+  
+  if ( $show_template ) {
+    my @map_icons = qw(
+      build_green.png
+        nas_green.png
+        wifi_green.png
+        well_green.png
+        route_green.png
+        equipment_green.png
+        cable_green.png
+        splitter_green.png
+        muff_green.png
+      );
+    
+    my $user_defined_map_icons = $Maps->icons_list({ NAME => '_SHOW', FILENAME => '_SHOW' });
+    
+    if ( $user_defined_map_icons && ref $user_defined_map_icons eq 'ARRAY' ) {
+      push @map_icons, map { $_->{filename} } @{$user_defined_map_icons};
+    }
+    
+    if ( @MAPS_CUSTOM_ICONS && scalar @MAPS_CUSTOM_ICONS > 0 ) {
+      push @map_icons, @MAPS_CUSTOM_ICONS;
+    }
+    
+    my $icon_select = $html->form_select(
+      'ICON',
+      {
+        SELECTED  => $Maps_obj->{ICON},
+        SEL_ARRAY => \@map_icons,
+        NO_ID     => 1,
+        ID        => 'ICON_SELECT'
+      }
+    );
+    
+    my $add_icon_link = $html->button( '', 'index=' . get_function_index('maps_icons_main') . '&add_form=1', {
+        ICON      => 'glyphicon glyphicon-plus',
+        ID        => 'ADD_ICON_BUTTON',
+        class     => 'btn btn-success',
+        ex_params => ' target="_blank" '
+      } );
+    
+    $html->tpl_show(
+      _include('maps_point_types', 'Maps'),
+      {
+        %{$Maps_obj},
+        MAPS_ICONS_WEB_DIR => $MAPS_ICONS_DIR_WEB_PATH,
+        ICON_SELECT        => $icon_select,
+        ADD_ICON_BUTTON    => $add_icon_link,
+        SUBMIT_BTN_NAME    => ($FORM{chg}) ? $lang{CHANGE_} : $lang{ADD},
+        SUBMIT_BTN_ACTION  => ($FORM{chg}) ? "change" : "add"
+      }
+    );
+  }
+  
+  # TODO: show icon images
+  my ($table) = result_former({
+    INPUT_DATA      => $Maps,
+    FUNCTION        => 'point_types_list',
+    BASE_FIELDS     => 0,
+    DEFAULT_FIELDS  => 'ID,NAME,ICON,COMMENTS',
+    FUNCTION_FIELDS => 'change,del',
+    SKIP_USER_TITLE => 1,
+    EXT_FIELDS      => 0,
+    EXT_TITLES      => {
+      id       => 'ID',
+      name     => $lang{NAME},
+      icon     => $lang{ICON},
+      comments => $lang{COMMENTS}
+    },
+    FILTER_COLS     => {
+      name => '_translate'
+    },
+    TABLE           => {
+      width   => '100%',
+      caption => "$lang{OBJECT_TYPES}",
+      ID      => 'OBJECT_TYPE_TABLE',
+      EXPORT  => 1,
+      MENU    => "$lang{ADD}:index=$index&show_add_form=1:add"
+    },
+    MAKE_ROWS       => 1,
+    SEARCH_FORMER   => 1,
+    MODULE          => 'Maps',
+  });
+  
+  print $table->show();
+  
+  return 1;
+}
+
+#**********************************************************
+=head2 maps_icons_main()
+
+=cut
+#**********************************************************
+sub maps_icons_main {
+  my %TEMPLATE_ICON = ();
+  my $show_add_form = $FORM{add_form} || 0;
+  
+  if ( $FORM{add} ) {
+    $Maps->icons_add( { %FORM } );
+    $show_add_form = !show_result( $Maps, $lang{ADDED} );
+  }
+  elsif ( $FORM{change} ) {
+    $Maps->icons_change( { %FORM } );
+    show_result( $Maps, $lang{CHANGED} );
+    $show_add_form = 1;
+  }
+  elsif ( $FORM{chg} ) {
+    my $tp_info = $Maps->icons_info( $FORM{chg} );
+    if ( !_error_show($Maps) ) {
+      %TEMPLATE_ICON = %{$tp_info};
+      $show_add_form = 1;
+    }
+  }
+  elsif ( $FORM{del} ) {
+    $Maps->icons_del( { ID => $FORM{del} } );
+    show_result( $Maps, $lang{DELETED} );
+  }
+  
+  my $open_upload_modal_btn = $html->button('UPLOAD', "get_index=_maps_icon_ajax_upload\&header=2", {
+      ICON          => 'glyphicon glyphicon-upload',
+      LOAD_TO_MODAL => 1,
+      class         => 'btn btn-success',
+      ID            => 'UPLOAD_BUTTON',
+    });
+  
+  if ( $show_add_form ) {
+    $html->tpl_show(
+      _include('maps_icon', 'Maps'),
+      {
+        %TEMPLATE_ICON,
+        MAPS_ICONS_WEB_DIR => $MAPS_ICONS_DIR_WEB_PATH,
+        FILENAME_SELECT    => _maps_icon_filename_select(\%TEMPLATE_ICON) || "$lang{NO_ICONS} $lang{IN} $MAPS_ICONS_DIR"
+        ,
+        UPLOAD_BTN         => $open_upload_modal_btn,
+        SUBMIT_BTN_ACTION  => ($FORM{chg}) ? 'change' : 'add',
+        SUBMIT_BTN_NAME    => ($FORM{chg}) ? $lang{CHANGE} : $lang{ADD},
+      }
+    );
+  }
+  
+  my ($table) = result_former({
+    INPUT_DATA      => $Maps,
+    FUNCTION        => 'icons_list',
+    BASE_FIELDS     => 0,
+    DEFAULT_FIELDS  => 'ID,NAME,PATH,COMMENTS',
+    FUNCTION_FIELDS => 'change,del',
+    SKIP_USER_TITLE => 1,
+    EXT_FIELDS      => 0,
+    EXT_TITLES      => {
+      id       => '#',
+      name     => $lang{NAME},
+      path     => $lang{PATH},
+      comments => $lang{COMMENTS}
+    },
+    TABLE           => {
+      width   => '100%',
+      caption => $lang{ICONS},
+      ID      => 'ICONS_TABLE',
+      EXPORT  => 1,
+      MENU    => "$lang{ADD}:index=$index&add_form=1:add"
+    },
+    MAKE_ROWS       => 1,
+    SEARCH_FORMER   => 1,
+    MODULE          => 'Maps',
+  });
+  
+  print $table->show();
+}
+
+#**********************************************************
+=head2 _maps_icon_ajax_upload()
+
+=cut
+#**********************************************************
+sub _maps_icon_ajax_upload {
+  return unless ($FORM{IN_MODAL});
+  
+  if ( !$FORM{UPLOAD_FILE} ) {
+    $html->tpl_show( _include('maps_icon_ajax_upload_form', 'Maps'), {
+        CALLBACK_FUNC => '_maps_icon_ajax_upload',
+        TIMEOUT       => '0',
+      } );
+    return 1;
+  }
+  
+  # Remove TPL_DIR part
+  my $upload_path = $MAPS_ICONS_DIR;
+  $upload_path =~ s/\/Abills\/templates\///g;
+  
+  my $uploaded = upload_file($FORM{UPLOAD_FILE}, {
+      PREFIX     => $upload_path,
+      EXTENTIONS => 'jpg,jpeg,png,gif'
+    });
+  
+  if ( $uploaded ) {
+    $html->message('info', $lang{SUCCESS});
+  }
+  
+  return 1;
+}
+
+#**********************************************************
+
+=head2 maps_builds_show($attr)
+
+  Arguments:
+    $attr
+
+  Returns:
+
+=cut
+
+#**********************************************************
+sub maps_builds_show {
+  my ($attr) = @_;
+  
+  my $export = $FORM{EXPORT_LIST} || $attr->{EXPORT};
+  my $object_info = $attr->{DATA};
+  
+  my $builds_list = $Address->build_list(
+    {
+      DISTRICT_ID        => $FORM{DISTRICT_ID} || '>0',
+      DISTRICT_NAME      => '_SHOW',
+      %LIST_PARAMS,
+      NUMBER             => '_SHOW',
+      PUBLIC_COMMENTS    => '_SHOW',
+      PLANNED_TO_CONNECT => '_SHOW',
+      STREET_NAME        => '_SHOW',
+      COORDX             => '!',
+      COORDY             => '!',
+      ZOOM               => '_SHOW',
+      COLS_NAME          => 1,
+      PAGE_ROWS          => 10000,
+      LOCATION_ID        => $attr->{ID} || $FORM{OBJECT_ID} || '_SHOW'
+    }
+  );
+  
+  my $count_array = _maps_points_count($builds_list, $object_info);
+  
+  my @export_arr = ();
+  foreach my $build ( @{$builds_list} ) {
+  
+    my $info_hash = {};
+    my $point_count = 0;
+    
+    if ( $attr->{CLIENT_MAP} ) {
+      $info_hash->{HTML} = $build->{public_comments} || '';
+      $point_count = 0;
+      if ($build->{planned_to_connect}){
+        $info_hash->{COLOR} = 'gray';
+      }
+    }
+    else {
+      $info_hash = maps_load_info({LOCATION_ID => $build->{id}});
+      $point_count = $info_hash->{COUNT} || (($count_array && ref $count_array eq 'ARRAY') ? scalar @{$count_array} : 0);
+    }
+    
+    next if ($FORM{GROUP_ID} && !$info_hash->{HTML});
+    
+    my $color = $info_hash->{COLOR} || _maps_point_color($point_count, $count_array);
+    
+    my $address_full = "$build->{district_name}, $build->{street_name}, $build->{number}";
+    
+    my $info_table = $info_hash->{HTML} || q{};
+    
+    my $tpl = qq(
+      {
+        "ID"       : $build->{id},
+        "MARKER"   : {
+          "ID"       : $build->{id},
+          "NAME"     : "$address_full",
+          "COORDX"   : $build->{coordy},
+          "COORDY"   : $build->{coordx},
+          "TYPE"     : "build_$color",
+          "INFO"     : "$info_table",
+          "COUNT"    : $point_count
+        },
+        "ADDRESS"  : "$address_full",
+        "DISTRICT" : $build->{district_id},
+        
+        "LAYER_ID" : $LAYER_ID_BY_NAME{BUILD}
+      }
+    );
+    
+    push @export_arr, $tpl;
+  }
+  
+  if ( $export ) {
+    return join(", ", @export_arr);
+  }
+  
+  $MAPS_ENABLED_LAYERS{ $LAYER_ID_BY_NAME{BUILD} } = 'BUILD';
+  return join(";", map { "ObjectsArray[ObjectsArray.length] = $_;" } @export_arr);
+}
+
+#**********************************************************
+
+=head2 maps_routes_show($attr)
+
+=cut
+
+#**********************************************************
+sub maps_routes_show {
+  my ($attr) = @_;
+  
+  my $line_opacity = $conf{MAP_LINE_OPACITY} || 0.5;
+  
+  my $route_info = '';
+  my @export_arr = ();
+  
+  my $list_routes = $Maps->routes_list(
+    {
+      ID            => $attr->{ID} || '_SHOW',
+      TYPE          => '_SHOW',
+      TYPE_NAME     => '_SHOW',
+      TYPE_COMMENTS => '_SHOW',
+      NAS1          => '_SHOW',
+      NAS2          => '_SHOW',
+      NAS1_PORT     => '_SHOW',
+      NAS2_PORT     => '_SHOW',
+      LENGTH        => '_SHOW',
+      COLOR         => '_SHOW',
+      FIBERS_COUNT  => '_SHOW',
+      LINE_WIDTH    => '_SHOW',
+      POINTS        => '_SHOW',
+      GROUP_NAME    => '_SHOW',
+      COLS_NAME     => 1,
+      ID            => $FORM{ID} || '_SHOW'
+    }
+  );
+  
+  #      _bp('', $list_routes, {TO_CONSOLE => 1});
+  
+  my $maps_route_index = get_function_index('maps_routes_list');
+  
+  foreach my $route ( @{$list_routes} ) {
+    my $list_routes_info = $Maps->routes_coords_list({ ID => $route->{id}, COLS_NAME => 1 });
+    
+    if ( $list_routes_info->[0]->{id} ) {
+      $route->{name} ||= '';
+      $route->{nas1} ||= '';
+      $route->{nas2} ||= '';
+      $route->{nas1_port} ||= '';
+      $route->{nas2_port} ||= '';
+      $route->{length} ||= '';
+      $route->{descr} ||= '';
+      $route->{id} ||= '';
+      
+      $route_info = qq{
+      <table>
+        <thead></thead>
+        <tbody>
+          <tr>
+            <th><strong>$lang{NAME}:</strong></th>
+            <td>$route->{name}</td>
+          </tr>
+          <tr>
+            <th>$lang{TYPE}:</th>
+            <td>$route->{type_name}</td>
+          </tr>
+          <tr>
+            <th>NAS1:</th>
+            <td>$route->{nas1}</td>
+          </tr>
+          <tr>
+            <th>NAS2:</th>
+            <td>$route->{nas2}</td>
+          </tr>
+          <tr>
+            <th>NAS1 $lang{PORT}:</th>
+            <td>$route->{nas1_port}</td>
+          </tr>
+          <tr>
+            <th>NAS2 $lang{PORT}:</th>
+            <td>$route->{nas2_port}</td>
+          </tr>
+          <tr>
+            <th>$lang{LENGTH}:</th>
+            <td>$route->{length}</td>
+          </tr>
+          <tr>
+            <th>$lang{DESCRIBE}:</th>
+            <td>$route->{descr}</td>
+          </tr>
+          <tr>
+            <td colspan=2><a href='$SELF_URL?index=$maps_route_index&chg=$route->{id}'>$lang{INFO}</a></td>
+          </tr>
+        </tbody>
+      </table>
+      };
+      $route_info =~ s/\n//gm;
+      
+      my @routes_coord_arr = ();
+      my @routes_markers_arr = ();
+      
+      foreach my $route_point ( @{$list_routes_info} ) {
+        push @routes_markers_arr, qq {
+              {
+                "ID"       : $route->{id},
+                "POINT_ID" : $route_point->{id},
+                "COORDX"   : $route_point->{coordy},
+                "COORDY"   : $route_point->{coordx},
+                "INFO" : "$route_info",
+                "TYPE" : "route_green"
+              }
+            };
+        push @routes_coord_arr, '[' . $route_point->{coordy} . ', ' . $route_point->{coordx} . ']';
+      }
+      
+      my $route_coords_info = join(', ', @routes_coord_arr);
+      my $routes_markers = join(', ', @routes_markers_arr);
+      
+      push @export_arr, qq{
+          {
+            "MARKERS" : [$routes_markers],
+            "POLYLINE" : {
+               "ID"       : $route->{id},
+               "POINTS": [$route_coords_info],
+               "strokeColor" : "$route->{color}",
+               "strokeOpacity" : $line_opacity,
+               "strokeWeight" : $route->{line_width},
+               "INFOWINDOW" : "$route_info"
+            },
+            "LAYER_ID" : $LAYER_ID_BY_NAME{ROUTE}
+          }
+        };
+      
+    }
+  }
+  
+  if ( $attr->{EXPORT} ) {
+    return join(", ", @export_arr);
+  }
+  
+  $MAPS_ENABLED_LAYERS{ $LAYER_ID_BY_NAME{ROUTE} } = 'ROUTE';
+  return join(";", map { "ObjectsArray[ObjectsArray.length] = $_;" } @export_arr);
+}
+
+#**********************************************************
+
+=head2 maps_wifis_show($attr)
+
+=cut
+
+#**********************************************************
+sub maps_wifis_show {
+  my ($attr) = @_;
+  
+  my $list_wifi = $Maps->wifi_zones_list({
+    ID        => $attr->{ID} || '_SHOW',
+    COLS_NAME => 1
+  });
+  _error_show($Maps);
+  
+  my @export_arr = ();
+  
+  foreach my $wifi ( @{$list_wifi} ) {
+    my $info = qq{
+            {
+               "ID"     : $wifi->{id},
+               "MARKER": {
+                  "ID"     : $wifi->{id},
+                  "COORDX" : $wifi->{coordy},
+                  "COORDY" : $wifi->{coordx},
+                  "INFO" : "<strong>$lang{WIFI_RADIUS}</strong>: $wifi->{radius}$lang{METERS_SHORT}",
+                  "TYPE" : "wifi_green"
+                },
+                "CIRCLE": {"RADIUS" : $wifi->{radius}, "COORDX" : $wifi->{coordy}, "COORDY" : $wifi->{coordx} },
+                "LAYER_ID" : $LAYER_ID_BY_NAME{WIFI}
+            }
+    };
+    push @export_arr, $info;
+  }
+  
+  if ( $attr->{EXPORT} ) {
+    return join(", ", @export_arr);
+  }
+  
+  $MAPS_ENABLED_LAYERS{ $LAYER_ID_BY_NAME{WIFI} } = 'WIFI';
+  return join(";", map { "ObjectsArray[ObjectsArray.length] = $_;" } @export_arr);
+}
+
+#**********************************************************
+
+=head2 maps_gps_show($attr)
+
+=cut
+
+#**********************************************************
+sub maps_gps_show {
+  my ($attr) = @_;
+  
+  require GPS;
+  GPS->import();
+  my $Gps = GPS->new($db, $admin, \%conf);
+  
+  my @list_gps = ();
+  my $tracked_admins = $Gps->tracked_admins_list();
+  
+  foreach my $tracker ( @{$tracked_admins} ) {
+    push @list_gps, $Gps->tracked_admin_info($tracker->{aid});
+  }
+  
+  my @export_arr = ();
+  my $admin_no = 0;
+  foreach my $admin_gps ( sort @list_gps ) {
+    
+    #Zero means no location for this admin_id;
+    if ( $admin_gps == 0 ) { next }
+    
+    $admin_no++;
+    
+    my $info = "$lang{ADMIN}: <strong>$admin_gps->{A_LOGIN}</strong><br />";
+    $info .= "$lang{LAST_UPDATE}: <strong>$admin_gps->{gps_time}</strong><br />";
+    $info .= "<br><button onclick='GPSControls.showRouteFor($admin_gps->{aid}, $admin_no, true)'><i class='fa fa-map-marker'></i>$lang{ROUTE}</button>";
+    
+    my $admin_icon = $Gps->thumbnail_get($admin_gps->{aid});
+    my $icon =
+        ($admin_icon)
+      ? "/images/$admin_icon"
+      : "../location/$admin_no";
+    
+    #    _bp('', $admin_gps, {TO_CONSOLE => 1});
+    
+    push @export_arr, qq{
+      {
+        "MARKER" : {
+                     "COORDX"   : $admin_gps->{coord_y},
+                     "COORDY"   : $admin_gps->{coord_x},
+                     "INFO" : "$info",
+                     "TYPE" : "$icon",
+                     "META" : { "colorNo" : $admin_no, "ADMIN" :  $admin_gps->{AID}, "x" : $admin_gps->{coord_y}, "y" : $admin_gps->{coord_x} }
+                   },
+        "LAYER_ID" : $LAYER_ID_BY_NAME{GPS}
+      }
+    };
+  }
+  
+  if ( $attr->{EXPORT} ) {
+    return join(", ", @export_arr);
+  }
+  
+  $MAPS_ENABLED_LAYERS{ $LAYER_ID_BY_NAME{GPS} } = 'GPS';
+  return join(";", map { "ObjectsArray[ObjectsArray.length] = $_;" } @export_arr);
+}
+
+#**********************************************************
+
+=head2 maps_gps_route_show($attr)
+
+=cut
+
+#**********************************************************
+sub maps_gps_route_show {
+  my ($attr) = @_;
+  my $aid = $FORM{AID};
+  my $date = $FORM{DATE} || $DATE;
+  
+  return '' unless ($FORM{AID} && $FORM{DATE});
+  
+  $FORM{TIME_FROM} ||= '00:00';
+  $FORM{TIME_TO} ||= '23:59';
+  
+  my $time_from = ($FORM{TIME_FROM} =~ /\d{2}[:]\d{2}/) ? $FORM{TIME_FROM} : '00:00';
+  my $time_to = ($FORM{TIME_TO} =~ /\d{2}[:]\d{2}/) ? $FORM{TIME_TO} : '23:59';
+  
+  require GPS;
+  GPS->import();
+  my $Gps = GPS->new($db, $admin, \%conf);
+  
+  $Gps->{debug} = 1 if ($FORM{DEBUG} > 7);
+  my $route = $Gps->tracked_admin_route_info($aid, $date, { FROM_TIME => $time_from, TO_TIME => $time_to },
+    { DESC => 1 });
+  _error_show($Gps) if ($FORM{DEBUG});
+  $route ||= { };
+  
+  my $route_points = $route->{list};
+  
+  #if no points, show last update date
+  if ( !$route_points || scalar @{$route_points} == 0 ) {
+    my $full_route = $Gps->tracked_admin_route_info($aid, { DESC => 1 });    #FIXME: hash params
+    _error_show($Gps) if ($FORM{DEBUG});
+    
+    my $last_message = '';
+    if ( $full_route && (my $list = $full_route->{list}) ) {
+      if ( $list && scalar @{$list} > 0 && @{$list}[0]->{gps_time} ) {
+        $last_message = "$lang{LAST} : @{$list}[0]->{gps_time}";
+      }
+    }
+    
+    return qq{ { "MESSAGE" : "GPS: $lang{NO_RECORD} $lang{FOR} $date .<br/> $last_message" } };
+  }
+  
+  my $admin_gps = $route->{admin};
+  
+  if ( $Gps->{errno} ) {
+    return "GPS tracked_admin_route_info ERROR. $Gps->{errstr}";
+  }
+  
+  my @routes_coord_arr = ();
+  my @routes_markers_arr = ();
+  
+  my $info = "$lang{ADMIN}: <strong>$admin_gps->{A_LOGIN}</strong><br />";
+  
+  foreach my $route_point ( @{$route_points} ) {
+    
+    #Save marker
+    push @routes_markers_arr, qq {
+            {
+              "COORDX"   : $route_point->{coord_y},
+              "COORDY"   : $route_point->{coord_x},
+              "INFO" : "$info <strong> $route_point->{gps_time} </strong> <br />",
+              "TYPE" : "user",
+              "CENTERED" : "true"
+            }
+      };
+    
+    push @routes_coord_arr, '[' . $route_point->{coord_y} . ', ' . $route_point->{coord_x} . ']';
+  }
+  
+  my $route_coords_info = join(', ', @routes_coord_arr);
+  my $routes_markers = join(', ', @routes_markers_arr);
+  
+  my $result = qq{
+  {
+    "MARKERS" : [$routes_markers],
+    "POLYLINE" : {
+      "POINTS": [ $route_coords_info ],
+      "INFOWINDOW" : "$info"
+    },
+    "LAYER_ID" : $LAYER_ID_BY_NAME{GPS_ROUTE}
+  }
+      };
+  
+  if ( $attr->{EXPORT} ) {
+    return $result;
+  }
+  
+  return '';
+}
+
+#**********************************************************
+
+=head2 maps_traffic_show($attr)
+
+=cut
+
+#**********************************************************
+sub maps_traffic_show {
+  my ($attr) = @_;
+  
+  my $export = $FORM{EXPORT_LIST} || $attr->{EXPORT};
+  
+  #my $object_info = $attr->{DATA};
+  
+  require Dv_Sessions;
+  Dv_Sessions->import();
+  my $Dv_sessions = Dv_Sessions->new($db, $admin, \%conf);
+  
+  my $builds_list = $Dv_sessions->reports2(
+    {
+      FROM_DATE   => '2016-01-01',
+      TO_DATE     => '2016-12-31',
+      TYPE        => 'BUILD',
+      LOCATION_ID => '_SHOW',
+      TRAFFIC_SUM => '_SHOW',
+      COORDX      => '_SHOW',
+      COORDY      => '_SHOW',
+      COLS_NAME   => 1
+    }
+  );
+  
+  my @json_arr = ();
+  foreach my $build ( @{$builds_list} ) {
+    
+    next if (!($build->{coordy} && $build->{coordx}));
+    
+    $build->{traffic_sum} = $build->{traffic_sum} * 8 / (1024 * 1024 * 1024);
+    $build->{radius} = $build->{traffic_sum} * 16;
+    
+    my $tpl = qq{
+            { "MARKER": {
+                  "COORDX"   : $build->{coordy},
+                  "COORDY"   : $build->{coordx},
+                  "INFO" : "<strong>$lang{TRAFFIC}</strong>: $build->{traffic_sum} <strong>Gb</strong>",
+                  "TYPE" : "build_green"
+                },
+                "CIRCLE": {"RADIUS" : $build->{radius}},
+                "LAYER_ID" : $LAYER_ID_BY_NAME{TRAFFIC}
+            }
+    };
+    
+    push @json_arr, $tpl;
+  }
+  
+  if ( $export ) {
+    return join(", ", @json_arr);
+  }
+  
+  $MAPS_ENABLED_LAYERS{ $LAYER_ID_BY_NAME{TRAFFIC} } = 'TRAFFIC';
+  return join(";", map { "ObjectsArray[ObjectsArray.length] = $_;" } @json_arr);
+}
+
+
+#**********************************************************
+=head2 maps_objects_show($attr)
+
+  Arguments:
+    $attr
+
+  Returns:
+
+=cut
+#**********************************************************
+sub maps_objects_show {
+  my ($attr) = @_;
+  my $export = $FORM{EXPORT_LIST} || $attr->{EXPORT};
+  
+  my $custom_points_list = $Maps->points_list({
+    NAME         => '_SHOW',
+    ICON         => '_SHOW',
+    TYPE         => '_SHOW',
+    TYPE_ID      => '_SHOW',
+    COORDX       => '_SHOW',
+    COORDY       => '_SHOW',
+    ADDRESS_FULL => '_SHOW',
+    EXTERNAL     => '0',
+    COLS_NAME    => 1,
+    %{ $attr ? $attr : { } },
+  });
+  _error_show($Maps);
+  
+  my %is_small_icon = (
+    5 => 1,
+    9 => 1,
+    1 => 1
+  );
+  
+  my @export_arr = ();
+  foreach my $point ( @{$custom_points_list} ) {
+    next if (!($point->{coordy} && $point->{coordx}) || (!$point->{icon}));
+    
+    $point->{type} = _translate($point->{type});
+    $point->{address_full} ||= '';
+    
+    my $icon_name = _maps_get_custom_point_icon($point->{icon});
+    my $size = (exists $is_small_icon{$point->{type_id}}) ? ' 25, 25 ' : ' 32, 37 ';
+    
+    my $info = "<strong>$point->{type} : </strong><a href='$SELF_URL?get_index=maps_objects_main&full=1&chg=$point->{id}'>$point->{name}</a><br/>"
+      . "<i>$point->{address_full}</i><br/>";
+    
+    my $tpl = qq{
+            {
+             "ID"    : $point->{id},
+             "MARKER": {
+                  "ID"    : $point->{id},
+                  "COORDX"   : $point->{coordy},
+                  "COORDY"   : $point->{coordx},
+                  "SIZE"     : [ $size ],
+                  "INFO" : "$info",
+                  "TYPE" : "$icon_name"
+                },
+             "LAYER_ID" : $LAYER_ID_BY_NAME{CUSTOM_POINT}
+            }
+    };
+    
+    push @export_arr, $tpl;
+  }
+  
+  if ( $export ) {
+    return join(", ", @export_arr);
+  }
+  
+  $MAPS_ENABLED_LAYERS{ $LAYER_ID_BY_NAME{CUSTOM_POINT} } = 'CUSTOM_POINT';
+  return join(";", map { "ObjectsArray[ObjectsArray.length] = $_ ;" } @export_arr);
+}
+
+#**********************************************************
+
+=head2 maps_terminals_show()
+
+=cut
+
+#**********************************************************
+sub maps_terminals_show {
+  
+  unless ( in_array('Paysys', \@MODULES) ) {
+    return '';
+  }
+  
+  require Paysys;
+  Paysys->import();
+  my $Paysys = Paysys->new( $db, $admin, \%conf );
+  
+  my $terminals_list = $Paysys->terminal_list( {
+    SHOW_ALL_COLUMNS => 1,
+    TYPE             => '_SHOW',
+    TYPE_ID          => '_SHOW',
+    COMMENT          => '_SHOW',
+    DIS_NAME         => '_SHOW',
+    ST_NAME          => '_SHOW',
+    BD_NUMBER        => '_SHOW',
+    COLS_NAME        => 1,
+    LOCATION_ID      => '!',
+    COORDX           => '_SHOW',
+    COORDY           => '_SHOW',
+  } );
+  _error_show($Paysys);
+  
+  my @export_arr = ();
+  foreach my $point ( @{$terminals_list} ) {
+    
+    next if (!($point->{coordy} && $point->{coordx}));
+    
+    my $type_id = $point->{type_id} || 2;
+    my $type_name = $point->{name} || 'PrivatBank';
+    my $id = $point->{id} || 1;
+    
+    $point->{comment} //= '';
+    $point->{dis_name} //= '';
+    $point->{st_name} //= '';
+    $point->{bd_number} //= '';
+    
+    my $info =
+      "<strong>$lang{TYPE}</strong>: $type_name </br>"
+        . "<strong>$lang{ADDRESS} </strong> $point->{dis_name}, $point->{st_name}, $point->{bd_number}</br>"
+        . ($point->{comment} ? "</hr>$point->{comment}" : '');
+    
+    my $tpl = qq{
+            {
+              "MARKER": {
+                "ID"       : $id,
+                "COORDX"   : $point->{coordy},
+                "COORDY"   : $point->{coordx},
+                "INFO"     : "$info",
+                "TYPE"     : "/images/terminals/terminal_$type_id.png"
+              },
+              "LAYER_ID" : $LAYER_ID_BY_NAME{CUSTOM_POINT}
+            }
+    };
+    
+    push @export_arr, $tpl;
+  }
+  
+  if ( $FORM{EXPORT_LIST} ) {
+    return join(", ", @export_arr);
+  }
+  
+  $MAPS_ENABLED_LAYERS{ $LAYER_ID_BY_NAME{CUSTOM_POINT} } = 'CUSTOM_POINT';
+  return join(";", map { "ObjectsArray[ObjectsArray.length] = $_ ;" } @export_arr);
+}
+
+#**********************************************************
+=head2 maps_districts_show()
+
+=cut
+#**********************************************************
+sub maps_districts_show {
+  my $attr = shift;
+  
+  my $districts_list = $Maps->districts_list({
+    OBJECT_ID        => $attr->{ID} || '_SHOW',
+    DISTRICT_ID      => $FORM{DISTRICT_ID} || '_SHOW',
+    DISTRICT         => '_SHOW',
+#    SHOW_ALL_COLUMNS => 1,
+    LIST2HASH        => 'object_id,district_id'
+  });
+  _error_show($Maps);
+  
+  my $district_for_object_id = sort_array_to_hash($districts_list, 'object_id');
+
+  my @object_ids = map { $_->{object_id} } @{$districts_list};
+  
+  my $layer_objects = _maps_get_layer_objects($LAYER_ID_BY_NAME{DISTRICT}, {
+      ID => join(';', @object_ids)
+    });
+  _error_show($Maps);
+  
+  
+  
+  foreach my $object (@$layer_objects){
+#    _bp('objet', $object, {TO_CONSOLE => 1});
+    $object->{POLYGON}{name} = $district_for_object_id->{$object->{OBJECT_ID}}{district};
+  }
+  
+  if ( $attr->{EXPORT} ) {
+    return join(', ', map { to_json($_) } @{$layer_objects});
+  }
+  
+  $MAPS_ENABLED_LAYERS{ $LAYER_ID_BY_NAME{DISTRICT} } = 'DISTRICT';
+  return join(";", map { "ObjectsArray[ObjectsArray.length] = " . to_json($_) } @{$layer_objects});
+}
+
+#**********************************************************
+
+=head2 maps_routes_list()
+
+=cut
+
+#**********************************************************
+sub maps_routes_list {
+  
+  #my ($attr) = @_;
+  
+  if ( $FORM{add_form} || $FORM{route} ) {
+    maps_route_add();
+  }
+  
+  result_former(
+    {
+      INPUT_DATA      => $Maps,
+      FUNCTION        => 'routes_list',
+      DEFAULT_FIELDS  => 'ID, NAME, TYPE_NAME, NAS1, NAS2, LENGTH, PARENT_ID, GROUP_NAME, POINTS',
+      FUNCTION_FIELDS => 'change,del',
+      SKIP_USER_TITLE => 1,
+      EXT_TITLES      => {
+        name         => $lang{NAME},
+        type_name    => $lang{TYPE},
+        descr        => $lang{DESCRIBE},
+        length       => $lang{LENGTH},
+        nas1         => "$lang{NAS} 1",
+        nas2         => "$lang{NAS} 2",
+        nas1_port    => "$lang{NAS} 1 $lang{PORT}",
+        nas2_port    => "$lang{NAS} 2 $lang{PORT}",
+        points       => $lang{MAPS},
+        fibers_count => $lang{FIBERS},
+        color        => $lang{COLOR},
+        parent_id    => $lang{ROUTE},
+        group_name   => $lang{GROUP},
+      },
+      TABLE           => {
+        width   => '100%',
+        caption => "$lang{ROUTES}",
+        qs      => $pages_qs . "&route=1",
+        ID      => 'EXCHANGE_RATE',
+        EXPORT  => 1,
+        MENU    => "$lang{ADD}:index=$index&add_form=1&$pages_qs:add",
+      },
+      FILTER_COLS     => {
+        points    => 'form_add_map:ID:ID,COORDX,POINTS,add=1',
+        type_name => '_translate',
+        nas1      => '_maps_result_former_nas_id_filter',
+        nas2      => '_maps_result_former_nas_id_filter',
+        parent_id => '_maps_result_former_parent_route_id_filter'
+      },
+      MAKE_ROWS       => 1,
+      SEARCH_FORMER   => 1,
+      TOTAL           => 1
+    }
+  );
+  
+  # Not using result former return $list because of incomplete columns
+  my $routes_list = $Maps->routes_list({ ID => '_SHOW', 'NAME' => '_SHOW', 'PARENT_ID' => '_SHOW', COLS_NAME => 1,
+    COLS_UPPER                              => 1 });
+  print $html->tree_menu($routes_list, $lang{ROUTES}, { COL_SIZE => 12 });
+  
+  return 1;
+}
+
+#**********************************************************
+
+=head2 maps_route_add($attr)
+
+=cut
+
+#**********************************************************
+sub maps_route_add {
+  
+  #my ($attr) = @_;
+  
+  $Maps->{ACTION} = 'add';
+  $Maps->{ACTION_LNG} = $lang{ADD};
+  
+  if ( $FORM{add} ) {
+    if ( $FORM{NAME} ) {
+      $Maps->routes_add({ %FORM });
+      if ( !$Maps->{errno} ) {
+        $html->message('info', $lang{INFO}, "$lang{ADDED}");
+      }
+    }
+    else {
+      $html->message('info', $lang{INFO}, "$lang{FIELDS_FOR_NAME_ARE_REQUIRED}");
+    }
+  }
+  elsif ( $FORM{del} && $FORM{COMMENTS} ) {
+    $Maps->routes_del({ ID => $FORM{del} });
+    if ( !$Maps->{errno} ) {
+      $html->message('info', $lang{INFO}, "$lang{DELETED}");
+    }
+  }
+  elsif ( $FORM{change} ) {
+    if ( $FORM{NAME} ) {
+      $Maps->routes_change({ %FORM });
+      
+      if ( !$Maps->{errno} ) {
+        $html->message('info', $lang{INFO}, "$lang{CHANGED}");
+        $Maps->{ACTION} = 'change_route';
+        $Maps->{ACTION_LNG} = $lang{CHANGE};
+      }
+    }
+    else {
+      $html->message('info', $lang{INFO}, "$lang{FIELDS_FOR_NAME_ARE_REQUIRED}");
+    }
+  }
+  elsif ( $FORM{chg} ) {
+    $Maps->{ACTION} = 'change';
+    $Maps->{ACTION_LNG} = $lang{CHANGE};
+    $Maps->route_info({ ID => $FORM{chg} });
+    
+    if ( !$Maps->{errno} ) {
+      $html->message('info', $lang{INFO}, "$lang{CHANGING}");
+    }
+  }
+  
+  my $list = $Nas->list(
+    {
+      LOCATION_ID => "!",
+      PAGE_ROWS   => '1000',
+      COLS_NAME   => 1
+    }
+  );
+  
+  $Maps->{NAS1_SEL} = $html->form_select(
+    'NAS1',
+    {
+      SELECTED       => $Maps->{NAS1} || $FORM{NAS1} || q{},
+      SEL_LIST       => $list,
+      SEL_KEY        => 'nas_id',
+      SEL_VALUE      => 'nas_name',
+      MAIN_MENU      => get_function_index('form_nas'),
+      MAIN_MENU_ARGV => "chg=" . ($FORM{NAS_ID} || q{})
+    }
+  );
+  
+  $Maps->{NAS2_SEL} = $html->form_select(
+    'NAS2',
+    {
+      SELECTED       => $Maps->{NAS2} || $FORM{NAS2} || q{},
+      SEL_LIST       => $list,
+      SEL_KEY        => 'nas_id',
+      SEL_VALUE      => 'nas_name',
+      MAIN_MENU      => get_function_index('form_nas'),
+      MAIN_MENU_ARGV => "chg=" . ($FORM{NAS_ID} || q{})
+    }
+  );
+  
+  $Maps->{TYPES} = $html->form_select(
+    "TYPE",
+    {
+      SELECTED => $Maps->{TYPE} || $FORM{TYPE},
+      SEL_LIST => translate_list_value($Maps->route_types_list({ COLS_NAME => 1, ID => '_SHOW', NAME => '_SHOW' })),
+      NO_ID    => 1,
+    }
+  );
+  
+  my %deleting_self_if_presented_option = (ID => '_SHOW');
+  if ( $FORM{chg} ) {
+    $deleting_self_if_presented_option{ID} = '!' . $FORM{chg};
+  }
+  
+  $Maps->{PARENT_ROUTE_ID} = $html->form_select(
+    'PARENT_ID',
+    {
+      SELECTED    => $FORM{PARENT_ID} || $Maps->{PARENT_ID} || '',
+      SEL_LIST    =>
+      $Maps->routes_list({ NAME => '_SHOW', NAS1 => '_SHOW', NAS2 => '_SHOW', %deleting_self_if_presented_option,
+        COLS_NAME               => 1 }),
+      NO_ID       => 1,
+      SEL_VALUE   => 'name,nas1,nas2',
+      SEL_OPTIONS => { '' => '' },
+      MAIN_MENU   => get_function_index('maps_routes_list'),
+    }
+  );
+  
+  $Maps->{GROUP_ID} = $html->form_select(
+    'GROUP_ID',
+    {
+      SELECTED    => $FORM{GROUP_ID} || $Maps->{GROUP_ID} || '',
+      SEL_LIST    => $Maps->route_groups_list({ NAME => '_SHOW', COLS_NAME => 1 }),
+      NO_ID       => 1,
+      SEL_OPTIONS => { '' => '' },
+      MAIN_MENU   => get_function_index('maps_route_groups'),
+    }
+  );
+  
+  $html->tpl_show(_include('maps_add_route', 'Maps'), { %FORM, %{$Maps} });
+  
+  return 1;
+}
+
+#**********************************************************
+=head2 maps_auto_coords()
+
+=cut
+#**********************************************************
+sub maps_auto_coords {
+  
+  # Preparation
+  require 'Maps/GMA.pm';
+  Maps::GMA->import();
+  my $GMA = Maps::GMA->new($db, $admin, \%conf, $Address);
+  
+  my $maps_index = get_function_index('maps_add_2');
+  my $single_build_index = get_function_index('maps_auto_coords_single');
+  
+  my $builds_list = $GMA->get_unfilled_addresses(\%FORM);
+  
+  if ( $FORM{header} && $FORM{GET_UNFILLED_ADDRESSES} ) {
+    #    print "Content-Type: application/json\n\n";
+    print to_json($builds_list, { utf8 => 0 });
+    return 1;
+  }
+  
+  # Show form with parameters
+  $html->tpl_show(
+    _include('maps_gma_form', 'Maps'),
+    {
+      COUNTRY_ABBR                   => $FORM{COUNTRY_ABBR} || 'UA',
+      DISTRICTS_ARE_NOT_REAL_CHECKED => $FORM{DISTRICTS_ARE_NOT_REAL},
+      STREET_SELECT                  => sel_streets({ SEL_OPTIONS => { '' => '' }, MAIN_MENU => 0 }),
+      DISTRICT_SELECT                => sel_districts({ }),
+    }
+  );
+  
+  my $builds_to_process = scalar @{$builds_list};
+  if ( $builds_to_process < 1 ) {
+    $html->message('warn', $lang{BUILDS}, $lang{NO_RECORD});
+    return 0;
+  }
+  
+  my $table = $html->table(
+    {
+      width      => '100%',
+      caption    => $lang{AUTO_COORDS},
+      border     => 1,
+      title      => [ '#', $lang{ADDRESS}, $lang{STATUS}, $lang{MAPS} ],
+      cols_align => [ 'left', 'right', 'right', 'right', 'center', 'center' ],
+      qs         => $pages_qs,
+      ID         => 'GMA_TABLE_ID'
+    }
+  );
+  
+  foreach my $build ( @{$builds_list} ) {
+    my $manual_add_btn = $html->button('add', "index=$maps_index&LOCATION_ID=$build->{id}&LOCATION_TYPE=BUILD",
+      { class => 'add', target => '_blank' });
+    $table->addrow($build->{id}, $build->{full_address}, '', ($build->{coordx}) ? $manual_add_btn : $lang{YES});
+  }
+  
+  print $table->show();
+  
+  my $builds_json = to_json($builds_list, { utf8 => 0 });
+  
+  print "<script>var builds_for_auto_coords = $builds_json ; var single_coord_index = '$single_build_index'</script>";
+  
+  return 1;
+}
+
+#**********************************************************
+
+=head2 maps_auto_coords_single() - single build request to make AJAX operations possible
+
+=cut
+
+#**********************************************************
+sub maps_auto_coords_single {
+  
+  return 0 unless ($FORM{REQUEST_ADDRESS});
+  
+  # Preparation
+  require 'Maps/GMA.pm';
+  Maps::GMA->import();
+  my $GMA = Maps::GMA->new($db, $admin, \%conf, $Address);
+  
+  # Parse input
+  my $build_id = $FORM{BUILD_ID};
+  my $requested_address = $FORM{REQUEST_ADDRESS};
+  
+  return 0 unless ($build_id);
+  
+  # Send request
+  my $coords = $GMA->get_coords_for($requested_address, $build_id);
+  
+  my $status = $coords->{STATUS};
+  
+  ### Show result ###
+  
+  my %NAME_FOR_STATUS = (
+    1 => $lang{SUCCESS},
+    2 => $lang{ERR_ZERO_RESULTS},
+    3 => $lang{ERR_NOT_ONLY_RESULT},
+    4 => $lang{ERR_NOT_EXACT_RESULT},
+  );
+  
+  my $maps_index = get_function_index('maps_add_2');
+  
+  my %responce = (
+    status         => $status,
+    message        => $NAME_FOR_STATUS{$status} || $lang{ERR_UNKNOWN},
+    requested_id   => $build_id,
+    requested_addr => $coords->{requested_address},
+    add_index      => $maps_index
+  );
+  
+  if ( $status == 500 ) {
+    $responce{set_class} = 'danger';
+    $responce{message} = $coords->{ERROR};
+  }
+  elsif ( $status == 1 ) {
+    
+    $Maps->changes2(
+      {
+        TABLE        => 'builds',
+        CHANGE_PARAM => 'ID',
+        DATA         => {
+          ID => $build_id,
+          %{$coords}
+        }
+      }
+    );
+    
+    $responce{set_class} = 'success';
+    $responce{change_status} = ($Maps->{errno}) ? 1 : 0;
+    
+  }
+  else {
+    
+    if ( $status == 2 ) {
+      
+      # Red and marked as non-acceptable
+      $responce{set_class} = 'danger';
+    }
+    elsif ( $status == 3 ) {
+      
+      # Select from form
+      $responce{set_class} = 'info';
+      $responce{non_unique_results} = $coords->{RESULTS};
+    }
+    elsif ( $status == 4 ) {
+      
+      # Add using bounds
+      $responce{set_class} = 'warning';
+    }
+    
+  }
+  
+  my $json_responce = to_json(\%responce, { utf8 => 0 });
+  
+  print $json_responce;
+  
+  return 1;
+}
+
+#**********************************************************
+
+=head2 maps_load_info($attr) - Loads information for location from specified module
+
+  Arguments:
+    $attr - hash_ref
+      LOCATION_ID   - location id
+      TYPE          - map object type
+
+  Returns:
+    hash_ref
+      HTML  - Infowindow content
+      COUNT - count for object
+
+=cut
+
+#**********************************************************
+sub maps_load_info {
+  my $module_name = $FORM{INFO_MODULE} || 'Maps';
+  
+  my $fn_name = lc "$module_name\_location_info";
+  if ( !defined &{$fn_name} ) {
+    load_module($module_name, $html);
+  }
+  
+  if ( defined &{$fn_name} ) {
+    my $result = &{ \&{$fn_name} }(@_);
+    if ( $result && $result->{HTML} ) {
+      $result->{HTML} =~ s/\n/ /gm;
+      $result->{HTML} =~ s/\+"+/'/gm;
+      return $result;
+    }
+  }
+  
+  return { };
+}
+
+#**********************************************************
+=head2 maps_user_status()
+
+=cut
+#**********************************************************
+sub maps_user_status {
+  my (@uid) = @_;
+  
+}
+
+#**********************************************************
+
+=head2 maps_location_info($attr) - Returns geolocation information about object
+
+  Arguments:
+    $attr
+      LOCATION_ID   - location id
+      TYPE          - map object type
+
+  Returns:
+    hash_ref
+      HTML  - content for infowindow
+      count - numeric label for marker
+
+=cut
+
+#**********************************************************
+sub maps_location_info {
+  my ($attr) = @_;
+  return unless ($attr->{LOCATION_ID});
+  
+  $attr->{TYPE} ||= 'BUILD';
+  
+  my $info = '';
+  my $count = 0;
+  
+  state $users_for_location_id;
+  state $online_uids;
+  if (! $online_uids){
+    $online_uids = _maps_get_online_users({SHORT => 1});
+  }
+  if ( !$users_for_location_id ) {
+    my $users_list = _maps_get_users({ RETURN_AS_ARRAY => 1 });
+    foreach my $user ( @{$users_list} ) {
+      my $location_id = $user->{build_id};
+      next unless ($location_id);
+      
+      if (exists $online_uids->{$user->{uid}} ){
+        $user->{online} = 1;
+      }
+      
+      # Sort to hash_ref of  array_refs
+      if ( $users_for_location_id->{$location_id} ) {
+        push(@{ $users_for_location_id->{$location_id} }, $user);
+      }
+      else {
+        $users_for_location_id->{$location_id} = [ $user ];
+      }
+    }
+  }
+
+  
+  if ( defined $users_for_location_id->{ $attr->{LOCATION_ID} } ) {
+    $info = maps_point_info_table(
+      {
+        OBJECTS           => $users_for_location_id->{ $attr->{LOCATION_ID} },
+        TABLE_TITLES      => [ 'ONLINE', 'LOGIN', 'DEPOSIT', 'FIO', 'ADDRESS_FLAT' ],
+        TABLE_LANG_TITLES => [ $lang{ONLINE}, '', $lang{DEPOSIT}, $lang{USER}, $lang{FLAT} ],
+      }
+    );
+    $count = scalar @{ $users_for_location_id->{ $attr->{LOCATION_ID} } };
+  }
+  elsif ($FORM{GROUP_ID}) {
+    return 0;
+  }
+  
+  return {
+    HTML  => $info,
+    COUNT => $count
+  }
+  
+}
+
+#**********************************************************
+
+=head2 maps_info_modules_list()
+
+=cut
+
+#**********************************************************
+sub maps_info_modules_list {
+  
+  my @result_list = ();
+  
+  our @MAPS_INFO_MODULES;
+  my @ext_modules = ('Msgs', 'Maps', 'Equipment', @MAPS_INFO_MODULES);
+  
+  foreach my $module_name ( @ext_modules ) {
+    load_module($module_name, $html);
+    my $fn_name = lc($module_name . "_location_info");
+    if ( defined &{$fn_name} ) {
+      
+      push(@result_list, $module_name);
+    }
+  }
+  
+  return \@result_list;
+}
+
+#**********************************************************
+
+=head2 maps_route_types()
+
+=cut
+
+#**********************************************************
+sub maps_route_types {
+  my %TEMPLATE_ROUTE_TYPE = ();
+  my $show_add_form = $FORM{add_form} || 0;
+  
+  if ( $FORM{add} ) {
+    $Maps->route_types_add({ %FORM });
+    $show_add_form = !show_result($Maps, $lang{ADDED});
+  }
+  elsif ( $FORM{change} ) {
+    $Maps->route_types_change({ %FORM });
+    show_result($Maps, $lang{CHANGED});
+    $show_add_form = 1;
+  }
+  elsif ( $FORM{chg} ) {
+    my $tp_info = $Maps->route_types_info($FORM{chg});
+    if ( !_error_show($Maps) ) {
+      %TEMPLATE_ROUTE_TYPE = %{$tp_info ? $tp_info : { }};
+      $show_add_form = 1;
+    }
+  }
+  elsif ( $FORM{del} ) {
+    $Maps->route_types_del({ ID => $FORM{del} });
+    show_result($Maps, $lang{DELETED});
+  }
+  
+  if ( $show_add_form ) {
+    
+    # Default line color is black
+    $TEMPLATE_ROUTE_TYPE{COLOR} ||= '#ffffff';
+    
+    $html->tpl_show(
+      _include('maps_route_types', 'Maps'),
+      {
+        %TEMPLATE_ROUTE_TYPE,
+        SUBMIT_BTN_ACTION => ($FORM{chg}) ? 'change' : 'add',
+        SUBMIT_BTN_NAME   => ($FORM{chg}) ? $lang{CHANGE} : $lang{ADD},
+      }
+    );
+  }
+  
+  result_former(
+    {
+      INPUT_DATA      => $Maps,
+      FUNCTION        => 'route_types_list',
+      DEFAULT_FIELDS  => "ID,NAME,COLOR,FIBERS_COUNT",
+      FUNCTION_FIELDS => 'change, del',
+      EXT_TITLES      => {
+        'name'         => $lang{NAME},
+        'id'           => 'ID',
+        'fibers_count' => $lang{FIBERS},
+        'color'        => $lang{COLOR},
+        'comments'     => $lang{COMMENTS}
+      },
+      FILTER_COLS     => { name => '_translate' },
+      TABLE           => {
+        width   => '100%',
+        caption => "$lang{ROUTE} $lang{TYPES}",
+        qs      => $pages_qs,
+        ID      => 'MAPS_ROUTE_TYPES',
+        header  => '',
+        EXPORT  => 1,
+        MENU    => "$lang{ADD}:index=$index&add_form=1" . ':add',
+      },
+      MAKE_ROWS       => 1,
+      SKIP_USER_TITLE => 1,
+      SEARCH_FORMER   => 1,
+      MODULE          => 'Maps',
+      TOTAL           => 1
+    }
+  );
+}
+
+#**********************************************************
+
+=head2 maps_route_groups()
+
+=cut
+
+#**********************************************************
+sub maps_route_groups {
+  
+  my %TEMPLATE_GROUP = ();
+  my $show_add_form = $FORM{add_form} || 0;
+  
+  if ( $FORM{add} ) {
+    $Maps->route_groups_add({ %FORM });
+    $show_add_form = !show_result($Maps, $lang{ADDED});
+  }
+  elsif ( $FORM{change} ) {
+    $Maps->route_groups_change({ %FORM });
+    show_result($Maps, $lang{CHANGED});
+    $show_add_form = 1;
+  }
+  elsif ( $FORM{chg} ) {
+    my $tp_info = $Maps->route_groups_info($FORM{chg});
+    if ( !_error_show($Maps) ) {
+      %TEMPLATE_GROUP = %{$tp_info ? $tp_info : { }};
+      $show_add_form = 1;
+    }
+  }
+  elsif ( $FORM{del} ) {
+    $Maps->route_groups_del({ ID => $FORM{del} });
+    show_result($Maps, $lang{DELETED});
+  }
+  
+  if ( $show_add_form ) {
+    
+    my %deleting_self_if_presented_option = (ID => '_SHOW');
+    if ( $FORM{chg} ) {
+      $deleting_self_if_presented_option{ID} = '!' . $FORM{chg};
+    }
+    
+    $TEMPLATE_GROUP{PARENT_GROUP} = $html->form_select(
+      'PARENT_ID',
+      {
+        SELECTED    => $FORM{PARENT_ID} || $TEMPLATE_GROUP{PARENT_ID} || '',
+        SEL_LIST    => $Maps->route_groups_list({ NAME => '_SHOW', %deleting_self_if_presented_option, COLS_NAME => 1 })
+        ,
+        NO_ID       => 1,
+        SEL_OPTIONS => { '' => '' },
+      }
+    );
+    
+    $html->tpl_show(
+      _include('maps_route_groups', 'Maps'),
+      {
+        %TEMPLATE_GROUP,
+        SUBMIT_BTN_ACTION => ($FORM{chg}) ? 'change' : 'add',
+        SUBMIT_BTN_NAME   => ($FORM{chg}) ? $lang{CHANGE} : $lang{ADD},
+      }
+    );
+  }
+  
+  result_former(
+    {
+      INPUT_DATA      => $Maps,
+      FUNCTION        => 'route_groups_list',
+      DEFAULT_FIELDS  => "ID,NAME,COMMENTS,PARENT_NAME",
+      FUNCTION_FIELDS => 'change, del',
+      EXT_TITLES      => {
+        'name'        => $lang{NAME},
+        'id'          => 'ID',
+        'comments'    => $lang{COMMENTS},
+        'parent_name' => $lang{PARENT_F},
+      },
+      TABLE           => {
+        width   => '100%',
+        caption => "$lang{ROUTE} $lang{GROUPS}",
+        qs      => $pages_qs,
+        ID      => 'MAPS_ROUTE_GROUPS',
+        header  => '',
+        EXPORT  => 1,
+        MENU    => "$lang{ADD}:index=$index&add_form=1" . ':add',
+      },
+      MAKE_ROWS       => 1,
+      SKIP_USER_TITLE => 1,
+      SEARCH_FORMER   => 1,
+      MODULE          => 'Maps',
+      TOTAL           => 1
+    }
+  );
+  
+  print $html->tree_menu($Maps->route_groups_list({ ID => '_SHOW', 'NAME' => '_SHOW', 'PARENT_ID' => '_SHOW' }),
+    $lang{GROUPS}, { COL_SIZE => 12 });
+}
+
+#**********************************************************
+
+=head2 maps_layers()
+
+=cut
+
+#**********************************************************
+sub maps_layers {
+  
+  my %TEMPLATE_LAYER = ();
+  my $show_add_form = $FORM{add_form} || 0;
+  
+  if ( $FORM{add} ) {
+    $FORM{STRUCTURE} = 'MULTIPLE';
+    $Maps->layers_add({ %FORM });
+    $show_add_form = !show_result($Maps, $lang{ADDED});
+  }
+  elsif ( $FORM{change} ) {
+    $Maps->layers_change({ %FORM });
+    show_result($Maps, $lang{CHANGED});
+    $show_add_form = 1;
+  }
+  elsif ( $FORM{chg} ) {
+    my $tp_info = $Maps->layers_info($FORM{chg});
+    if ( !_error_show($Maps) ) {
+      %TEMPLATE_LAYER = %{$tp_info ? $tp_info : { }};
+      $show_add_form = 1;
+    }
+  }
+#  elsif ( $FORM{del} ) {
+#    $Maps->layers_del({ ID => $FORM{del} });
+#    show_result($Maps, $lang{DELETED});
+#  }
+  
+  if ( $show_add_form ) {
+    $html->tpl_show(
+      _include('maps_layer', 'Maps'),
+      {
+        %TEMPLATE_LAYER, %FORM,
+        SUBMIT_BTN_ACTION => ($FORM{chg}) ? 'change' : 'add',
+        SUBMIT_BTN_NAME   => ($FORM{chg}) ? $lang{CHANGE} : $lang{ADD},
+      }
+    );
+  }
+  
+  my $layers_list = _maps_layers_list();
+  
+  my $table = $html->table({
+    caption => "$lang{LAYERS}",
+    qs      => $pages_qs,
+    ID      => 'MAPS_LAYERS',
+    header  => '',
+    title   => ['#',$lang{NAME}, $lang{MODULE}, $lang{STRUCTURE}, $lang{COMMENTS}, '-'],
+    EXPORT  => 1,
+    MENU    => "$lang{ADD}:index=$index&add_form=1" . ':add',
+    HAS_FUNCTION_FIELDS => 1,
+  });
+  
+  my %loaded_modules = ();
+  foreach my $layer ( @{$layers_list->{LAYERS}} ) {
+    
+    # Need special behaviour if need other's module dictionary
+    my $name = $layer->{lang_name} || do {
+      if ( $layer->{module} && $layer->{module} ne 'Maps' ) {
+        if ( !exists $loaded_modules{$layer->{module}} ) {
+          load_module($layer->{module}, { %{$html}, CONFIG_ONLY => 1 });
+          $loaded_modules{$layer->{module}} = 1;
+        }
+        _translate('$lang{' . $layer->{name} . '}');
+      }
+      else {
+        _translate($layer->{name});
+      }
+    };
+    
+    $table->addrow(
+      $layer->{id},
+      $name,
+      $layer->{module},
+      $layer->{structure},
+      $layer->{comments} || q{},
+      ($layer->{id} <= 6) ? $html->button($lang{CHANGE}, "index=$index&chg=$layer->{id}", {class => 'change'}) : '',
+    );
+  }
+  
+  print $table->show();
+  
+  return 1;
+}
+
+#**********************************************************
+=head2 _maps_layers_list() - aggregates layers from DB and external modules
+
+=cut
+#**********************************************************
+sub _maps_layers_list {
+  
+  my $layers_list = $Maps->layers_list(
+    {
+      MODULE           => join(';', @MODULES),
+      COLS_NAME        => 1,
+      COLS_UPPER       => 0,
+      SORT             => 'id',
+      DESC             => 'DESC',
+      SHOW_ALL_COLUMNS => 1,
+    }
+  );
+  _error_show($Maps);
+  
+  # TODO: move to outer func
+  my $district_module = [ grep { $_->{id} eq $LAYER_ID_BY_NAME{DISTRICT} } @$layers_list ]->[0];
+  if (defined $district_module){
+    $district_module->{add_func} = 'maps_districts_main';
+    $district_module->{custom_params} = {
+      OBJECT_TYPE_ID   => '',
+      SAVE_AS_GEOMETRY => 1,
+      RETURN_FORM      => 'COLOR'
+    }
+  }
+  
+  my %layer_export_list_name_refs = (
+    $LAYER_ID_BY_NAME{BUILD}        => 'builds',
+    $LAYER_ID_BY_NAME{WIFI}         => 'wifis',
+    $LAYER_ID_BY_NAME{DISTRICT}     => 'districts',
+    $LAYER_ID_BY_NAME{ROUTE}        => 'routes',
+    $LAYER_ID_BY_NAME{TRAFFIC}      => 'traffic',
+    $LAYER_ID_BY_NAME{CUSTOM_POINT} => 'objects',
+    $LAYER_ID_BY_NAME{DISTRICT}     => 'districts',
+  );
+  
+  my $modules_extra_layers = cross_modules_call('_maps_layers', { SILENT => 1 });
+  my $extra_scripts = '';
+  
+  foreach my $module_name ( keys %{$modules_extra_layers} ) {
+    next if (!defined $modules_extra_layers->{$module_name});
+    
+    my $result = $modules_extra_layers->{$module_name};
+    
+    push @{$layers_list}, @{ $result->{LAYERS} };
+    
+    # Load custom scripts
+    if ( $result->{SCRIPTS} ) {
+      foreach my $script_name ( @{$result->{SCRIPTS}} ) {
+        $extra_scripts .= "<script src='$script_name'></script>";
+      }
+    }
+    
+    # Apply new data sources
+    if ( $result->{EXPORT_FUNC} ) {
+      foreach my $id ( keys %{$result->{EXPORT_FUNC}} ) {
+        $layer_export_list_name_refs{$id} = $result->{EXPORT_FUNC}->{$id};
+      }
+    }
+  };
+  
+  foreach ( @{$layers_list} ) {
+    $_->{lang_name} //= _translate($_->{name});
+  }
+  
+  return {
+    LAYERS        => $layers_list,
+    EXTRA_SCRIPTS => $extra_scripts,
+    EXPORT_REFS   => \%layer_export_list_name_refs,
+  }
+}
+
+
+
+
+
+#**********************************************************
+=head2 _maps_show_result_message()
+
+=cut
+#**********************************************************
+sub _maps_show_result_message {
+  my ($message, $attr) = @_;
+  
+  if ( !_error_show($Maps) ) {
+    $html->tpl_show(
+      _include('maps_redirect', 'Maps'),
+      {
+        SECTION  => '',
+        MESSAGE  => $message,
+        MAP_TYPE => $FORM{MAP_TYPE} || 'google',
+        %{ $attr ? $attr : { } }
+      }
+    );
+  }
+  
+}
+
+#**********************************************************
+=head2 _maps_parse_and_save_layer_objects()
+
+=cut
+#**********************************************************
+sub _maps_parse_and_save_layer_objects {
+  my ($layer_id, $layer_objects, $attr) = @_;
+  return 0 unless ($layer_id && $layer_objects);
+  
+  my @inserted_geometric_figures = ();
+#  $Maps->{debug} = 1;
+  foreach my $layer_object ( @{$layer_objects} ) {
+    my $type = $layer_object->{TYPE};
+    my $object = $layer_object->{OBJECT};
+  
+    # Transforming rectangle to polygon
+    if ( $type eq 'rectangle' ) {$type = 'polygon'};
+  
+    my $func_name = $type . 's_add';
+    
+    # Add to main table
+    my $added = $Maps->$func_name(
+      {
+        LAYER_ID => $layer_id,
+        %{$object},
+        COLOR     => $object->{COLOR} || $FORM{COLOR} || undef,
+        OBJECT_ID => $attr->{OBJECT_ID}
+      }
+    );
+    if ( $added && $added == 0 ) {
+      _bp('Wrong type', $func_name);
+      return 0;
+    }
+    my $new_map_object_id = $Maps->{INSERT_ID};
+    
+    if ( $Maps->{errno} ) {
+      _bp('Wrong object', $layer_object);
+      _error_show($Maps);
+    }
+    elsif ( exists $object->{POINTS} ) {
+      push @inserted_geometric_figures, $new_map_object_id;
+      my $parent_key_name = uc($type . '_id');
+  
+      if ( $type eq 'polyline' ) {
+        #TODO: if !$object->{LENGTH}, calculate length
+        
+        $Maps->polyline_points_add({
+          POLYLINE_ID => $new_map_object_id,
+          POINTS      => $object->{POINTS}
+        });
+      }
+      else {
+        my $points_add_func_name = $type . '_points_add';
+        
+        # Add each coord
+        # Points are encoded in legacy way
+        my @points = split(';', $object->{POINTS});
+        foreach my $point_str ( @points ) {
+          my @point_coords = split(',\s?', $point_str);
+          $Maps->$points_add_func_name( {
+            COORDX           => $point_coords[1],
+            COORDY           => $point_coords[0],
+            $parent_key_name => $new_map_object_id
+          } );
+          _error_show($Maps);
+        }
+      }
+    } # End elsif has POINTS
+    else {
+      push @inserted_geometric_figures, $new_map_object_id;
+    }
+  } # End foreach
+  
+  return \@inserted_geometric_figures;
+}
+
+#**********************************************************
+=head2 _maps_get_layer_objects()
+
+=cut
+#**********************************************************
+sub _maps_get_layer_objects {
+  my ($layer_id, $attr) = @_;
+  
+  my @main_object_types = qw/ circle polygon polyline /; # text /;
+  my %have_points = ( polygon => 1, polyline => 1 );
+  
+  my @OBJECTS = ();
+  foreach my $object_type ( @main_object_types ) {
+    my $func_name = $object_type . 's_list';
+  
+    my $this_type_objects_list = $Maps->$func_name( {
+      LAYER_ID         => $layer_id,
+      SHOW_ALL_COLUMNS => 1,
+      COLS_UPPER       => 1,
+      OBJECT_ID        => $attr->{ID} || '_SHOW',
+      PAGE_ROWS        => 10000
+    } );
+  
+    next if (!is_not_empty_array_ref($this_type_objects_list));
+  
+    if ( $have_points{$object_type} ) {
+      my $points_func_name = $object_type . '_points_list';
+      my $parent_id_name = uc($object_type . '_id');
+      #      $Maps->{debug} = 1;
+    
+      # TODO: optimize to IN query, sort_by hash, assign points by id
+    
+      foreach my $map_object_row ( @{$this_type_objects_list} ) {
+        my $points_list = $Maps->$points_func_name( {
+          $parent_id_name => $map_object_row->{id},
+          COORDX          => '_SHOW',
+          COORDY          => '_SHOW',
+          COLS_UPPER      => 0,
+          PAGE_ROWS       => 10000
+        } );
+      
+        $map_object_row->{POINTS} = [ map { [ + $_->{coordx}, + $_->{coordy} ] } @{$points_list} ];
+      }
+    }
+    
+    push(@OBJECTS, map {
+        {
+          uc($object_type) => $_,
+          LAYER_ID         => $layer_id,
+          OBJECT_ID        => $_->{object_id}
+        }
+      } @{$this_type_objects_list});
+  }
+  
+  return \@OBJECTS;
+}
+
+#**********************************************************
+=head2 _maps_get_new_object_dynamic_add_script($layer_id, $object_id)
+
+  This function should generate MAP_EVENT to show new marker in place of added object
+
+=cut
+#**********************************************************
+sub _maps_get_new_object_dynamic_add_script {
+  my ($layer_id, $object_id) = @_;
+  
+  return '' unless ($layer_id && $object_id);
+  
+  my $markers_string = '';
+  
+  if ( $layer_id == $LAYER_ID_BY_NAME{BUILD} ) {
+    $markers_string = maps_builds_show({ ID => $object_id, EXPORT => 1 })
+  }
+  elsif ( $layer_id == $LAYER_ID_BY_NAME{WIFI} ) {
+    $markers_string = maps_wifis_show({ ID => $object_id, EXPORT => 1 })
+  }
+  elsif ( $layer_id == $LAYER_ID_BY_NAME{DISTRICT} ) {
+    $markers_string = maps_districts_show({ ID => $object_id, EXPORT => 1 })
+  }
+  elsif ( $layer_id == $LAYER_ID_BY_NAME{ROUTE} ) {
+    $markers_string = maps_routes_show({ ID => $object_id, EXPORT => 1 })
+  }
+  elsif ( $layer_id == $LAYER_ID_BY_NAME{CUSTOM_POINT} ) {
+    $markers_string = maps_objects_show({ ID => $object_id, EXPORT => 1 });
+  }
+  elsif ( $FORM{EXPORT_FUNC} && $FORM{MODULE} ) {
+    if ( !defined &{$FORM{EXPORT_FUNC}} ) {
+      load_module($FORM{MODULE}, $html);
+    }
+    if ( defined &{$FORM{EXPORT_FUNC}} ) {
+      $markers_string =  &{ \&{$FORM{EXPORT_FUNC}}}();
+    }
+  }
+  elsif ( $layer_id >= 100 ) {
+    $markers_string = _maps_get_layer_objects($layer_id, { ID => $object_id, EXPORT => 1 })
+  }
+  else {
+    return q{};
+  }
+  
+  my $notification = qq{
+    {
+    "TYPE"    : "MAP_EVENT",
+    "OBJECTS" : [ $markers_string ]
+    }
+  };
+  
+  return qq{
+  <script>
+    AMessageChecker.processData($notification,1);
+  </script>
+  };
+}
+
+#**********************************************************
+=head2 _maps_remove_layer_objects()
+
+=cut
+#**********************************************************
+sub _maps_remove_layer_objects {
+  my ($layer_id, $object_id, $attr) = @_;
+  
+  my @main_object_types = qw/ point circle polygon polyline /; # text /;
+  my %have_points = ( polygon => 1, polyline => 1 );
+  my $have_error = 0;
+  
+  # Retrive all objects for this layer_id and object_id
+  foreach my $type ( @main_object_types ) {
+    my $list_func_name = $type . 's_list';
+    my $delete_func_name = $type . 's_del';
+    
+    my $this_type_objects_list = $Maps->$list_func_name( {
+      LAYER_ID   => $layer_id,
+      OBJECT_ID  => $object_id,
+      COLS_UPPER => 0
+    } );
+    $have_error ||= $Maps->{errno};
+    
+    # Saving IDS
+    if ( $this_type_objects_list && ref $this_type_objects_list eq 'ARRAY' && @{$this_type_objects_list} > 0 ) {
+      $Maps->$delete_func_name($_->{id}) foreach (@{$this_type_objects_list});
+      $have_error ||= $Maps->{errno};
+      if ( $have_points{$type} ) {
+        my $delete_points_func = $type . '_points_del';
+        my $parent_key_name = $type . '_id';
+        
+        $Maps->$delete_points_func(undef, { $parent_key_name => $_->{id} }) foreach (@{$this_type_objects_list});
+        $have_error ||= $Maps->{errno};
+      }
+    }
+  }
+  
+  return !$have_error;
+}
+
+#**********************************************************
+=head2 _maps_change_layer_objects()
+
+=cut
+#**********************************************************
+sub _maps_change_layer_objects {
+  my ($layer_id, $object_id, $attr) = @_;
+  
+  if ( $attr->{TYPE} && $attr->{TYPE} eq 'marker' ) {
+    # Need to update coords for custom point
+    my $id = $attr->{OBJECT_ID} || $attr->{ID};
+    if ( !$id ) {
+      # TODO:: get marker by object_id
+      return 0;
+    }
+    $Maps->points_change({
+      ID     => $id,
+      COORDX => $attr->{COORDX},
+      COORDY => $attr->{COORDY},
+    });
+    
+  }
+  elsif ( $attr->{TYPE} && $attr->{TYPE} eq 'polyline' ) {
+    
+    my $id = $attr->{POLYLINE_ID} || 0;
+    # OBJECT_ID contains polyline->{object_id}
+    if ( !$id && defined $object_id ) {
+      my $list = $Maps->polylines_list({ LAYER_ID=> $layer_id, OBJECT_ID => $object_id, COLS_NAME => 1, COLS_UPPER => 0 });
+      return 0 unless ($list && ref $list eq 'ARRAY' && scalar(@{$list}) > 0);
+      
+      $id = $list->[0]->{id};
+    }
+    _bp('polyline_id', $id, {TO_CONSOLE => 1});
+    # Delete old points for polyline
+    $Maps->polyline_points_del(undef, { polyline_id => $id });
+    
+    my @points = split(';', $attr->{POINTS});
+    # Add each coord
+    foreach my $point_str ( @points ) {
+      my @point_coords = split(',\s?', $point_str);
+      $Maps->polyline_points_add( {
+        COORDX      => $point_coords[1],
+        COORDY      => $point_coords[0],
+        POLYLINE_ID => $id
+      } );
+      _error_show($Maps);
+    }
+  }
+  else {
+    print "Not impelemented for type";
+    return 0;
+  }
+  
+  return 1;
+}
+
+
+#**********************************************************
+=head2 maps_builds_quick()
+
+=cut
+#**********************************************************
+sub maps_builds_quick {
+  my $districts_list = $Address->district_list( {
+    COLS_NAME => 1,
+    SORT      => 'd.name',
+    PAGE_ROWS => 10000
+  } );
+  return if (_error_show($Address));
+  
+  foreach my $district ( @{$districts_list} ) {
+    # Get all streets
+    my $streets_list = $Address->street_list( {
+      DISTRICT_ID => $district->{id},
+      STREET_NAME => '_SHOW',
+      SECOND_NAME => '_SHOW',
+      COLS_NAME   => 1,
+      SORT        => 's.name',
+      PAGE_ROWS   => 10000
+    } );
+    return if (_error_show($Address));
+    
+    my $streets_content = '';
+    foreach my $street ( @{$streets_list} ) {
+      my $builds_list = $Address->build_list( {
+        STREET_ID => $street->{id},
+        COLS_NAME => 1,
+        SORT      => 1,
+        PAGE_ROWS => 10000
+      } );
+      return if (_error_show($Address));
+      
+      my $builds_content = '';
+      foreach my $build ( @{$builds_list} ) {
+        $builds_content .= $html->button( $build->{number},
+          "index=7&type=11&search=1&search_form=1&LOCATION_ID=$build->{id}&BUILDS=$street->{id}", {
+            class         => 'btn btn-lg btn-primary',
+            OUTPUT2RETURN => 1
+          } );
+      }
+      
+      $streets_content .= $html->tpl_show( templates('form_show_hide'), {
+          NAME    => $street->{street_name}
+            . ( $street->{second_name} ? " ( $street->{second_name} ) " : '' )
+            . ' ( ' . (scalar @{$builds_list}) . ' )',
+          CONTENT => '<div class="button-block">' . $builds_content . '</div>',
+          PARAMS  => 'collapsed-box'
+        },
+        {
+          OUTPUT2RETURN => 1
+        } );
+    }
+    
+    $html->tpl_show( templates('form_show_hide'), {
+        NAME    => $lang{DISTRICT} . ' ' . $district->{name} . ' ( ' . (scalar @{$streets_list}) . ' )',
+        CONTENT => $streets_content,
+        PARAMS  => 'collapsed-box'
+      } )
+  };
+  
+}
+
+#**********************************************************
+=head2 maps_add_external_object()
+
+=cut
+#**********************************************************
+sub maps_add_external_object {
+  my ($type_id, $attr) = @_;
+  return if (!$type_id || ref $type_id);
+  
+  my $type_info = $Maps->point_types_info($type_id);
+  _error_show($Maps);
+  
+  my $name = $attr->{NAME} || do {
+    my $max_ids = $Maps->points_max_ids_for_types($type_id);
+    _error_show($Maps);
+    
+    my $max_id = $max_ids->{$type_id} || '';
+    _translate($type_info->{NAME}) . $max_id;
+  };
+  
+  delete $attr->{ID};
+  $Maps->points_add({
+    %{$attr},
+    EXTERNAL => 1,
+    NAME     => $name,
+    TYPE_ID  => $type_id,
+  });
+  _error_show($Maps);
+  return $Maps->{errno} ? 0 : $Maps->{INSERT_ID};
+}
+
+#**********************************************************
+=head2 maps_show_object_button()
+
+=cut
+#**********************************************************
+sub maps_show_object_button {
+  my ($layer_id, $object_id, $attr) = @_;
+  
+  my $params = '';
+  
+  my %button_params = (
+    class          => 'btn btn-xs btn-info',
+    title          => $lang{SHOW},
+    ICON           => 'glyphicon glyphicon-globe',
+  );
+  
+  if (exists $attr->{POINT_ID} && !$attr->{POINT_ID}){
+    $button_params{class} = 'btn btn-xs btn-warning disabled'
+  }
+  
+  if ($attr->{GO_TO_MAP}){
+    my $maps_index = get_function_index('maps_show_poins');
+    $params = "index=$maps_index&show_layer=$layer_id&OBJECT_ID=$object_id";
+    
+    if ($attr->{SINGLE}){
+      $params .= "&SINGLE=1&LAYER_ID=$layer_id&POINT_ID=$attr->{SINGLE}";
+    }
+    
+    if ($attr->{RETURN_HREF}){
+      return $params;
+    }
+  }
+  else {
+    $button_params{ex_params} = qq/onclick="MapLayers.showObject($layer_id, $object_id)"/;
+    $button_params{class} .= ' pull-right';
+    $button_params{JAVASCRIPT} = '';
+    $button_params{SKIP_HREF} = 1;
+    $button_params{NO_LINK_FORMER} = 1;
+  }
+  
+  my $name = ($attr && $attr->{NAME}) ? $attr->{NAME} : '';
+  if ($name){
+    $button_params{ADD_ICON} = $button_params{ICON};
+    delete $button_params{ICON}
+  }
+  
+  return $html->button($name, $params, \%button_params)
+}
+
+#**********************************************************
+=head2 maps_calculate_polyline_length($polyline_id)
+
+=cut
+#**********************************************************
+sub maps_calculate_polyline_length {
+  my ($polyline_id) = shift || $FORM{POLYLINE_ID};
+  return -1 unless ($polyline_id);
+  
+  # Retrive all points
+  my $points = $Maps->polyline_points_list({ POLYLINE_ID => $polyline_id, COLS_UPPER => 1 });
+  _error_show($Maps);
+  
+  # Calculate length
+  my $length = 0;
+  foreach (my $i = 0; $i < $#{$points}; $i++){
+    $length += Maps::mercator_to_meters(
+      $points->[$i-1]{COORDX},
+      $points->[$i-1]{COORDY},
+      $points->[$i]{COORDX},
+      $points->[$i]{COORDY}
+    );
+  }
+  
+  # Save length
+  $Maps->polylines_change({ID => $polyline_id, LENGTH => $length});
+  
+  # Return length
+  return $length;
+}
+
+
+
+#**********************************************************
+
+=head2 _maps_points_count($list, $object_info, $attr) - Counts points
+
+  Arguments:
+    $list - arr_ref for DB list
+    $object_info - DB list
+    $attr - hash_ref
+      KEY    - string, key for which to count
+
+  Returns:
+    arr_ref - array that contains sorted count
+
+=cut
+
+#**********************************************************
+sub _maps_points_count {
+  my ($list, $object_info, $attr) = @_;
+  my $key = (defined $attr->{KEY}) ? $attr->{KEY} : 'id';
+  
+  my %max_objects_on_point = ();
+  foreach my $line ( @{$list} ) {
+    if ( $object_info->{ $line->{$key} } ) {
+      $max_objects_on_point{ $line->{$key} } = $#{ $object_info->{ $line->{$key} } } + 1;
+    }
+  }
+  
+  my @max_arr = sort { $b <=> $a } values %max_objects_on_point;
+  
+  return \@max_arr;
+}
+
+#**********************************************************
+
+=head2 _maps_point_color($point_count, $max_points) - get color for point
+
+  Arguments:
+    $point_count  - Point object count
+    $max_points   - Points max objects
+
+  Returns:
+    string - color name
+
+=cut
+
+#**********************************************************
+sub _maps_point_color {
+  my ($point_count, $max_points) = @_;
+  
+  my $color = 'green';
+  
+  return $color unless ($point_count);
+  
+  #Fire for top 3
+  if ( $point_count > 2 && $max_points->[2] && $point_count >= $max_points->[2] ) {
+    $color = 'fire';
+  }
+  
+  #Other points by colors
+  elsif ( $point_count > 0 && $point_count < 3 ) {
+    $color = 'white';
+  }
+  elsif ( $point_count < 5 ) {
+    $color = 'green';
+  }
+  elsif ( $point_count < 10 ) {
+    $color = 'blue';
+  }
+  elsif ( $point_count >= 10 ) {
+    $color = 'yellow';
+  }
+  else {
+    $color = 'grey';
+  }
+  
+  return $color;
+}
+
+#**********************************************************
+=head2 _maps_get_custom_point_icon()
+
+=cut
+#**********************************************************
+sub _maps_get_custom_point_icon {
+  my ($icon) = @_;
+  
+  if ( $icon !~ /^https?\:\/\//o ) {
+    my $has_extension = $icon =~ /\.\w{3,4}$/o;
+    
+    if ( $has_extension ) {
+      $icon =~ s/\.\w{3,4}$//;
+    }
+  }
+  
+  return $icon;
+}
+
+#**********************************************************
+=head2 _maps_icon_filename_select()
+
+=cut
+#**********************************************************
+sub _maps_icon_filename_select {
+  my ($attr) = @_;
+  
+  my $name = $attr->{NAME} || 'FILENAME';
+  
+  our $base_dir;
+  $base_dir ||= '/usr/abills';
+  
+  my $files = _get_files_in($base_dir . $MAPS_ICONS_DIR, { FILTER => 'png'});
+  
+  return 0 if (!$files);
+  
+  if ($attr->{NO_EXTENSION}) {
+    $_ =~ s/\.png// foreach (@{$files});
+  }
+  
+  return $html->form_select(
+    $name,
+    {
+      SELECTED  => $attr->{$name} || $FORM{$name},
+      SEL_ARRAY => $files,
+      NO_ID     => 1
+    }
+  );
+}
+
+#**********************************************************
+=head2 _maps_parent_object_select()
+
+=cut
+#**********************************************************
+sub _maps_parent_object_select {
+  my ($attr) = @_;
+  
+  my $selected_parent_id = $attr->{PARENT_ID} || $FORM{PARENT_ID};
+  delete $attr->{PARENT_ID};
+  
+  my %show_parent_btn_params = ();
+  if ( $selected_parent_id ) {
+    %show_parent_btn_params = (
+      MAIN_MENU      => get_function_index('maps_objects_main'),
+      MAIN_MENU_ARGV => "chg=$selected_parent_id"
+    )
+  }
+  
+  return $html->form_select(
+    'PARENT_ID',
+    {
+      SELECTED    => $selected_parent_id,
+      SEL_LIST    => $Maps->points_list({ NAME_ADDRESS => '_SHOW', %{ $attr ? $attr : { }} }),
+      NO_ID       => 1,
+      SEL_OPTIONS => { '' => '' },
+      %show_parent_btn_params
+    }
+  );
+}
+
+
+#**********************************************************
+=head2 _maps_object_types_select() - Show options for types select
+
+=cut
+#**********************************************************
+sub _maps_object_types_select {
+  my ($attr) = @_;
+  
+  my $types_list = $Maps->point_types_list({ COLS_NAME => 1, NAME => '_SHOW' });
+  $types_list = translate_list_value($types_list);
+  
+  my $ex_params = '';
+  if ( $attr->{AUTOSUBMIT} ) {
+    $ex_params .= ' data-auto-submit=' . $attr->{AUTOSUBMIT};
+  }
+  
+  my $select = $html->form_select( 'TYPE_ID', {
+      SELECTED  => $attr->{SELECTED} || $FORM{TYPE_ID} || '',
+      SEL_LIST  => $types_list,
+      NO_ID     => 1,
+      EX_PARAMS => "required='required'$ex_params",
+      %{$attr},
+    }
+  );
+  unless ( $attr->{OUTPUT2RETURN} ) {
+    print $select;
+  }
+  return $select;
+}
+
+#**********************************************************
+
+=head2 _maps_layer_structure_select()
+
+=cut
+
+#**********************************************************
+sub _maps_layer_structure_select {
+  my ($attr) = @_;
+  
+  return $html->form_select(
+    'STRUCTURE',
+    {
+      SELECTED  => $attr->{STRUCTURE} || $FORM{STRUCTURE},
+      SEL_ARRAY => [ qw /MARKER MULTIPLE MARKERS_POLYLINE MARKER_CIRCLE CIRCLE/ ],
+      NO_ID     => 1
+    }
+  );
+}
+
+#**********************************************************
+
+=head2 _maps_result_former_nas_id_filter() - returns button to nas
+
+=cut
+
+#**********************************************************
+sub _maps_result_former_nas_id_filter {
+  my ($nas_id) = @_;
+  return '' unless ($nas_id);
+  
+  # Next block should be called only once
+  # Not moving it to top level, to prevent loading every time
+  state $nases_by_id = undef;
+  if ( !$nases_by_id ) {
+    my $nases_list = $Nas->list({ SHORT => 1, NAS_NAME => '_SHOW', NAS_ID => '_SHOW', COLS_NAME => 1 });
+    _error_show($Nas);
+    
+    $nases_by_id = sort_array_to_hash($nases_list, 'nas_id');
+  }
+  
+  my $nas = $nases_by_id->{$nas_id};
+  return '' unless (defined $nas);
+  
+  return $html->button($nas->{nas_name}, "index=62&NAS_ID=$nas->{nas_id}", { });
+}
+
+#**********************************************************
+
+=head2 _maps_result_former_parent_route_id_filter()
+
+=cut
+
+#**********************************************************
+sub _maps_result_former_parent_route_id_filter {
+  my ($route_id) = @_;
+  return '' unless ($route_id);
+  
+  # Next block should be called only once
+  # Not moving it to top level, to prevent loading every time
+  state $routes_by_id = undef;
+  if ( !$routes_by_id ) {
+    my $routes_list = $Maps->routes_list({ ID => '_SHOW', NAME => '_SHOW', COLS_NAME => 1 });
+    _error_show($Maps);
+    
+    $routes_by_id = sort_array_to_hash($routes_list);
+  }
+  
+  my $route = $routes_by_id->{$route_id};
+  return '' unless (defined $route);
+  
+  return $html->button($route->{name}, "index=" . get_function_index('maps_routes_list') . "&NAS_ID=$route->{id}", { });
+}
+
+
+#**********************************************************
+=head2 _maps_result_former_show_custom_point_on_map_btn()
+
+=cut
+#**********************************************************
+sub _maps_result_former_show_custom_point_on_map_btn {
+  my (undef, $attr) = @_;
+  
+  my $object_id = $attr->{VALUES}->{ID};
+  my $custom_point_layer_id = $LAYER_ID_BY_NAME{CUSTOM_POINT} || '';
+  
+  return '' unless ($object_id);
+  
+  # Next block should be called only once
+  # Not moving it to top level, to prevent loading every time
+  state $objects_by_id = undef;
+  
+  if ( !$objects_by_id ) {
+    my $objects_list = $Maps->points_list( {
+      NAME      => '_SHOW',
+      ID        => '_SHOW',
+      ICON      => '_SHOW',
+      COORDX    => '_SHOW',
+      COORDY    => '_SHOW',
+      COLS_NAME => 1
+    });
+    _error_show($Maps);
+    
+    $objects_by_id = sort_array_to_hash($objects_list);
+  }
+  
+  if ( !$objects_by_id->{$object_id}->{coordx} ) {
+    my $icon_attr = '';
+    if ( defined $objects_by_id->{$object_id}->{icon} ) {
+      my $icon_name = _maps_get_custom_point_icon($objects_by_id->{$object_id}->{icon});
+      $icon_attr = "&ICON=$icon_name";
+    }
+    return $html->button('', "get_index=maps_add_2&full=1&add=CUSTOM_POINT$icon_attr&OBJECT_ID=$object_id", {
+        ICON => 'glyphicon glyphicon-plus'
+      });
+  };
+  
+  return $html->button('', "get_index=maps_add_2&full=1&show_layer=$custom_point_layer_id&OBJECT_ID=$object_id",
+    { ICON => 'glyphicon glyphicon-globe' }
+  );
+}
+
+1;

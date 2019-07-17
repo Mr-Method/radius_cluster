@@ -1,0 +1,416 @@
+#!perl
+
+=head1 NAME
+  Dom Economizer - module for hous payments Economizer
+
+=cut
+
+=head1 Synopsis
+  The module counts the costs for utilities
+
+  Capabilities:
+    - add data from the counters
+    - calculation of cost per month
+    - visual representation
+=cut
+
+use Economizer;
+my $Economizer = Economizer->new($db, $admin, \%conf);
+#**********************************************************
+=head2 o_main($attr)
+
+  Arguments:
+
+
+  Returns:
+
+=cut
+
+#**********************************************************
+sub e_user {
+  #my ($attr) = @_;
+  my %INFORMATION;
+  $INFORMATION{BTN_NAME} = "$lang{ADD}";
+  $INFORMATION{ACTION}   = "add";
+
+  if ($FORM{DATE} && $FORM{action} eq 'add') {
+
+    my $prev_date = $Economizer->info_user_info({COLS_NAME => 1, PREV_DATE => $FORM{DATE}, UID => $user->{UID}});
+    my $next_date = $Economizer->info_user_info({COLS_NAME => 1, NEXT_DATE => $FORM{DATE}, UID => $user->{UID}});
+
+    if($prev_date ne '' && ($prev_date->{light} > $FORM{LIGHT} || $prev_date->{gas} > $FORM{GAS} || $prev_date->{water} > $FORM{WATER})){
+      $html->message("err", "$lang{NEW_DATA_FOR} $FORM{DATE} $lang{SMALLER_THEN} $prev_date->{date}!", "$lang{CHECK_CORRECTNESS}");
+      $INFORMATION{DATE} = $FORM{DATE};
+      $INFORMATION{LIGHT} = $FORM{LIGHT};
+      $INFORMATION{GAS}   = $FORM{GAS};
+      $INFORMATION{WATER} = $FORM{WATER};
+      $INFORMATION{COMMUNAL} = $FORM{COMMUNAL};
+      $INFORMATION{COMMENTS} = $FORM{COMMENTS};
+    }
+    elsif($next_date ne '' && ($next_date->{light} < $FORM{LIGHT} || $next_date->{gas} < $FORM{GAS} || $next_date->{water} < $FORM{WATER})){
+      $html->message("err", "$lang{NEW_DATA_FOR} $FORM{DATE} $lang{GREATER_THEN} $next_date->{date}!", "$lang{CHECK_CORRECTNESS}");
+      $INFORMATION{DATE} = $FORM{DATE};
+      $INFORMATION{LIGHT} = $FORM{LIGHT};
+      $INFORMATION{GAS}   = $FORM{GAS};
+      $INFORMATION{WATER} = $FORM{WATER};
+      $INFORMATION{COMMUNAL} = $FORM{COMMUNAL};
+      $INFORMATION{COMMENTS} = $FORM{COMMENTS};
+    }
+    else{
+      $Economizer->add_user_info({ UID => $user->{UID}, %FORM });
+      if (!$Economizer->{errno}) {
+        $html->message("success", "$lang{INFO} $lang{ADDED}");
+      }
+      else {
+        $html->message("err", "$lang{INFO_ALREADY_ADDED}");
+      }
+    }
+  }
+  elsif ($FORM{action} eq 'change') {
+    my $prev_date = $Economizer->info_user_info({COLS_NAME => 1, PREV_DATE => $FORM{DATE}, UID => $user->{UID}});
+    my $next_date = $Economizer->info_user_info({COLS_NAME => 1, NEXT_DATE => $FORM{DATE}, UID => $user->{UID}});
+
+    if($prev_date ne '' && ($prev_date->{light} > $FORM{LIGHT} || $prev_date->{gas} > $FORM{GAS} || $prev_date->{water} > $FORM{WATER})){
+      $html->message("err", "$lang{NEW_DATA_FOR} $FORM{DATE} $lang{SMALLER_THEN} $prev_date->{date}!", "$lang{CHECK_CORRECTNESS}");
+      $INFORMATION{DATE} = $FORM{DATE};
+      $INFORMATION{LIGHT} = $FORM{LIGHT};
+      $INFORMATION{GAS}   = $FORM{GAS};
+      $INFORMATION{WATER} = $FORM{WATER};
+      $INFORMATION{COMMUNAL} = $FORM{COMMUNAL};
+      $INFORMATION{COMMENTS} = $FORM{COMMENTS};
+    }
+    elsif($next_date ne '' && ($next_date->{light} < $FORM{LIGHT} || $next_date->{gas} < $FORM{GAS} || $next_date->{water} < $FORM{WATER})){
+      $html->message("err", "$lang{NEW_DATA_FOR} $FORM{DATE} $lang{GREATER_THEN} $next_date->{date}!", "$lang{CHECK_CORRECTNESS}");
+      $INFORMATION{DATE} = $FORM{DATE};
+      $INFORMATION{LIGHT} = $FORM{LIGHT};
+      $INFORMATION{GAS}   = $FORM{GAS};
+      $INFORMATION{WATER} = $FORM{WATER};
+      $INFORMATION{COMMUNAL} = $FORM{COMMUNAL};
+      $INFORMATION{COMMENTS} = $FORM{COMMENTS};
+    }
+    else{
+      $Economizer->change_user_info({ ID => $FORM{ID}, %FORM });
+      if (!$Economizer->{errno}) {
+        $html->message("success", "$lang{INFO} $lang{CHANGED}");
+      }
+      else {
+        $html->message("err", "$lang{CANT_CHANGE}");
+      }
+    }
+  }
+
+  if ($FORM{chg}) {
+    my $date_info = $Economizer->info_user_info({ COLS_NAME => 1, ID => $FORM{chg} });
+    $INFORMATION{DATE}     = $date_info->{date};
+    $INFORMATION{LIGHT}    = $date_info->{light};
+    $INFORMATION{GAS}      = $date_info->{gas};
+    $INFORMATION{WATER}    = $date_info->{water};
+    $INFORMATION{COMMUNAL} = $date_info->{communal};
+    $INFORMATION{COMMENTS} = $date_info->{comments};
+    $INFORMATION{BTN_NAME} = "$lang{CHANGE}";
+    $INFORMATION{ACTION}   = "change";
+    $INFORMATION{ID}       = "$FORM{chg}";
+  }
+
+  if ($FORM{del}) {
+    $Economizer->del_user_info({ ID => $FORM{del} });
+    if (!$Economizer->{errno}) {
+      $html->message("success", "$lang{INFO} $lang{DELETED}");
+    }
+    else {
+      $html->message("err", "$lang{NOT} $lang{DELETE}");
+    }
+  }
+
+  my $info_list = $Economizer->list_user_info(
+    {
+      COLS_NAME => 1,
+      UID       => $user->{UID},
+      DATE      => '_SHOW',
+      LIGHT     => '_SHOW',
+      GAS       => '_SHOW',
+      WATER     => '_SHOW',
+      COMMUNAL  => '_SHOW',
+      COMMENTS  => '_SHOW',
+      SORT      => 'date',
+      DESC      => 'DESC',
+      LIMIT     => 25
+    }
+  );
+
+
+  $html->tpl_show(
+    _include('economizer_add_public_utilites', 'Economizer'),
+    {
+      DATE => $INFORMATION{DATE} || $DATE,
+      %INFORMATION
+    }
+  );
+
+  my ($table, $list) = result_former(
+    {
+      INPUT_DATA      => $Economizer,
+      LIST            => $info_list,
+      DEFAULT_FIELDS  => "date, light, gas, water, communal, comments",
+      FUNCTION_FIELDS => 'change, del',
+      EXT_TITLES      => {
+        'date'     => "$lang{DATE}",
+        'light'    => "$lang{LIGHT}, $lang{KWT}",
+        'gas'      => "$lang{GAS}, $lang{M3}",
+        'water'    => "$lang{WATER}, $lang{M3}",
+        'communal' => "$lang{COMMUNAL}" . ", $lang{GRN}",
+        'comments' => "$lang{COMMENTS}"
+      },
+      TABLE => {
+        width   => '100%',
+        caption => "$lang{ECONOMIZER}",
+        qs      => $pages_qs,
+        ID      => 'USER_ECONOMIZER',
+        header  => '',
+        EXPORT  => 1,
+        MENU    => "$lang{ADD}:index=" . get_function_index('e_user') . ':add' . ";",
+      },
+      MAKE_ROWS     => 1,
+      SEARCH_FORMER => 1,
+      MODULE        => 'Economizer',
+      TOTAL         => 1
+    }
+  );
+
+  return 1;
+}
+
+#**********************************************************
+=head2 o_charts() -
+
+  Arguments:
+    $attr -
+  Returns:
+
+  Examples:
+
+=cut
+#**********************************************************
+sub e_statistics {
+  my ($attr) = @_;
+
+  my %INFORMATION;
+  require JSON;
+
+  my @YEARS = ('2016', '2017', '2018', '2019', '2020');
+  my ($year, undef, undef) = split('-', $DATE);
+
+  $INFORMATION{YEARS_SELECT} = $html->form_select(
+  'YEAR',
+  {
+    SELECTED => $FORM{YEAR} || $year,
+    SEL_ARRAY => \@YEARS,
+    SEL_KEY  => 'id',
+    SEL_VALUE=> 'name',
+    NO_IDS => 1,
+  }
+);
+    
+  my $info_list = $Economizer->list_user_info(
+    {
+      COLS_NAME => 1,
+      UID       => $user->{UID},
+      DATE      => '_SHOW',
+      FROM_DATE => $FORM{YEAR} ? "$FORM{YEAR}-01-01"        : "$year-01-31",
+      TO_DATE   => $FORM{YEAR} ? $FORM{YEAR} + 1 . "-01-31" : $year + 1 . "-01-31",
+      LIGHT     => '_SHOW',
+      GAS       => '_SHOW',
+      WATER     => '_SHOW',
+      COMMUNAL  => '_SHOW',
+      COMMENTS  => '_SHOW',
+      SORT      => 'date',
+      DESC      => 'DESC',
+      LIMIT     => 25
+    }
+  );
+
+  if ( scalar (@$info_list) < 2){ 
+    $html->message('info', "$lang{NO_PUBLIC_UTILITIES_FOR_THIS_YEAR}");
+  }
+  else{
+    my @dates = ();
+  my @light = ();
+  my @gas   = ();
+  my @water = ();
+
+  my @NORMAL_DATES_LIST = reverse(@$info_list);
+
+  for (my $i = 1 ; $i < scalar(@NORMAL_DATES_LIST) ; $i++) {
+    my ($first_year,  $first_month,  $first_day)  = split('-', $NORMAL_DATES_LIST[ $i - 1 ]->{date});
+    my ($second_year, $second_month, $second_day) = split('-', $NORMAL_DATES_LIST[$i]->{date});
+
+    #push (@dates, "$NORMAL_DATES_LIST[$i - 1]->{date} - $NORMAL_DATES_LIST[$i]->{date}");
+    push(@dates, "$first_day $MONTHES[--$first_month]  - $second_day $MONTHES[--$second_month] ");
+    push(@light, ($NORMAL_DATES_LIST[$i]->{light} - $NORMAL_DATES_LIST[ $i - 1 ]->{light}));
+    push(@gas,   ($NORMAL_DATES_LIST[$i]->{gas} - $NORMAL_DATES_LIST[ $i - 1 ]->{gas}));
+    push(@water, ($NORMAL_DATES_LIST[$i]->{water} - $NORMAL_DATES_LIST[ $i - 1 ]->{water}));
+  }
+
+  # $INFORMATION{CHART_COUNTER} = $html->make_charts_simple(
+  #   {
+  #     TRANSITION    => 1,
+  #     TYPES         => { "$lang{WATER}" => 'LINE', "$lang{LIGHT}" => 'LINE', "$lang{GAS}" => 'LINE' },
+  #     X_TEXT        => \@dates,
+  #     DATA          => { "$lang{LIGHT}" => \@light, "$lang{GAS}" => \@gas, "$lang{WATER}" => \@water },
+  #     OUTPUT2RETURN => 1,
+  #     GRAPH_ID      => 'COUNTER',
+  #     TITLE => "$lang{DIFFERENCE_PUBLIC_UTILITIES_FOR_PERIODS}",
+  #   }
+  # );
+
+  $INFORMATION{CHART_COUNTER} = $html->chart({
+    TYPE     => 'line',
+    X_LABELS => \@dates,
+    DATA          => { "$lang{LIGHT}" => \@light, "$lang{GAS}" => \@gas, "$lang{WATER}" => \@water },
+    BACKGROUND_COLORS => {
+        $lang{WATER} => 'rgb(54, 162, 235)',
+        $lang{LIGHT} => 'rgb(255,205,86)',
+        $lang{GAS}   => 'rgb(255,99,132)'
+      },
+      FILL => 'false',
+    TITLE    => "$lang{DIFFERENCE_PUBLIC_UTILITIES_FOR_PERIODS}",
+    OUTPUT2RETURN => 1,
+  });
+
+  my @money_for_light = ();
+  my @money_for_gas   = ();
+  my @money_for_water = ();
+
+  my $light_till_100 = 0.714;
+  my $light_till_500 = 1.29;
+  my $gas_per_one   = 6.879;
+  my $water_per_one = 14.64;
+
+  my $light_total = 0;
+  my $gas_total   = 0;
+  my $water_total = 0;
+
+  for (my $i = 0; $i < scalar(@dates); $i++) {
+
+    if($light[$i] < 100){
+      my $light_pay = $light[$i] * $light_till_100;
+      push(@money_for_light, $light_pay);
+      $light_total += $light_pay;
+    }
+    elsif($light[$i] > 100 && $light[$i] < 500){
+      my $light_pay = 100 * $light_till_100;
+      $light_pay += ($light[$i] - 100) * $light_till_500;
+      push(@money_for_light, $light_pay);
+      $light_total += $light_pay;
+    }
+
+    my $gas_pay = $gas[$i] * $gas_per_one;
+    $gas_total += $gas_pay;
+    push(@money_for_gas, $gas_pay);
+
+    my $water_pay = $water[$i] * $water_per_one;
+    $water_total += $water_pay;
+    push(@money_for_water, $water_pay);
+  }
+
+  # $INFORMATION{CHART_MONEY} = $html->make_charts_simple(
+  #   {
+  #     TRANSITION    => 1,
+  #     TYPES         => { "$lang{WATER}" => 'COLUMN', "$lang{LIGHT}" => 'COLUMN', "$lang{GAS}" => 'COLUMN' },
+  #     X_TEXT        => \@dates,
+  #     DATA          => { "$lang{LIGHT}" => \@money_for_light, "$lang{GAS}" => \@money_for_gas, "$lang{WATER}" => \@money_for_water },
+  #     OUTPUT2RETURN => 1,
+  #     GRAPH_ID      => 'MONEY',
+  #     TITLE => "$lang{SPENT_MONEY_FOR_PUB_UTILITIES_FOR_PERIODS}",
+  #   }
+  # );
+
+  $INFORMATION{CHART_MONEY} = $html->chart({
+      TYPE     => 'bar',
+      X_LABELS => \@dates,
+      DATA     => {"$lang{LIGHT}" => \@money_for_light, "$lang{GAS}" => \@money_for_gas, "$lang{WATER}" => \@money_for_water },
+      BACKGROUND_COLORS => {
+        $lang{WATER} => 'rgb(54, 162, 235)',
+        $lang{LIGHT} => 'rgb(255,205,86)',
+        $lang{GAS}   => 'rgb(255,99,132)'
+      },
+      TITLE          => "$lang{SPENT_MONEY_FOR_PUB_UTILITIES_FOR_PERIODS}",
+      OUTPUT2RETURN  => 1,
+    });
+
+  # $INFORMATION{CHART_MONEY_TOTAL} = $html->make_charts_simple(
+  #   {
+  #     TRANSITION    => 1,
+  #     TYPES         => { "$lang{WATER}" => 'PIE', "$lang{LIGHT}" => 'PIE', "$lang{GAS}" => 'PIE' },
+  #     X_TEXT        => \@dates,
+  #     DATA          => { "$lang{GAS}" => [$light_total, $gas_total, $water_total] },
+  #     OUTPUT2RETURN => 1,
+  #     GRAPH_ID      => 'MONEY_TOTAL',
+  #     TITLE => "$lang{AMOUNT_MONEY_SPENT}",
+  #   }
+  # );
+
+  $INFORMATION{CHART_MONEY_TOTAL} = $html->chart({
+      TYPE     => 'doughnut',
+      X_LABELS => ["$lang{LIGHT}", "$lang{GAS}", "$lang{WATER}"],
+      DATA     => {TOTAL => [$water_total, $light_total, $gas_total ]},
+      BACKGROUND_COLORS => {
+        TOTAL => ['rgb(255,205,86)', 'rgb(255,99,132)', 'rgb(54, 162, 235)']
+      },
+      TITLE          => "$lang{AMOUNT_MONEY_SPENT}",
+      OUTPUT2RETURN => 1,
+    });
+  }
+
+  $html->tpl_show(
+    _include('economizer_statistics', 'Economizer'),
+    {
+      DATE => $INFORMATION{DATE} || $DATE,
+      %INFORMATION
+    }
+  );
+
+  return 1;
+}
+
+
+#**********************************************************
+
+=head2 o_add_type($attr)
+
+  Arguments:
+
+
+  Returns:
+
+=cut
+
+#**********************************************************
+sub e_tariffs {
+  my ($attr) = @_;
+
+  my %DATA;
+  $DATA{ACTION}   = 'add';
+  $DATA{BTN_NAME} = "$lang{ADD}";
+
+  if ($FORM{action} eq 'add') {
+
+  }
+  elsif ($FORM{action} eq 'change') {
+
+  }
+
+  if ($FORM{chg}) {
+    $DATA{ACTION}   = 'change';
+    $DATA{BTN_NAME} = "$lang{CHANGE}";
+  }
+
+  if ($FORM{del}) {
+
+  }
+
+  $html->tpl_show(_include('economizer_add_tariff', 'Economizer'), {%DATA});
+  return 1;
+}
+
+1;

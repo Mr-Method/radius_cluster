@@ -1,0 +1,447 @@
+#!perl
+
+=head1 NAME
+  Config web managment
+=cut
+
+use strict;
+use warnings FATAL => 'all';
+use Conf;
+
+our ($db, $admin, %conf, $html, %lang, @bool_vals);
+
+my $Config = Conf->new($db, $admin, \%conf);
+my $debug = $FORM{DEBUG} || 0;
+
+$Config->{ACTION}     = 'add';
+$Config->{LNG_ACTION} = $lang{ADD};
+
+#**********************************************************
+
+=head2 config_main($attr) Main config parameters
+
+=cut
+
+#**********************************************************
+sub config_main {
+
+  #Modules
+  my @header_arr = ("$lang{MAIN}:index=$index&MODULE=main");
+  foreach my $module (@MODULES) {
+    next if ($module eq 'Config');
+    push @header_arr, "$module:index=$index&MODULE=$module";
+  }
+
+  print $html->table_header(\@header_arr, { TABS => 1 });
+
+  if ($FORM{MODULE} && $FORM{MODULE} ne 'main') {
+    $LIST_PARAMS{PARAM} = uc($FORM{MODULE}) . '_*';
+    $pages_qs .= "&MODULE=$FORM{MODULE}";
+  }
+
+  if ($FORM{change}) {
+    my %pre_conf  = ();
+    my %post_conf = ();
+    my $list      = $Config->list({ PAGE_ROWS => 10000, COLS_NAME => 1 });
+
+    if (_error_show($Config)) { return 0 }
+
+    foreach my $line (@{$list}) {
+      $pre_conf{ $line->{param} } = $line->{type};
+    }
+
+    foreach my $p (sort keys %FORM) {
+      if (defined($pre_conf{$p})) {
+        if (defined($FORM{$p}) && $FORM{$p} eq 'subparams') {
+          my @params_val = ();
+          my $i          = 0;
+          while (defined($FORM{ $p . '_' . $i })) {
+            push @params_val, $FORM{ $p . '_' . $i };
+            $i++;
+          }
+
+          $post_conf{$p} = join(':', @params_val);
+        }
+        else {
+          $post_conf{$p} = $FORM{$p};
+        }
+      }
+    }
+
+    my $debug_out = '';
+    foreach my $p (sort keys %post_conf) {
+      $debug_out .= "$p -> " . ($post_conf{$p} || q{}) . "\n";
+      $Config->config_add(
+        {
+          PARAM   => $p,
+          VALUE   => $post_conf{$p},
+          REPLACE => 1
+        }
+      );
+    }
+
+    if (!_error_show($Config)) {
+      $html->message('info', $lang{INFO}, $html->pre($debug_out, { OUTPUT2RETURN => 1 }));
+    }
+  }
+
+  form_search(
+    {
+      SIMPLE => {
+        $lang{PARAM}    => 'PARAM',
+        $lang{DESCRIBE} => 'COMMENTS'
+      }
+    }
+  );
+
+  my $list = $Config->list({ %LIST_PARAMS, COLS_NAME => 1 });
+
+  if (_error_show($Config)) { return 0 }
+
+  my $table = $html->table(
+    {
+      width   => '100%',
+      caption => "Options",
+      title   => [ $lang{PARAM}, $lang{VALUE} ],
+      qs      => $pages_qs,
+      pages   => $Config->{TOTAL},
+      ID      => 'CONFIG'
+    }
+  );
+
+  foreach my $line (@{$list}) {
+    my $value = '';
+
+    #bool
+    if ($line->{type} == 1) {
+
+      #my @arr = split( /, ?/, $line->{value} );
+      foreach my $v (0, 1) {
+        $value .= "$conf{$line->{param}} / $v / " if ($debug);
+        $value .= $html->form_input(
+          "$line->{param}",
+          $v,
+          {
+            TYPE  => 'radio',
+            STATE => (defined($conf{ $line->{param} }) && $conf{ $line->{param} } eq $v) ? 'checked' : undef
+          }
+        )
+        . ' '
+        . $bool_vals[$v]
+        . $html->br();
+      }
+    }
+
+    #Int
+    elsif ($line->{type} == 2 && defined $conf{ $line->{param} }) {
+      $value .= $html->form_input("$line->{param}", "$conf{$line->{param}}", { SIZE => 5 });
+    }
+
+    #Multival
+    elsif ($line->{type} == 3 && defined $conf{ $line->{param} }) {
+      my @val_arr = split(/:/, $conf{ $line->{param} });
+
+      my @param_arr = split(/:/, $line->{value});
+
+      $value = $html->form_input(
+        "$line->{param}" . '',
+        'subparams',
+        {
+          TYPE  => 'checkbox',
+          STATE => ($conf{ $line->{param} }) ? 'checked' : undef
+        }
+      )
+      . ' '
+      . $lang{ACTIV}
+      . $html->br();
+
+      for (my $i = 0 ; $i <= $#param_arr ; $i++) {
+        my $param = $param_arr[$i];
+        $param =~ s/[\n\r]//g;
+        my ($key, $default_val) = split(/=/, $param);
+        $value .= (($key) ? _translate($key) : "$lang{PARAM} " . ($i + 1)) . ': ' . $html->form_input($line->{param} . '_' . $i, $val_arr[$i] || $default_val, { SIZE => 10 }) . $html->br();
+      }
+    }
+
+    #Select
+    elsif ($line->{type} == 4) {
+      my @param_arr = split(/;/, $line->{value});
+      my %select_hash = ();
+      for (my $i = 0 ; $i <= $#param_arr ; $i++) {
+        my $line_ = $param_arr[$i];
+        $line_ =~ s/[\n\r]//g;
+        my ($key, $val) = split(/=/, $line_);
+        $select_hash{$key} = ($val) ? _translate($val) : "$key";
+      }
+
+      $value = $html->form_select(
+        $line->{param},
+        {
+          SELECTED => $conf{ $line->{param} },
+          SEL_HASH => \%select_hash,
+          NO_ID    => 1
+        }
+      );
+    }
+
+    # Multi str
+    elsif ($line->{type} == 5) {
+      my $param_value = $conf{ $line->{param} };
+
+      $value = $html->form_textarea($line->{param}, $param_value, { SIZE => 40, EX_PARAMS => " placeholder='$line->{value}'" });
+    }
+    else {
+      my $param_value = $conf{ $line->{param} };
+
+      if (ref $param_value eq 'ARRAY') {
+        $param_value = join(';', @{$param_value});
+      }
+
+      $value = $html->form_input("$line->{param}", $param_value, { SIZE => 40, EX_PARAMS => " placeholder='$line->{value}'" });
+    }
+
+    my $br = $html->br() || "\n";
+    if (defined $line->{comments}) {
+      $line->{comments} =~ s/\n/$br/g;
+    }
+
+    my $search_color_mark;
+    if ($FORM{COMMENTS}) {
+      my $text = $FORM{COMMENTS};
+      $text =~ s/\*//g;
+      $search_color_mark = $html->color_mark($text, $_COLORS[6]);
+      if ($line->{comments}) {
+        $line->{comments} =~ s/(.*)$text(.*)/$1$search_color_mark$2/;
+      }
+    }
+
+    $table->addrow(
+      $html->b(($conf{ $line->{param} }) ? $html->color_mark($line->{param}, 'green') : $line->{param}) . $html->br() . ($line->{comments} || q{}),
+      $value,
+
+      #$html->button($lang{CHANGE}, "index=$index&chg=$line->{param}", { CLASS => 'change' }),
+      #$html->button($lang{DEL}, "index=$index&del=$line->{param}", { MESSAGE => "$lang{DEL} '$line->{param}' ?", CLASS => 'del' })
+    );
+  }
+
+  print $html->form_main(
+    {
+      CONTENT => $table->show({ OUTPUT2RETURN => 1 }),
+      HIDDEN  => {
+        index => $index,
+      },
+      SUBMIT => { change => $lang{CHANGE} }
+    }
+  );
+
+  return 1;
+}
+
+#**********************************************************
+
+=head2 config_manage() Main config parameters
+
+=cut
+
+#**********************************************************
+sub config_manage {
+
+  my @types = ('STRING', 'BOOL', 'INT', 'MULTIVAL', 'SELECT', 'MULTISTR');
+
+  #my @types_colors = (
+  #);
+
+  if ($FORM{add}) {
+    $Config->add({%FORM});
+
+    if (!_error_show($Config)) {
+      $html->message('info', $lang{INFO}, "$lang{ADDED}");
+    }
+  }
+  elsif ($FORM{change}) {
+    $Config->change({%FORM});
+
+    if (!_error_show($Config)) {
+      $html->message('info', $lang{INFO}, "$lang{CHANGED}");
+    }
+  }
+  elsif ($FORM{chg}) {
+    $Config->info({ ID => $FORM{chg}, %FORM });
+    if (!_error_show($Config)) {
+      $html->message('info', $lang{INFO}, "$lang{CHANGING}");
+    }
+    $Config->{ACTION}     = 'change';
+    $Config->{LNG_ACTION} = $lang{CHANGE};
+  }
+  elsif ($FORM{del}) {
+    $Config->del($FORM{del});
+
+    if (!_error_show($Config)) {
+      $html->message('info', $lang{INFO}, "$lang{DELETED} [$FORM{del}]");
+    }
+  }
+
+  $Config->{TYPE_SEL} = $html->form_select(
+    'TYPE',
+    {
+      SELECTED => $Config->{TYPE} || $FORM{TYPE},
+      SEL_ARRAY => \@types,
+
+      #STYLE        => \@types_colors,
+      ARRAY_NUM_ID => 1
+    }
+  );
+
+  $html->tpl_show(_include('config_manage', 'Config'), { %FORM, %{$Config} });
+
+  my $list = $Config->list({ %LIST_PARAMS, COLS_NAME => 1 });
+
+  if (_error_show($Config)) { return 0 }
+
+  my $table = $html->table(
+    {
+      width   => '100%',
+      caption => "Options",
+      title   => [ $lang{KEY}, $lang{VALUE}, 'Type', "-", "-" ],
+      qs      => $pages_qs,
+      pages   => $Config->{TOTAL},
+      ID      => 'SPAM_AWL'
+    }
+  );
+
+  foreach my $line (@{$list}) {
+    $table->addrow($line->{param}, $line->{value}, $line->{type}, $html->button($lang{CHANGE}, "index=$index&chg=$line->{param}", { class => 'change' }), $html->button($lang{DEL}, "index=$index&del=$line->{param}", { MESSAGE => "$lang{DEL} '$line->{param}' ?", class => 'del' }));
+  }
+
+  print $table->show();
+
+  return 1;
+}
+
+#**********************************************************
+
+=head2 config_password_generator() - configuration for passwords generator
+
+=cut
+
+#**********************************************************
+sub config_password_generator {
+
+#  use Abills::Base qw/_bp/;
+#  _bp('', $conf{CONFIG_PASSWORD});
+  
+  if ($FORM{action}) {
+    $FORM{CASE}  //= 0;
+    $FORM{CHARS} //= 0;
+
+    my $new_config_string = join(':', $FORM{CASE}, $FORM{CHARS});
+
+    $Config->config_add(
+      {
+        PARAM   => 'CONFIG_PASSWORD',
+        VALUE   => $new_config_string,
+        REPLACE => 1
+      }
+    );
+
+    $Config->config_add(
+      {
+        PARAM   => 'PASSWD_LENGTH',
+        VALUE   => ($FORM{SYMBOLS_COUNT} || $conf{PASSWD_LENGTH}),
+        REPLACE => 1
+      }
+    );
+
+    if (!_error_show($Config)) {
+      $conf{CONFIG_PASSWORD} = $new_config_string;
+      $conf{PASSWD_LENGTH}   = $FORM{SYMBOLS_COUNT};
+    }
+
+  }
+  elsif ($FORM{reset}){
+    my $error = 0;
+    $Config->config_del('CONFIG_PASSWORD');
+    $error = _error_show($Config);
+    
+    $Config->config_del('PASSWD_LENGTH');
+    $error ||= _error_show($Config);
+    
+    if (!$error){
+      $html->message('info', $lang{DELETED});
+      $html->redirect("$SELF_URL?index=$index")
+    };
+  }
+  
+  my $config_string = $conf{CONFIG_PASSWORD} || '0:0';
+  my $count = $conf{PASSWD_LENGTH} // 6;
+  my ($case, $chars) = split(':', $config_string);
+  
+  $case = 0 if ($case > 3);
+  $chars = 0 if ($chars > 3);
+  
+  $html->tpl_show(
+    _include('config_password', 'Config'),
+    {
+      MIN_LENGTH => ($count < 6) ? $count : 6,
+      MAX_LENGTH => 32,
+
+      SYMBOLS_COUNT           => $count,
+      "CASE_$case\_CHECKED"   => 'checked="checked"',
+      "CHARS_$chars\_CHECKED" => 'checked="checked"'
+    }
+  );
+}
+
+#**********************************************************
+
+=head2 config_get_password_constraints($config_string)
+
+=cut
+
+#**********************************************************
+sub config_get_password_constraints {
+  my ($config_string) = @_;
+
+  my $length = $conf{PASSWD_LENGTH};
+  my ($case, $special_chars) = split(':', $config_string);
+
+  if ($case > 3) {
+    $case = 1;
+  }
+
+  if ($special_chars > 3) {
+    $special_chars = 3;
+  }
+  my $lang_case = '';
+  if ($case == 0) {
+    $lang_case = $lang{UPPERCASE};
+  }
+  elsif ($case == 1) {
+    $lang_case = $lang{LOWERCASE};
+  }
+  elsif ($case == 2) {
+    $lang_case = $lang{UPPERCASE} . ', ' . $lang{LOWERCASE};
+  }
+  elsif ($case == 3) {
+    $lang_case = $lang{NO};
+  }
+
+  my $lang_chars = '';
+  if ($special_chars == 0) {
+    $lang_chars = $lang{NUMBERS};
+  }
+  elsif ($special_chars == 1) {
+    $lang_chars = $lang{SPECIAL_CHARS} . '(-_!&%@#:)';
+  }
+  elsif ($special_chars == 2) {
+    $lang_chars = $lang{NUMBERS} . ', ' . $lang{SPECIAL_CHARS} . '(-_!&%@#:)';
+  }
+  elsif ($special_chars == 3) {
+    $lang_chars = $lang{NO};
+  }
+
+  return $html->br . $lang{LENGTH} . ' : >= ' . ($length || '') . $html->br . $lang{LETTERS} . ' : ' . $lang_case . $html->br . $lang{NON_ALPHABET_SYMBOLS} . ' ' . lc($lang{SYMBOLS}) . ' : ' . $lang_chars . $html->br;
+
+}
+
+1

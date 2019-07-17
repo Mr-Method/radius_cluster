@@ -1,0 +1,28 @@
+#Iner_ID : Main or Sub or if -1 user menu func list
+
+%FUNCTIONS_LIST = (
+  "01:0:$lang{EMPLOYEES}:null:"                          => 5,
+  "02:1:$lang{EMPLOYEES}:employees_main:"                => 5,
+  "03:1:$lang{GEO}:employees_geolocation:EID"            => 5,
+  "04:1:$lang{POSITIONS}:employees_positions:"           => 5,
+  "05:4:$lang{POSITIONS_TREE}:employees_positions_tree:" => 5,
+  "07:2:$lang{EMPLOYEE_PROFILE}:profile_list_admin:"     => 5,
+  "08:7:$lang{QUESTIONS}:question_show:"                 => 5,
+  "10:1:$lang{VACATIONS}:employees_vacations:"           => 5,
+  # "11:1:RFID:employees_rfid_log_to_timesheet:"         => 5,
+  "11:1:Charts:employees_time_sheet_charts:DATE"         => 5,
+#  "12:1:RFID:null"                                       => 5,
+#  "13:12:$lang{MANAGE} $lang{TIME}:employees_work_time"  => 5,
+  "12:1:$lang{DUTY}:employees_duty:" => 5,
+  
+  "20:0:RFID $lang{LOG}:employees_rfid_log:"             => 4,
+  
+  "30:0:$lang{TIME_SHEET}:form_admins_time_sheet:"       => 8,
+  "31:30:TEST:employees_timesheet_print:print"           => 8,
+
+  "40:0:$lang{DAILY_NOTES}:employees_daily_notes:"              => 9,
+);
+
+%PERIODIC = (daily => ['employees_rfid_log_to_timesheet']);
+
+1

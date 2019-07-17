@@ -1,0 +1,62 @@
+#!perl
+
+=head1 NAME
+  Rkn
+=name2 SYNOPSYS
+  Control of Rkn
+=cut
+
+use strict;
+use warnings FATAL => 'all';
+use Rkn;
+
+our (
+  $db,
+  $admin,
+  %conf,
+  $html,
+  %lang,
+  @bool_vals
+);
+
+my $Rkn = Rkn->new( $db, $admin, \%conf );
+
+#**********************************************************
+=head2 unireg_main()
+
+=cut
+#**********************************************************
+sub rkn_main {
+	$Rkn->{debug}=1;
+  my ($table) = result_former( {
+      INPUT_DATA      => $Rkn,
+      FUNCTION        => 'list',
+      BASE_FIELDS     => 0,
+      DEFAULT_FIELDS  => 'ID,BLOCKTYPE,HASH,INCTIME',
+      FUNCTION_FIELDS => 'change,del',
+      SKIP_USER_TITLE => 1,
+      EXT_FIELDS      => 0,
+      EXT_TITLES      =>
+      {
+        id       => 'ID',
+        inctime  => $lang{DATE},
+      },
+      TABLE           =>
+      {
+        width   => '100%',
+        caption => "Rkn",
+        ID      => 'RKN_TABLE',
+        EXPORT  => 1,
+        MENU    => "$lang{ADD}:index=$index&show_add_form=1:add"
+      },
+      MAKE_ROWS       => 1,
+      SEARCH_FORMER   => 1,
+      MODULE          => 'Rkn',
+    } );
+
+  print $table->show();
+
+  return 1;
+}
+
+1;

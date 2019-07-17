@@ -1,0 +1,2 @@
+
+$lang{TABLES}='Tables';

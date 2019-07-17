@@ -1,0 +1,640 @@
+#!perl
+
+=head1 NAME
+
+  Cams - RTSP flows management
+
+=cut
+
+our ($db, $admin, %conf, $html, %lang);
+
+use Abills::Base qw/_bp in_array/;
+
+use Cams;
+my $Cams = Cams->new( $db, $admin, \%conf );
+
+my $Cams_console;
+if ( !$conf{CAMS_ZONEMINDER} ) {
+  require Cams::Cams;
+  Cams::Cams->import();
+  $Cams_console = Cams::Cams->new( $Cams, \%conf );
+}
+else {
+  require Cams::Zoneminder;
+  Cams::Zoneminder->import();
+  $Cams_console = Cams::Zoneminder->new( $Cams, \%conf );
+}
+
+use Abon;
+my $Abon = Abon->new( $db, $admin, \%conf );
+
+use Abills::Experimental;
+
+
+my $SERVER_IP = $conf{CAMS_SERVER_HOST};
+my $SERVER_PORT = $conf{CAMS_SERVER_PORT} || 8088;
+
+#**********************************************************
+=head2 cams_main() - manage Cams registered users
+
+=cut
+#**********************************************************
+sub cams_main {
+  my $attr = shift;
+  
+  my %CAMS_USER_INFO = ();
+  my $show_add_form = $FORM{add_form} || 0;
+  
+  # Default page logic
+  if ( $FORM{add} ) {
+    $Cams->user_add( \%FORM );
+    show_result($Cams, $lang{ADDED});
+    
+    $Abon->subscribe_add( $FORM{UID}, $FORM{ABON_ID} );
+    _error_show($Abon);
+  }
+  elsif ( $FORM{del} ) {
+    $Cams->users_del( \%FORM );
+    show_result($Cams, $lang{DELETED});
+    
+    $Abon->subscribe_del( $FORM{UID}, $FORM{ABON_ID} );
+    _error_show($Abon);
+  }
+  elsif ( $FORM{change} ) {
+    $Cams->user_change( { %FORM } );
+    show_result($Cams, $lang{CHANGED});
+    
+    #TODO: CHANGE abon subscriptions
+    $html->message( 'err', 'Not implemented', 'Changing Abon subscriptions is not implemented' );
+    
+    $show_add_form = 1;
+  }
+  elsif ( $FORM{chg} ) {
+    my $tp_info = $Cams->user_info( $FORM{chg} );
+    if ( !_error_show($Cams) ) {
+      %CAMS_USER_INFO = %{$tp_info};
+      $show_add_form = 1;
+    }
+  }
+  
+  my $tp_id_select = $html->form_select(
+    'TP_ID',
+    {
+      SELECTED    => $FORM{TP_ID} || $CAMS_USER_INFO{TP_ID} || q{},
+      SEL_LIST    => $Cams->tp_list( { ID => '_SHOW', NAME => '_SHOW' } ),
+      NO_ID       => 1,
+      SEL_OPTIONS => { '' => '' },
+      EX_PARAMS   => 'required="required"'
+    }
+  );
+  
+  if ( $show_add_form && !$FORM{ACTIVATION} ) {
+    $html->tpl_show(
+      _include('cams_main', 'Cams'),
+      {
+        %CAMS_USER_INFO,
+        UID               => $FORM{UID} || $FORM{chg},
+        ACTIVATION        => $attr->{ACTIVATION},
+        TP_ID_SELECT      => $tp_id_select,
+        SUBMIT_BTN_ACTION => ($FORM{chg}) ? 'change' : 'add',
+        SUBMIT_BTN_NAME   => ($FORM{chg}) ? $lang{CHANGE} : $lang{ACTIVATE},
+      }
+    );
+  }
+  
+  if ( $attr->{ACTIVATION} ) {
+    if ( $FORM{add} && !$Cams->{errno} ) {
+      my $uid = $FORM{UID} || q{};
+      $html->message( 'info', $lang{SUCCESS},
+        $html->button( $lang{GO2PAGE}, "index=$index&UID=$uid", { BUTTON => 1 } ) );
+    }
+    return 1;
+  }
+  
+  my $cams_users_list = $Cams->users_list( { UID => $FORM{UID} || '_SHOW', SHOW_ALL_COLUMNS => 1, COLS_NAME => 1 } );
+  
+  my $cams_users_table = $html->table(
+    {
+      width      => '100%',
+      caption    => $lang{USERS},
+      title      =>
+      [ '#', $lang{USER}, $lang{ADDED}, $lang{TARIF_PLAN}, "TP $lang{STREAMS_COUNT}", "$lang{USER} $lang{STREAMS_COUNT}"
+        , '-', '-' ],
+      cols_align => [ 'left', 'right', 'right', 'right', 'center', 'center', 'center', 'center' ],
+      pages      => $Cams->{TOTAL},
+      qs         => $pages_qs,
+      ID         => 'CAMS_USER_ID'
+    }
+  );
+  
+  my $num = 1;
+  foreach my $user ( @{$cams_users_list} ) {
+    my $change_btn = $html->button( '', "index=$index&chg=$user->{uid}", { class => 'change' } );
+    my $del_btn = $html->button( '', "index=$index&del=$user->{uid}",
+      { MESSAGE => "$lang{DEL} Cams $user->{login} ?", class => 'del' } );
+    
+    $cams_users_table->addrow(
+      $num++,
+      user_ext_menu($user->{uid}, $user->{login}),
+      $user->{created},
+      $user->{tp_name},
+      $user->{tp_streams_count},
+      $user->{user_streams_count},
+      $change_btn,
+      $del_btn
+    );
+  }
+  
+  print $cams_users_table->show();
+}
+
+#**********************************************************
+=head2 cams_tp_main() - shows current registered tarif plans
+
+=cut
+#**********************************************************
+sub cams_tp_main {
+  
+  my %TEMPLATE_CAMS_TP = ();
+  my $show_add_form = $FORM{add_form} || 0;
+  
+  unless ( in_array('Abon', \@MODULES) ) {
+    $html->message( 'err', "Need 'Abon' module" );
+  }
+  
+  if ( $FORM{add} ) {
+    if (!$FORM{ABON_ID}){
+      $html->message('err', $lang{ERR_WRONG_DATA}, " $lang{FIELD_ARE_REQUIRED} : Abon _{TARIF_PLAN}_");
+    }
+    else {
+      $Cams->tp_add( { %FORM } );
+      $show_add_form = !show_result($Cams, $lang{ADDED});
+    }
+  }
+  elsif ( $FORM{change} ) {
+    $Cams->tp_change( { %FORM } );
+    show_result($Cams, $lang{CHANGED});
+    $show_add_form = 1;
+  }
+  elsif ( $FORM{chg} ) {
+    my $tp_info = $Cams->tp_info( $FORM{chg} );
+    if ( !_error_show($Cams) ) {
+      %TEMPLATE_CAMS_TP = %{$tp_info ? $tp_info : { }};
+      $show_add_form = 1;
+    }
+  }
+  elsif ( $FORM{del} ) {
+    $Cams->tp_del( { ID => $FORM{del} } );
+    show_result($Cams, $lang{DELETED});
+  }
+  
+  if ( $show_add_form ) {
+    $html->tpl_show(
+      _include('cams_tp', 'Cams'),
+      {
+        %TEMPLATE_CAMS_TP,
+        ABON_TP_SELECT    => _abon_tp_select({ EXCLUDE_REGISTERED => 1 }),
+        SUBMIT_BTN_ACTION => ($FORM{chg}) ? 'change' : 'add',
+        SUBMIT_BTN_NAME   => ($FORM{chg}) ? $lang{CHANGE} : $lang{ADD},
+      }
+    );
+  }
+  
+  result_former(
+    {
+      INPUT_DATA        => $Cams,
+        FUNCTION        => 'tp_list',
+        
+        #        BASE_FIELDS     => 4,
+        DEFAULT_FIELDS  => "ID,NAME,STREAMS_COUNT,ABON_NAME",
+        FUNCTION_FIELDS => 'change, del',
+        EXT_TITLES      => {
+        'name'          => $lang{NAME},
+        'id'            => 'ID',
+        'abon_name'     => 'Abon',
+        'streams_count' => "$lang{MAX} $lang{STREAMS_COUNT}",
+        'comments'      => $lang{COMMENTS}
+      },
+        TABLE           => {
+        width   => '100%',
+        caption => "$lang{CAMERAS} $lang{TARIF_PLANS}",
+        qs      => $pages_qs,
+        ID      => 'DISCOUNTS',
+        header  => '',
+        EXPORT  => 1,
+        MENU    => "$lang{ADD}:index=$index&add_form=1" . ':add',
+      },
+        MAKE_ROWS       => 1,
+        SEARCH_FORMER   => 1,
+        MODULE          => 'Cams',
+        TOTAL           => 1
+    }
+  );
+}
+
+#**********************************************************
+=head2 cams_user_main()
+
+=cut
+#**********************************************************
+sub cams_user_main {
+  my $uid = $FORM{UID} || 0;
+  
+  if ( !$uid ) {
+    return cams_main({ SHOW_ALL_USERS => 1 });
+  }
+  
+  my $user_service_info = $Cams->user_info( $FORM{UID} );
+  if ( $user_service_info ) {
+    cams_main();
+  }
+  else {
+    # Show activate form
+    $FORM{add_form} = 1;
+    cams_main({ ACTIVATION => 1 });
+  }
+  
+  return 1;
+}
+
+#**********************************************************
+=head2 cams_client_streams_management() - manage user streams
+
+=cut
+#**********************************************************
+sub cams_client_streams_management {
+  my %CAMS_STREAM = ();
+  my $show_add_form = 0;
+  
+  if ($FORM{add_form}){
+    $show_add_form = 1;
+    
+    # Default params
+    $CAMS_STREAM{RTSP_PORT} = '554';
+    $CAMS_STREAM{LOGIN} = 'admin';
+    $CAMS_STREAM{PASSWORD} = 'admin';
+  }
+  
+  if ( $FORM{add} ) {
+    # Check user can add more cameras
+    my $client_service = $Cams->user_info( $user->{UID} );
+    if ( $client_service->{USER_STREAMS_COUNT} >= $client_service->{TP_STREAMS_COUNT} ) {
+      $html->message( 'warn', $lang{ERROR}, $lang{YOU_HAVE_REGISTERED_MAX_ALLOWED_STREAMS_COUNT} );
+    }
+    else {
+      $Cams->stream_add( \%FORM );
+      if ( show_result($Cams, $lang{ADDED}) ) {
+        my $last_id = $Cams->{INSERT_ID};
+        $Cams_console->add_cam( {
+            %FORM,
+            ID  => $last_id,
+            URL => 'rtsp://' . $FORM{IP} . ':' . $FORM{RTSP_PORT} . $FORM{RTSP_PATH}
+          } );
+      }
+      else {
+        # If error, show form again
+        $show_add_form = 1;
+      }
+    }
+  }
+  elsif ( $FORM{change} ) {
+    $Cams_console->change_cam( {
+      %FORM,
+      URL => 'rtsp://' . $FORM{IP} . ':' . $FORM{RTSP_PORT} . $FORM{RTSP_PATH}
+    });
+    $Cams->stream_change( \%FORM );
+    show_result($Cams, $lang{CHANGED});
+    $show_add_form = 1;
+    %CAMS_STREAM = %FORM;
+  }
+  elsif ( $FORM{chg} ) {
+    my $tp_info = $Cams->stream_info( $FORM{chg} );
+    if ( !_error_show($Cams) ) {
+      %CAMS_STREAM = %{$tp_info};
+      $show_add_form = 1;
+    }
+  }
+  elsif ( $FORM{del} ) {
+    $Cams_console->delete_cam( { ID => $FORM{del} } );
+    $Cams->stream_del( { ID => $FORM{del} } );
+    show_result($Cams, $lang{DELETED});
+  }
+  
+  if ( $show_add_form ) {
+    
+    $CAMS_STREAM{ORIENTATION_SELECT} = _cams_orientation_select({SELECTED => $CAMS_STREAM{ORIENTATION}});
+    
+    $html->tpl_show(
+      _include('cams_stream_add', 'Cams'),
+      {
+        %CAMS_STREAM, %FORM,
+        UID               => $user->{UID} || $FORM{UID},
+        DISABLED_CHECKED  => $CAMS_STREAM{DISABLED} ? 'checked' : '',
+        SUBMIT_BTN_ACTION => ($FORM{chg}) ? 'change' : 'add',
+        SUBMIT_BTN_NAME   => ($FORM{chg}) ? $lang{CHANGE} : $lang{ADD},
+      }
+    );
+  }
+  
+  my $uid = $user->{UID} || $FORM{UID};
+  return 0 unless ($uid);
+  
+  my $streams_list = $Cams->streams_list(
+    {
+      UID              => $uid || '_SHOW',
+      USER_LOGIN       => '_SHOW',
+      SHOW_ALL_COLUMNS => 1,
+      COLS_NAME        => 1
+    }
+  );
+  _error_show($Cams);
+  
+  my @titles = ('#', $lang{NAME}, 'Host', $lang{LOGIN}, $lang{DISABLED}, '-', '-');
+  my $table = $html->table(
+    {
+      width      => '100%',
+      caption    => $lang{CAMERAS},
+      title      => \@titles,
+      cols_align => [ 'left', 'right', 'center', 'right', 'center', 'center' ],
+      pages      => $Cams->{TOTAL},
+      qs         => $pages_qs,
+      ID         => 'CAMERAS_STREAMS_ID',
+      MENU       => "$lang{ADD}:index=$index&sid=$sid&add_form=1&UID=$uid" . ':add',
+    }
+  );
+  
+  my $num = 1;
+  foreach my $stream ( @{$streams_list} ) {
+    my $chg_button = $html->button( '', "index=$index&sid=$sid&chg=$stream->{id}", { class => 'change' } );
+    my $del_button = $html->button(
+      '',
+      "index=$index&sid=$sid&del=$stream->{id}",
+      {
+        class   => 'del',
+        MESSAGE => "$lang{DEL} $stream->{name} ?"
+      }
+    );
+    $table->addrow( $num++, $stream->{name}, $stream->{host}, $stream->{login},
+        ($stream->{disabled} eq '1') ? $lang{YES} : $lang{NO}, $chg_button, $del_button );
+  }
+  
+  print $table->show();
+  
+  return 1;
+}
+
+#**********************************************************
+=head2 cams_client_streams() - show user his cams
+
+=cut
+#**********************************************************
+sub cams_client_streams {
+  my $uid = $user->{UID};
+  return 0 unless ($uid);
+  
+  my $user_streams_list = $Cams->streams_list(
+    {
+      UID           => $uid,
+      DISABLED      => '0',
+      NAME          => '_SHOW',
+      NAME_HASH     => '_SHOW',
+      ZONEMINDER_ID => $FORM{SINGLE} || '_SHOW',
+      COLS_NAME     => 1
+    }
+  );
+  
+  my $streams_html = '';
+  if ( !$conf{CAMS_ZONEMINDER} ) {
+    foreach my $stream ( @{$user_streams_list} ) {
+      $streams_html .= $html->tpl_show(
+        _include('cams_stream_div', 'Cams'),
+        {
+          STREAM_NAME      => $stream->{name},
+          STREAM_HASH_NAME => $stream->{name_hash},
+          SERVER_IP        => $SERVER_IP,
+          SERVER_PORT      => $SERVER_PORT,
+        },
+        { OUTPUT2RETURN => 1 }
+      );
+    }
+  }
+  else {
+    my $zoneminder_path = $conf{CAMS_ZONEMINDER_URL};
+    foreach my $stream ( @{$user_streams_list} ) {
+      next unless ($stream->{zoneminder_id});
+      $streams_html .= $html->tpl_show(
+        _include(($FORM{SINGLE} ? 'cams_mjpeg_single_stream' : 'cams_mjpeg_div'), 'Cams'),
+        {
+          ZONEMINDER_PATH => $zoneminder_path,
+          STREAM_NAME     => $stream->{name},
+          ZONEMINDER_ID   => $stream->{zoneminder_id},
+          RAND            => rand(100)
+        },
+        { OUTPUT2RETURN => 1 }
+      );
+    }
+  }
+  
+  $html->tpl_show( _include('cams_streams_wrapper', 'Cams'), { CAMS => $streams_html } );
+}
+
+#**********************************************************
+=head2 cams_client_main()
+
+=cut
+#**********************************************************
+sub cams_client_main {
+  my $uid = $user->{uid};
+  
+  my $user_service = $Cams->user_info( $uid );
+  _error_show($Cams);
+  
+  if ( $user_service ) {
+    my $client_streams = $Cams->streams_list( { UID => $uid } );
+    _error_show($Cams) && return 0;
+    
+    if ( $client_streams && scalar @{$client_streams} > 0 ) {
+      cams_client_streams();
+    }
+    else {
+      cams_client_streams_management();
+    }
+    
+  }
+  else {
+    # Emulating redirect
+    $index = get_function_index('cams_client_tp_management');
+    cams_client_tp_management();
+  }
+  
+  return 1;
+}
+
+#**********************************************************
+=head2 cams_client_show_activation()
+
+=cut
+#**********************************************************
+sub cams_client_tp_management {
+  
+  if ( $FORM{action} && $FORM{action} eq 'subscribe' ) {
+    my $tp_id = $FORM{SELECTED_TP_ID};
+  
+    if ( !$tp_id ) {
+      $html->message('err', $lang{ERR_WRONG_DATA}, "$lang{FIELD_ARE_REQUIRED} : $lang{TARIF_PLAN}");
+    }
+    else {
+      $Cams->user_add( { UID => $user->{UID}, TP_ID => $tp_id } );
+      if ( show_result($Cams, $lang{SUCCESS}) ) {
+        $Abon->subscribe_add( $FORM{UID}, $FORM{ABON_ID} );
+        _error_show($Abon);
+      };
+    
+      #Emulate redirect to streams
+      $index = get_function_index('cams_client_streams_management');
+      return cams_client_streams_management();
+    }
+  }
+  elsif ( $FORM{action} && $FORM{action} eq 'unsubscribe' ) {
+    
+    my $successful_unsubscribe = 1;
+    $Cams->users_del( { UID => $user->{UID} } );
+    
+    $successful_unsubscribe = !_error_show($Cams);
+    if ( $successful_unsubscribe ) {
+      $Abon->subscribe_del( $FORM{UID}, $FORM{ABON_ID} );
+      $successful_unsubscribe = !_error_show($Abon);
+    };
+    
+    if ( $successful_unsubscribe ) {
+      $html->message( 'info', $lang{SUCCESS}, $lang{YOU_HAVE_BEEN_SUCCESSFULY_UNSUBSCRIBED} )
+    }
+    
+    # Show again
+  }
+  
+  my $client_service = $Cams->user_info( $user->{UID} );
+  my $active_tp_id = ($client_service) ? $client_service->{tp_id} : 0;
+  
+  my $tp_list = $Cams->tp_list( { SHOW_ALL_COLUMNS => 1, COLS_UPPER => 1 } );
+  my $html_content = '';
+  foreach my $tp ( @{$tp_list} ) {
+    my $tp_id = $tp->{id};
+    
+    my $btn_name = $lang{SUBSCRIBE};
+    my $btn_class = 'btn-success';
+    my $btn_action = "action=subscribe&SELECTED_TP_ID=$tp_id";
+    
+    if ( $active_tp_id ) {
+      if ( $active_tp_id == $tp->{id} ) {
+        $btn_name = $lang{UNSUBSCRIBE};
+        $btn_class = 'btn-danger';
+        $btn_action = "action=unsubscribe";
+      }
+      else {
+        $btn_class = 'btn-default disabled';
+      }
+    }
+    
+    $tp->{SUBSCRIBE_BTN} = $html->button( $btn_name, "index=$index&sid=$sid&" . $btn_action, {
+        NO_LINK_FORMER => 1,
+        SKIP_HREF      => 1,
+        class          => 'btn ' . $btn_class,
+        ex_params      => "data-tp_id='$tp->{id}'",
+        CONFIRM        => "$btn_name : $tp->{NAME}?"
+      } );
+    $html_content .= $html->tpl_show( _include('cams_tp_card', 'Cams'), $tp, { OUTPUT2RETURN => 1 } );
+  }
+  
+  $html->tpl_show( _include('cams_tp_wrapper', 'Cams'), { CONTENT => $html_content } );
+  
+  #  my $tarif = $Abon->tariff_info(1);
+  #  delete $tarif->{admin};
+  #  delete $tarif->{db};
+  #  delete $tarif->{conf};
+  #  delete $tarif->{COL_NAMES_ARR};
+  #  _bp('$OBJECT', $tarif, { EXIT =>  0});
+  
+}
+
+#**********************************************************
+=head2 _cams_orientation_select()
+
+=cut
+#**********************************************************
+sub _cams_orientation_select {
+  my $attr = shift || { };
+  
+  my @orientations = (
+    { id => 0, name => $lang{NORMAL} },
+    { id => 1, name => "$lang{ROTATE} $lang{RIGHT}" },
+    { id => 2, name => $lang{INVERTED} },
+    { id => 3, name => "$lang{ROTATE} $lang{LEFT}" },
+    { id => 4, name => "$lang{FLIPPED} $lang{HORIZONTALLY}" },
+    { id => 5, name => "$lang{FLIPPED} $lang{VERTICALLY}" },
+  );
+  
+  return $html->form_select( 'ORIENTATION', {
+      SELECTED => $attr->{SELECTED} || $FORM{ORIENTATION} || q{},
+      SEL_LIST => \@orientations,
+      NO_ID    => 1
+    } );
+}
+
+#**********************************************************
+=head2 _abon_tp_select($attr)
+
+  Arguments:
+    $attr - additional arguments to form_select()
+
+  Returns:
+    html_string - <select>
+
+=cut
+#**********************************************************
+sub _abon_tp_select {
+  my ($attr) = @_;
+  $attr ||= { };
+  
+  my $abon_tp_list;
+  if ( $attr->{ABON_TP_LIST} ) {
+    $abon_tp_list = $attr->{ABON_TP_LIST};
+  }
+  else {
+    $abon_tp_list = $Abon->tariff_list( { COLS_NAME => 1, SORT => 'tp_id' } );
+    _error_show($Abon);
+  }
+  
+  if ( $attr->{EXCLUDE_REGISTERED} ) {
+    $Cams->tp_list( { ABON_ID => '_SHOW', ID => '_SHOW', COLS_NAME => 0, LIST2HASH => 'abon_id, id' } );
+    _error_show($Cams);
+    
+    my @filtered_tp_list = ();
+    
+    if ( $Cams->{list_hash} ) {
+      my %cams_registered_abon = %{ $Cams->{list_hash} };
+      @filtered_tp_list = grep { !exists $cams_registered_abon{$_->{tp_id}} } @{$abon_tp_list};
+      $abon_tp_list = \@filtered_tp_list;
+    }
+    
+  }
+  
+  return $html->form_select(
+    'ABON_ID',
+    {
+      SELECTED  => $FORM{ABON_ID} || $attr->{ABON_ID} || q{},
+      SEL_LIST  => $abon_tp_list,
+      SEL_NAME  => 'name',
+      SEL_KEY   => 'tp_id',
+      
+      NO_ID     => 1,
+      
+      EX_PARAMS => 'required="required"',
+      MAIN_MENU => get_function_index('abon_tariffs'),
+    }
+  );
+}
+
+
+
+1;

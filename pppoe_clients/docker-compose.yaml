@@ -1,0 +1,3544 @@
+version: "3"
+services:
+    pppoe_client_nedobiychuk:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/nedobiychuk/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/nedobiychuk/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_bukov1:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_bukov1/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_bukov1/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_bukov14:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_bukov14/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_bukov14/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_bukov2:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_bukov2/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_bukov2/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_bukov4:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_bukov4/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_bukov4/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_bukov5:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_bukov5/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_bukov5/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_bukov6:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_bukov6/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_bukov6/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_bukov8:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_bukov8/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_bukov8/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_bukov9:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_bukov9/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_bukov9/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_burl13:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_burl13/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_burl13/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_burl14:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_burl14/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_burl14/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_burl2a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_burl2a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_burl2a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_burl30a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_burl30a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_burl30a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_burl32:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_burl32/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_burl32/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_burl34:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_burl34/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_burl34/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_burl35:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_burl35/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_burl35/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_burl36:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_burl36/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_burl36/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_burl37:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_burl37/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_burl37/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_burl3a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_burl3a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_burl3a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_burl5a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_burl5a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_burl5a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_burl8:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_burl8/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_burl8/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_camera:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_camera/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_camera/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_cerkovna1:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_cerkovna1/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_cerkovna1/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_cerkovna4:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_cerkovna4/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_cerkovna4/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_cerkovna6:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_cerkovna6/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_cerkovna6/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_cerkovna8:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_cerkovna8/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_cerkovna8/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ch1:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ch1/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ch1/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ch11:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ch11/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ch11/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ch12:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ch12/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ch12/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ch15:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ch15/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ch15/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ch3:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ch3/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ch3/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ch5:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ch5/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ch5/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ch6:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ch6/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ch6/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ch8:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ch8/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ch8/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_chap1:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chap1/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chap1/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_chap2:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chap2/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chap2/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_chap3:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chap3/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chap3/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_chap4:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chap4/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chap4/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_chap8:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chap8/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chap8/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_chern11:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chern11/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chern11/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_chern28:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chern28/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chern28/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_chern3:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chern3/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chern3/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_chern36:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chern36/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chern36/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_chern6:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chern6/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chern6/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_chern9:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chern9/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chern9/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_cherniv12:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_cherniv12/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_cherniv12/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_cherniv13:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_cherniv13/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_cherniv13/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_cherniv15:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_cherniv15/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_cherniv15/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_cherniv17:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_cherniv17/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_cherniv17/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_cherniv2:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_cherniv2/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_cherniv2/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_cherniv3:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_cherniv3/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_cherniv3/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_cherniv4:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_cherniv4/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_cherniv4/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_cherniv5:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_cherniv5/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_cherniv5/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_cherniv7:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_cherniv7/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_cherniv7/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_cherniv8:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_cherniv8/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_cherniv8/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_cherniv8a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_cherniv8a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_cherniv8a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_chop10:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chop10/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chop10/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_chop12:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chop12/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chop12/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_chop13a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chop13a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chop13a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_chop19:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chop19/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chop19/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_chop2:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chop2/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chop2/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_chop21:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chop21/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chop21/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_chop23:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chop23/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chop23/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_chop25:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chop25/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chop25/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_chop3:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chop3/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chop3/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_chop8:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chop8/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chop8/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_chop9:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chop9/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_chop9/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_fenix:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_fenix/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_fenix/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_franka1:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_franka1/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_franka1/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_franka11:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_franka11/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_franka11/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_franka13:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_franka13/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_franka13/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_franka2:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_franka2/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_franka2/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_franka2a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_franka2a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_franka2a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_franka2b:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_franka2b/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_franka2b/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_franka2v:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_franka2v/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_franka2v/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_franka3:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_franka3/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_franka3/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_galych1:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych1/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych1/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_galych11:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych11/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych11/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_galych12:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych12/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych12/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_galych13:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych13/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych13/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_galych14:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych14/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych14/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_galych15:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych15/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych15/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_galych16:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych16/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych16/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_galych17:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych17/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych17/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_galych18:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych18/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych18/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_galych2:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych2/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych2/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_galych23a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych23a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych23a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_galych32:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych32/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych32/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_galych33:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych33/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych33/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_galych36:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych36/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych36/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_galych38:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych38/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych38/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_galych39:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych39/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych39/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_galych41:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych41/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych41/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_galych43:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych43/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych43/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_galych47:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych47/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych47/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_galych48:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych48/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych48/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_galych49:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych49/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych49/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_galych53:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych53/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych53/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_galych55:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych55/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych55/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_galych57:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych57/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych57/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_galych7:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych7/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych7/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_galych8:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych8/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_galych8/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_gastel23:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_gastel23/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_gastel23/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov1:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov1/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov1/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov10:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov10/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov10/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov110a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov110a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov110a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov12:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov12/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov12/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov121:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov121/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov121/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov13:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov13/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov13/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov14:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov14/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov14/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov16:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov16/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov16/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov18:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov18/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov18/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov19:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov19/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov19/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov1a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov1a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov1a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov1d:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov1d/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov1d/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov1e:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov1e/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov1e/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov1g:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov1g/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov1g/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov1n:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov1n/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov1n/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov1t:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov1t/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov1t/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov2:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov2/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov2/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov21:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov21/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov21/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov21a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov21a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov21a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov22:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov22/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov22/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov22a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov22a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov22a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov22b:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov22b/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov22b/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov23:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov23/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov23/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov28:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov28/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov28/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov28a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov28a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov28a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov28a_pochta:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov28a_pochta/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov28a_pochta/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov28b:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov28b/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov28b/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov29a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov29a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov29a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov2a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov2a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov2a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov31:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov31/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov31/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov35:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov35/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov35/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov36a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov36a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov36a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov37:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov37/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov37/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov38:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov38/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov38/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov39:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov39/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov39/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov4:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov4/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov4/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov40:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov40/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov40/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov42:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov42/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov42/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov42a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov42a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov42a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov43:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov43/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov43/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov45:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov45/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov45/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov49:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov49/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov49/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov49a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov49a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov49a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov57:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov57/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov57/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov6:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov6/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov6/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov63:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov63/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov63/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov69:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov69/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov69/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_golov9:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov9/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_golov9/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_gorkogo3:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_gorkogo3/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_gorkogo3/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_grush10:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_grush10/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_grush10/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_grush14:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_grush14/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_grush14/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_grush16:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_grush16/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_grush16/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_grush2:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_grush2/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_grush2/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_grush22a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_grush22a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_grush22a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_grush24:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_grush24/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_grush24/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_grush26:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_grush26/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_grush26/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_grush28:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_grush28/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_grush28/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_grush30:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_grush30/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_grush30/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_grush6:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_grush6/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_grush6/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_hot10:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_hot10/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_hot10/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_hot11:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_hot11/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_hot11/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_hot12:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_hot12/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_hot12/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_hot18:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_hot18/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_hot18/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_hot2:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_hot2/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_hot2/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_hot22:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_hot22/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_hot22/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_hot3:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_hot3/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_hot3/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_hot5:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_hot5/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_hot5/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_hot6:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_hot6/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_hot6/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_hran:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_hran/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_hran/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ivas1:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ivas1/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ivas1/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ivas11:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ivas11/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ivas11/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ivas12:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ivas12/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ivas12/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ivas2:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ivas2/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ivas2/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ivas20:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ivas20/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ivas20/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ivas22:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ivas22/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ivas22/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ivas24:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ivas24/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ivas24/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ivas30a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ivas30a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ivas30a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ivas6:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ivas6/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ivas6/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ivas7:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ivas7/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ivas7/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_jarem1:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem1/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem1/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_jarem10:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem10/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem10/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_jarem10a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem10a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem10a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_jarem13:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem13/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem13/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_jarem17:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem17/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem17/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_jarem19:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem19/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem19/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_jarem19a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem19a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem19a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_jarem2:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem2/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem2/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_jarem24:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem24/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem24/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_jarem24a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem24a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem24a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_jarem25:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem25/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem25/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_jarem26:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem26/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem26/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_jarem27:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem27/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem27/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_jarem28a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem28a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem28a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_jarem29:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem29/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem29/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_jarem31:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem31/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem31/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_jarem31a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem31a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem31a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_jarem37:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem37/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem37/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_jarem39:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem39/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem39/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_jarem41:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem41/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem41/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_jarem45:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem45/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_jarem45/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_karmel12:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_karmel12/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_karmel12/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_karmel17:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_karmel17/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_karmel17/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_karmel18:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_karmel18/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_karmel18/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_karmel19:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_karmel19/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_karmel19/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_karmel20:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_karmel20/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_karmel20/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_karmel21:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_karmel21/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_karmel21/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_karmel25:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_karmel25/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_karmel25/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_karmel27:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_karmel27/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_karmel27/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_karmel30:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_karmel30/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_karmel30/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_karmel32:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_karmel32/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_karmel32/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_karmel5:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_karmel5/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_karmel5/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kobyl10:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kobyl10/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kobyl10/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kobyl11:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kobyl11/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kobyl11/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kobyl13:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kobyl13/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kobyl13/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kobyl14:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kobyl14/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kobyl14/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kobyl16:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kobyl16/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kobyl16/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kobyl2:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kobyl2/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kobyl2/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kobyl20:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kobyl20/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kobyl20/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kobyl22:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kobyl22/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kobyl22/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kobyl23:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kobyl23/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kobyl23/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kobyl24:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kobyl24/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kobyl24/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kobyl25:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kobyl25/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kobyl25/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kobyl2a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kobyl2a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kobyl2a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kobyl3:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kobyl3/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kobyl3/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kobyl31:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kobyl31/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kobyl31/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kobyl32:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kobyl32/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kobyl32/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kobyl32a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kobyl32a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kobyl32a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kobyl4:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kobyl4/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kobyl4/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kobyl5:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kobyl5/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kobyl5/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kobyl6:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kobyl6/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kobyl6/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kobyl7:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kobyl7/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kobyl7/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kosh12:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kosh12/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kosh12/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kosh14:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kosh14/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kosh14/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kosh16:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kosh16/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kosh16/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kosh2:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kosh2/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kosh2/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kosh20:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kosh20/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kosh20/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kosh22:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kosh22/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kosh22/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kosh24:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kosh24/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kosh24/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kosh29:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kosh29/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kosh29/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kosh2a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kosh2a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kosh2a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kosh31:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kosh31/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kosh31/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kosh33:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kosh33/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kosh33/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kosh37:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kosh37/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kosh37/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kosh4:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kosh4/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kosh4/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kosh7a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kosh7a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kosh7a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kosh8:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kosh8/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kosh8/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kotov1:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov1/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov1/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kotov12:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov12/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov12/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kotov15:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov15/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov15/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kotov16:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov16/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov16/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kotov17:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov17/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov17/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kotov18:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov18/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov18/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kotov1a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov1a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov1a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kotov2:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov2/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov2/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kotov20:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov20/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov20/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kotov22:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov22/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov22/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kotov22b:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov22b/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov22b/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kotov24a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov24a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov24a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kotov25:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov25/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov25/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kotov26:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov26/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov26/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kotov28:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov28/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov28/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kotov3:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov3/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov3/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kotov30:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov30/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov30/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kotov34:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov34/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov34/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kotov4:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov4/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov4/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kotov5:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov5/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov5/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kotov5a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov5a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov5a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kotov6:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov6/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov6/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kotov7a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov7a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kotov7a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_koz10:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_koz10/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_koz10/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_koz11:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_koz11/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_koz11/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_koz16:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_koz16/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_koz16/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_koz16a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_koz16a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_koz16a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_koz22:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_koz22/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_koz22/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_koz30:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_koz30/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_koz30/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_koz32:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_koz32/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_koz32/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_koz4:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_koz4/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_koz4/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_koz8:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_koz8/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_koz8/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kyev1:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kyev1/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kyev1/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kyev10:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kyev10/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kyev10/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kyev11:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kyev11/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kyev11/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kyev11a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kyev11a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kyev11a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kyev13:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kyev13/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kyev13/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kyev14:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kyev14/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kyev14/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kyev16:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kyev16/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kyev16/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kyev2:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kyev2/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kyev2/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kyev24:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kyev24/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kyev24/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kyev3:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kyev3/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kyev3/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kyev39:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kyev39/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kyev39/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kyev4:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kyev4/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kyev4/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kyev48:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kyev48/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kyev48/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kyev50:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kyev50/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kyev50/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kyev52:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kyev52/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kyev52/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kyev56:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kyev56/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kyev56/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kyev8:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kyev8/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kyev8/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_kyev9:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kyev9/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_kyev9/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_lisna10:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lisna10/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lisna10/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_lisna15:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lisna15/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lisna15/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_lisna16:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lisna16/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lisna16/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_lisna17:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lisna17/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lisna17/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_lisna19a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lisna19a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lisna19a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_lisna1a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lisna1a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lisna1a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_lisna21:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lisna21/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lisna21/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_lisna3:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lisna3/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lisna3/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_lisna4:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lisna4/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lisna4/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_lisova19:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lisova19/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lisova19/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_lisova8:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lisova8/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lisova8/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_lukr1:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lukr1/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lukr1/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_lukr11:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lukr11/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lukr11/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_lukr14:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lukr14/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lukr14/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_lukr16:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lukr16/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lukr16/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_lukr1a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lukr1a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lukr1a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_lukr24:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lukr24/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lukr24/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_lukr26:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lukr26/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lukr26/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_lukr28:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lukr28/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lukr28/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_lukr4:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lukr4/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lukr4/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_lukr5:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lukr5/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lukr5/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_lukr7a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lukr7a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lukr7a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_lukr8:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lukr8/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lukr8/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_lukr9:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lukr9/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_lukr9/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_majak1:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_majak1/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_majak1/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_majak38:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_majak38/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_majak38/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_majak39:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_majak39/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_majak39/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_meln1:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_meln1/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_meln1/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_meln11:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_meln11/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_meln11/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_meln17:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_meln17/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_meln17/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_meln20:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_meln20/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_meln20/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_meln26:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_meln26/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_meln26/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_meln27:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_meln27/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_meln27/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_meln3:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_meln3/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_meln3/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_meln30:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_meln30/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_meln30/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_meln33a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_meln33a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_meln33a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_meln35:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_meln35/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_meln35/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_meln36:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_meln36/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_meln36/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_meln39:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_meln39/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_meln39/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_meln40:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_meln40/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_meln40/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_meln43:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_meln43/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_meln43/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_meln45:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_meln45/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_meln45/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_meln46:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_meln46/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_meln46/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_meln48a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_meln48a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_meln48a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_meln48b:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_meln48b/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_meln48b/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_meln6:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_meln6/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_meln6/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_meln8a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_meln8a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_meln8a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_novosel1:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_novosel1/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_novosel1/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_novosel11:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_novosel11/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_novosel11/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_novosel11a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_novosel11a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_novosel11a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_novosel12:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_novosel12/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_novosel12/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_novosel14a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_novosel14a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_novosel14a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_novosel15:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_novosel15/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_novosel15/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_novosel17:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_novosel17/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_novosel17/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_novosel2:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_novosel2/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_novosel2/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_novosel27:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_novosel27/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_novosel27/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_novosel3:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_novosel3/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_novosel3/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_novosel37:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_novosel37/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_novosel37/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_novosel4:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_novosel4/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_novosel4/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_novosel41:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_novosel41/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_novosel41/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_novosel43:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_novosel43/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_novosel43/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_novosel5:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_novosel5/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_novosel5/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_novosel7a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_novosel7a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_novosel7a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_novosel8:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_novosel8/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_novosel8/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_okobyl14:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_okobyl14/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_okobyl14/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_okobyl18:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_okobyl18/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_okobyl18/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_okobyl1a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_okobyl1a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_okobyl1a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_okobyl21a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_okobyl21a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_okobyl21a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_okobyl22:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_okobyl22/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_okobyl22/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_okobyl25:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_okobyl25/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_okobyl25/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_okobyl5:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_okobyl5/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_okobyl5/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_okobyl8:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_okobyl8/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_okobyl8/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_pol1:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pol1/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pol1/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_pr_kobyl6:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pr_kobyl6/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pr_kobyl6/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_pr_kosh1a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pr_kosh1a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pr_kosh1a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_pr_kosh2:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pr_kosh2/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pr_kosh2/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_pr_kosh4:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pr_kosh4/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pr_kosh4/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_pr_kosh8:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pr_kosh8/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pr_kosh8/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_pr_kotov3:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pr_kotov3/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pr_kotov3/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_pr_kotov4:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pr_kotov4/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pr_kotov4/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_pr_kotov4b:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pr_kotov4b/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pr_kotov4b/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_pr_kyev17:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pr_kyev17/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pr_kyev17/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_pr_kyev27:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pr_kyev27/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pr_kyev27/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_pr_kyev29:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pr_kyev29/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pr_kyev29/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_pr_kyiv26:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pr_kyiv26/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pr_kyiv26/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_pushkina12:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina12/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina12/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_pushkina13:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina13/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina13/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_pushkina14:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina14/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina14/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_pushkina15:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina15/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina15/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_pushkina16:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina16/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina16/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_pushkina19:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina19/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina19/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_pushkina21:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina21/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina21/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_pushkina22:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina22/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina22/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_pushkina23:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina23/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina23/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_pushkina23a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina23a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina23a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_pushkina24:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina24/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina24/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_pushkina25:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina25/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina25/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_pushkina29:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina29/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina29/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_pushkina2b:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina2b/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina2b/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_pushkina3:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina3/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina3/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_pushkina35:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina35/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina35/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_pushkina39a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina39a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina39a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_pushkina39b:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina39b/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina39b/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_pushkina4:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina4/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina4/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_pushkina41:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina41/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina41/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_pushkina5:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina5/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina5/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_pushkina8:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina8/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina8/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_pushkina9:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina9/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_pushkina9/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_rus26:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_rus26/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_rus26/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sadova1:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova1/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova1/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sadova10:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova10/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova10/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sadova11a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova11a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova11a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sadova14:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova14/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova14/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sadova15:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova15/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova15/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sadova16:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova16/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova16/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sadova18:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova18/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova18/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sadova19:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova19/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova19/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sadova1a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova1a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova1a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sadova1b:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova1b/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova1b/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sadova24:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova24/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova24/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sadova26:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova26/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova26/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sadova27:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova27/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova27/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sadova28:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova28/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova28/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sadova28a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova28a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova28a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sadova2a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova2a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova2a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sadova3:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova3/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova3/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sadova4:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova4/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova4/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sadova4a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova4a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova4a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sadova4b:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova4b/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova4b/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sadova4v:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova4v/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova4v/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sadova5:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova5/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova5/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sadova6:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova6/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova6/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sadova6a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova6a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova6a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sadova7:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova7/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova7/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sadova7a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova7a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova7a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sadova7b:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova7b/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova7b/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sadova8:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova8/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova8/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sadova9:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova9/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sadova9/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sag1:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sag1/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sag1/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sag13:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sag13/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sag13/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sag14:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sag14/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sag14/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sag15:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sag15/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sag15/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sag21:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sag21/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sag21/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sag25:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sag25/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sag25/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sag4a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sag4a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sag4a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sag5a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sag5a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sag5a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sag6:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sag6/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sag6/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sag7:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sag7/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sag7/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sag8:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sag8/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sag8/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_sag9:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sag9/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_sag9/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_shev1:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_shev1/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_shev1/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_shev2:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_shev2/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_shev2/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_shev4b:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_shev4b/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_shev4b/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_shev6:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_shev6/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_shev6/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_shev7:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_shev7/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_shev7/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_shev9:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_shev9/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_shev9/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_silrada:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_silrada/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_silrada/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_stas1:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_stas1/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_stas1/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_stas2:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_stas2/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_stas2/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_test:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_test/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_test/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_traktor1:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_traktor1/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_traktor1/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_traktor1a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_traktor1a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_traktor1a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_traktor1e:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_traktor1e/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_traktor1e/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_traktor2u:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_traktor2u/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_traktor2u/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr1:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr1/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr1/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr10:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr10/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr10/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr11:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr11/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr11/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr13:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr13/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr13/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr14:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr14/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr14/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr14a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr14a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr14a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr15:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr15/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr15/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr16:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr16/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr16/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr17:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr17/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr17/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr18:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr18/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr18/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr2:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr2/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr2/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr20:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr20/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr20/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr21:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr21/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr21/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr22:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr22/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr22/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr23:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr23/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr23/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr24:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr24/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr24/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr25a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr25a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr25a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr26:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr26/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr26/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr3:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr3/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr3/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr30:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr30/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr30/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr30a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr30a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr30a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr33:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr33/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr33/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr34:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr34/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr34/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr34a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr34a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr34a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr36:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr36/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr36/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr39:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr39/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr39/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr40:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr40/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr40/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr41:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr41/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr41/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr44:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr44/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr44/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr46:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr46/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr46/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr47:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr47/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr47/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr49:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr49/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr49/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr55:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr55/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr55/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr57:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr57/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr57/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr57a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr57a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr57a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr58:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr58/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr58/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr6:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr6/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr6/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr64:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr64/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr64/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr7:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr7/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr7/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr70:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr70/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr70/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr7a:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr7a/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr7a/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr8:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr8/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr8/dsl-provider:/etc/ppp/peers/dsl-provider
+    pppoe_client_ned_ukr9:
+        build:
+            context: ./
+        privileged: true
+        volumes:
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr9/chap-secret:/etc/ppp/chap-secret
+            - /usr/local/docker/pppoe_clients/clients_conf/ned_ukr9/dsl-provider:/etc/ppp/peers/dsl-provider

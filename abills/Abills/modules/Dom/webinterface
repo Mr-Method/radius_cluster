@@ -1,0 +1,82 @@
+use warnings;
+use strict;
+use Dom;
+use JSON qw/to_json/;
+use Users;
+use Address;
+
+our (
+  $db,
+  $admin,
+  %conf,
+  $html,
+  %lang
+);
+
+my $Address = Address->new($db, $admin, \%conf);
+my $Dom = Dom->new($db, $admin, \%conf);
+
+#**********************************************************
+=head2 dom_info() Create 2D build model
+  Returns:
+      1
+=cut
+#**********************************************************
+sub dom_info {
+  my %info;
+  my $build_info = $Address->build_info(
+    {
+      ID     => $FORM{BUILD_CONSTRUCT},
+      NUMBER => '_SHOW'
+    }
+  );
+
+  if($build_info->{FLORS}==0 && $build_info->{ENTRANCES}==0){
+    $html->message('warn', $lang{DELETED}, "$lang{USERS} $FORM{IDS}");
+    return 1;
+  }
+
+  my $users_list = $Dom->list(
+    {
+      FIO            => '_SHOW',
+      ADDRESS_BUILD  => $build_info->{NUMBER},
+      UID            => '_SHOW',
+      CITY           => '_SHOW',
+      COMPANY_ID     => '_SHOW',
+      DISABLE        => '_SHOW',
+      USER_STATUS    => '1',
+      CREDITOR       => '_SHOW',
+      DEBETOR        => '_SHOW',
+      ADDRESS_FLAT   => '_SHOW',
+      ADDRESS_STREET => '_SHOW',
+      PAGE_ROWS      => 10000,
+      COLS_NAME      => 1,
+    }
+  );
+  my %user_by_flat;
+  my %lang_pack = (
+    FLAT => $lang{ADDRESS_FLAT},
+    FIO  => $lang{FIO}
+  );
+
+  foreach my $user (@$users_list) {
+    $user_by_flat{ $user->{address_flat} } = $user;
+
+  }
+
+  my $json_text      = to_json(\%user_by_flat, { utf8 => 0 });
+  my $json_lang_pack = to_json(\%lang_pack,    { utf8 => 0 });
+
+  $info{LANG_PACK} = $json_lang_pack;
+  $info{USER_INFO} = $json_text;
+  $info{BUILD_FLORS}     = $build_info->{FLORS};
+  $info{BUILD_ENTRANCES} = $build_info->{ENTRANCES};
+  $info{FLORS_ROOMS} = $build_info->{FLATS} / ($build_info->{FLORS} * $build_info->{ENTRANCES});
+  $info{FLORS_ROOMS} = $info{FLORS_ROOMS} % 1 == 0 ? int($info{FLORS_ROOMS} + 1) : $info{FLORS_ROOMS};
+
+  $html->tpl_show(_include('dom_show', 'Dom'), \%info);
+
+  return 1;
+}
+
+1

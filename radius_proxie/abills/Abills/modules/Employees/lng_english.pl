@@ -1,0 +1,26 @@
+$lang{EMPLOYEES}='Employees';
+$lang{EMPLOYEE}='Employee';
+$lang{POSITIONS}='Positions';
+$lang{POSITION}='Position';
+$lang{SUBORDINATION_TREE}='Subordination tree';
+$lang{ADD_POSITION}='Add position';
+$lang{SUBORDINATION}='Subordination';
+$lang{GEO_ZONE}='Responsibility geo-area';
+$lang{POSITIONS_TREE}='Show positions';
+$lang{GEO}='Geo area';
+$lang{CLEAR}='Clear geo-link';
+$lang{EMPLOYEE_PROFILE}='Employee profile';
+$lang{QUESTION}='Question';
+$lang{STAFF_PROFILES}='Staff profiles';
+$lang{CHOICE}='Choice';
+$lang{TRUE_ANSWER}='Answer';
+$lang{MARK}='Mark';
+$lang{OPEN_VACANCY}='Open vacancy';
+$lang{ADD_EMPLOYEE}='Add employee';
+$lang{VACATIONS}='Vacations';
+$lang{HOSPITAL}='Hospital';
+$lang{BUSINESS_TRIP}='Business trip';
+$lang{DAY_OFF}='Day off';
+$lang{SLACK}='Slack';
+$lang{DUTY}='On duty';
+1

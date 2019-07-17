@@ -1,0 +1,47 @@
+#Iner_ID : Main or Sub or if -1 user menu func list
+%FUNCTIONS_LIST = ("01:-1:$lang{MESSAGES}:msgs_admin:UID"            => 15,
+  #"02:0:$lang{MESSAGES}:msgs_admin:"                                => 5,
+  "02:0:$lang{MESSAGES}:msgs_chapters:"                              => 5,
+  "04:2:$lang{ADMINS}:msgs_admins:"                                  => 5,
+  "05:2:$lang{TEMPLATES}:msgs_survey:"                               => 5,
+  "06:2:$lang{STATUS}:msgs_status:"                                  => 5,
+  #"06:2:$lang{TEMPLATES}:msgs_temlates:"                            => 5,
+  "08:0:$lang{MESSAGES}:msgs_reports:"                               => 4,
+  "09:8:$lang{EVALUATION_OF_PERFORMANCE}:msgs_reports_tasks_rating:" => 4,
+  "11:8:$lang{REQUESTS}:msgs_reports_requests:"                      => 4,
+);
+
+load_module( "Msgs", $html );
+
+if ( defined( $user->{UID} ) ){
+  my $count = msgs_new( { UID => $user->{UID} } );
+  if ( $count ne '' ){
+    $USER_FUNCTION_LIST{"01:0:$lang{MESSAGES} $count:msgs_user:defaultindex"} = 0;
+  }
+  else{
+    $USER_FUNCTION_LIST{"01:0:$lang{MESSAGES}:msgs_user:"} = 0;
+  }
+}
+
+elsif ( defined( $admin->{AID} ) ){
+  my ($count, $unreg_count) = msgs_new( { AID => $admin->{AID} } );
+  $FUNCTIONS_LIST{"10:0:$lang{MESSAGES} $count:msgs_admin:"} = 8;
+  #  $FUNCTIONS_LIST{"32:10:$lang{ADD}:msgs_admin_add:"}          = 8;
+  $FUNCTIONS_LIST{"32:10:$lang{SHEDULE}:msgs_shedule:"} = 8;
+  $FUNCTIONS_LIST{"35:10:$lang{SHEDULE_BOARD}:msgs_shedule2:"} = 8;
+  $FUNCTIONS_LIST{"37:10:$lang{SHEDULE_BOARD} $lang{MONTH}:msgs_shedule2_month:"} = 8;
+  $FUNCTIONS_LIST{"36:10:$lang{SHEDULE_BOARD}:msgs_task_info:MSGS_ID"} = 8;
+  $FUNCTIONS_LIST{"32:10:$lang{DISPATCH}:msgs_dispatch:"} = 8;
+  $FUNCTIONS_LIST{"33:0:$lang{REQUESTS} $unreg_count:msgs_unreg_requests_list:"} = 8;
+  $FUNCTIONS_LIST{"34:33:$lang{ADD}:msgs_unreg_requests:"} = 8;
+  $FUNCTIONS_LIST{"39:10:$lang{DELIVERY}:msgs_delivery_main:"} = 8;
+
+}
+
+use Abills::Base qw(in_array);
+if ( in_array( "Maps", \@MODULES ) ){
+  $FUNCTIONS_LIST{"38:10:$lang{TASKS_ROUTE_MAP}:msgs_employee_tasks_map:"} = 8;
+}
+
+
+1

@@ -1,0 +1,54 @@
+/* Shedule Table */
+
+#new-tasks .workElement {
+    display: inline-block;
+
+    vertical-align: middle;
+    padding: 3px 0 0 2px;
+
+    border: 1px solid slateblue;
+    background-color: #f1ffcc;
+    cursor: pointer;
+
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    border-radius: 5px;
+}
+
+.adminCaption {
+    width: 150px;
+    font-weight: 600;
+    border: 1px solid silver;
+}
+
+.task span.glyphicon {
+}
+
+.timeRow {
+
+}
+
+.timeTd {
+    position: relative;
+    left: -1.5em;
+    font-weight: 600;
+}
+
+.taskFree {
+    background-color: #E6F9FF;
+}
+
+.taskBusy {
+    background-color: #c6dfff;
+}
+
+.taskBusy.taskActive, .workElement.taskActive {
+    background-color: greenyellow !important;
+}
+
+.correctTarget {
+    background-color: #d3ffd8;
+    border: 1px solid silver;
+}

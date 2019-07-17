@@ -1,0 +1,26 @@
+$lang{EMPLOYEES}='Сотрудники';
+$lang{EMPLOYEE}='Сотрудник';
+$lang{POSITIONS}='Должности';
+$lang{POSITION}='Должность';
+$lang{SUBORDINATION_TREE}='Дерево подчинения';
+$lang{ADD_POSITION}='Добавить должность';
+$lang{SUBORDINATION}='Подчинение';
+$lang{GEO_ZONE}='Гео зона ответственности';
+$lang{POSITIONS_TREE}='Показать должности';
+$lang{GEO}='Геолокация';
+$lang{CLEAR}='Очистить гео-привязку';
+$lang{EMPLOYEE_PROFILE}='Анкета сотрудника';
+$lang{QUESTION}='Вопрос';
+$lang{STAFF_PROFILES}='Анкеты сотрудников';
+$lang{CHOICE}='Вариант';
+$lang{TRUE_ANSWER}='Правильный ответ';
+$lang{MARK}='Оценка';
+$lang{OPEN_VACANCY}='Свободная вакансия';
+$lang{ADD_EMPLOYEE}='Добавить сотрудника';
+$lang{VACATIONS}='Отпуск';
+$lang{HOSPITAL}='Больничный';
+$lang{BUSINESS_TRIP}='Командировка';
+$lang{DAY_OFF}='Отпросился';
+$lang{SLACK}='Бездействие';
+$lang{DUTY}='Дежурный';
+1

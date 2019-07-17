@@ -1,0 +1,20 @@
+$lang{LIGHT}='Light';
+$lang{WATER}='Water';
+$lang{GAS}='Gas';
+$lang{PUBLIC_UTILITIES}='Public utilities';
+$lang{INFO_ALREADY_ADDED}='Information for this day already exists';
+$lang{CANT_CHANGE}='Can not change data';
+$lang{COMMUNAL}='Communal';
+$lang{INPUT_MONEY}='Enter money amount';
+$lang{INPUT_COUNTER}='Enter counter data';
+$lang{ORGANIZER}='Organizer';
+$lang{DATE}='Date';
+$lang{KWT}='kWT';
+$lang{M3}='m^3';
+$lang{GRN}='grn';
+$lang{CALC_COST}='Calculate the cost';
+$lang{CHECK_CORRECTNESS}='Check the correctness';
+$lang{NEW_DATA_FOR}='New data for ';
+$lang{GREATER_THEN}=' greater then ';
+$lang{SMALLER_THEN}=' smaller then ';
+1

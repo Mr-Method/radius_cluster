@@ -1,0 +1,8 @@
+%FUNCTIONS_LIST = (
+  "01:0:$lang{REFERRAL_SYSTEM}:referral_settings:" => 5,
+  "02:0:$lang{REFERRAL_SYSTEM}:referral_user:UID"  => 20,
+  "03:0:$lang{REFERRAL_SYSTEM}:referral_report"    => 4,
+  "04:3::referral_show:IN_MODAL"                   => 4,
+  "05:3::referral_form_search:IN_MODAL"            => 4,
+  "06:3::referral_set:REFERRER_UID"                => 4,
+);

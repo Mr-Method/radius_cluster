@@ -1,0 +1,33 @@
+%FUNCTIONS_LIST = (
+  "01:0:$lang{EQUIPMENT}:equipment_model:"                        => 5,
+  "02:1:$lang{TYPE}:equipment_types:"                             => 5,
+  "03:1:$lang{VENDOR}:equipment_vendor:"                          => 5,
+  "03:1:$lang{TRAPS}:equipment_traps_types:"                      => 5,
+  # "04:1:$lang{BOXES}:equipment_boxes:"          => 5,
+  #	"05:4:$lang{TYPE}:equipment_box_types:"       => 5,
+  "06:0:$lang{EQUIPMENT}:equipment_list:"                         => 8,
+  "07:6:$lang{DEVICE}:equipment_info:NAS_ID"                      => 8,
+  "08:0:$lang{TRAPS}:equipment_traps:"                            => 8,
+  "09:0:Vlan:equipment_vlan:"                                     => 8,
+
+  "10:6:$lang{EQUIPMENT} Backup:equipment_show_snmp_backup_files" => 8,
+  "11:6:Backup:equipment_backup:NAS_ID"                           => 8,
+
+  "12:6::equipment_snmp_upload:NAS_ID,IN_MODAL"                   => 8,
+  "13:6::equipment_snmp_backup:NAS_ID,IN_MODAL"                   => 8,
+  "14:6:MAC:equipment_mac_log:"                                   => 8,
+  "14:0:$lang{EQUIPMENT}:equipment_monitor:"                      => 6,
+  #"15:6:NetMap:network_map:"                                      => 8,
+  "16:0:UserRoute:user_route:UID"                                   => 15,
+);
+
+if ($conf{EQUIP_NEW}) {
+	$FUNCTIONS_LIST{"15:0:EQUIP:equipment_panel_new"} = 8;
+	$FUNCTIONS_LIST{"16:0:EQUIP:equipment_snmp_user_data:UID"} = 20;
+	$FUNCTIONS_LIST{"17:1:SNMP_TMPL:equipment_tmpl_edit:ID"} = 5;
+	$FUNCTIONS_LIST{"18:1:STATS:equipment_stats_edit:PORT"} = 5;
+}
+
+%PERIODIC = (daily   => [ 'equipment_traps_clean' ]);
+
+1

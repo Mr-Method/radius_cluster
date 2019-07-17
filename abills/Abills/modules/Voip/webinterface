@@ -1,0 +1,2787 @@
+#!perl
+
+=head1 NAME
+
+  Voip web functions
+
+  h323-disconnect-cause for CISCO of Radius Server
+  In case of CISCO router, from the Radius server h323-disconnect-cause with code is returned. Like h323-disconnect-cause=4 or h323-disconnect-cause=7.
+  In the following mini dictionary disconnect cause along description corresponding code is shown which will help instantly to identify disconnect issue if we find any code.
+
+           Local-Clear                    0
+           Local-No-Accept                1
+           Local-Decline                  2
+           Remote-Clear                   3
+           Remote-Refuse                  4
+           Remote-No-Answer               5
+           Remote-Caller-Abort            6
+           Transport-Error                7
+           Transport-Connect-Fail         8
+           Gatekeeper-Clear               9
+           Fail-No-User                   10
+           Fail-No-Bandwidth              11
+           No-Common-Capabilities         12
+           FACILITY-Forward               13
+           Fail-Security-Check            14
+           Local-Busy                     15
+           Local-Congestion               16
+           Remote-Busy                    17
+           Remote-Congestion              18
+           Remote-Unreachable             19
+           Remote-No-Endpoint             20
+           Remote-Off-Line                21
+           Remote-Temporary-Error         22
+
+=cut
+
+use strict;
+use warnings FATAL => 'all';
+
+use Voip;
+use Voip_Sessions;
+use Nas;
+use Log;
+use Fees;
+use Tariffs;
+use Abills::Base qw(in_array sendmail sec2time);
+
+our ($db,
+  $admin,
+  %conf,
+  $html,
+  %lang,
+  %ADMIN_REPORT,
+  @status,
+  %permissions,
+  @bool_vals,
+  @_COLORS,
+  @PERIODS, # ???
+  @MONTHES,
+  @WEEKDAYS,
+  $base_dir
+);
+
+our $Voip     = Voip->new( $db, $admin, \%conf );
+my $sessions = Voip_Sessions->new( $db, \%conf );
+my $fees     = Fees->new( $db, $admin, \%conf );
+my $tariffs  = Tariffs->new( $db, \%conf, $admin );
+my $Nas      = Nas->new( $db, \%conf );
+our $Log     = Log->new( $db, \%conf );
+
+#my $MODULE = ($module{$index}) ? $module{$index} : 'Voip';
+my $debug = 0;
+
+my @service_status_colors = ($_COLORS[9], $_COLORS[6], '#808080', '#0000FF', '#FF8000', '#009999');
+
+$conf{VOIP_ASTERISK_USERS} = '' if (!$conf{VOIP_ASTERISK_USERS});
+
+my %ACCT_TERMINATE_CAUSES = (
+  'Unknown'                      => 0,
+  'User-Request'                 => 1,
+  'Lost-Carrier'                 => 2,
+  'Lost-Service'                 => 3,
+  'Idle-Timeout'                 => 4,
+  'Session-Timeout'              => 5,
+  'Admin-Reset'                  => 6,
+  'Admin-Reboot'                 => 7,
+  'Port-Error'                   => 8,
+  'NAS-Error'                    => 9,
+  'NAS-Request'                  => 10,
+  'NAS-Reboot'                   => 11,
+  'Port-Unneeded'                => 12,
+  'Port-Preempted'               => 13,
+  'Port-Suspended'               => 14,
+  'Service-Unavailable'          => 15,
+  'Callback'                     => 16,
+  'User-Error'                   => 17,
+  'Host-Request'                 => 18,
+  'Supplicant-Restart'           => 19,
+  'Reauthentication-Failure'     => 20,
+  'Port-Reinit'                  => 21,
+  'Port-Disabled'                => 22,
+  'Lost-Alive/Billd Calculation' => 23
+);
+
+require Voip::Yate;
+
+if($permissions{4}) {
+  require Voip::Configure;
+}
+
+#*******************************************************************
+# Delete user from module
+# voip_user_del()
+#*******************************************************************
+sub voip_user_del{
+  my ($uid) = @_;
+
+  $Voip->{UID} = $uid;
+  $Voip->user_del( { UID => $uid } );
+
+  return 0;
+}
+
+#*******************************************************************
+=head2 form_chg_tp() Change user variant form
+
+=cut
+#*******************************************************************
+sub voip_chg_tp{
+  my ($attr) = @_;
+
+  my $user;
+
+  if ( defined( $attr->{USER_INFO} ) ){
+    $user = $attr->{USER_INFO};
+    $user = $Voip->user_info( $user->{UID} );
+    if ( $user->{TOTAL} < 1 ){
+      $html->message( 'info', $lang{INFO}, $lang{NOT_ACTIVE} );
+      return 0;
+    }
+  }
+  else{
+    $html->message( 'err', $lang{ERROR}, "$lang{USER_NOT_EXIST}" );
+    return 0;
+  }
+
+  my $period = $FORM{period} || 0;
+  require Shedule;
+  Shedule->import();
+  my $shedule = Shedule->new( $db, $admin );
+
+  if ( $FORM{set} ){
+    if ( $period > 0 ){
+
+      my ($year, $month, $day);
+      if ( $period == 1 ){
+        ($year, $month, $day) = split( /-/, $Voip->{ABON_DATE}, 3 );
+      }
+      else{
+        ($year, $month, $day) = split( /-/, $FORM{DATE}, 3 );
+      }
+      my $message;
+      $shedule->add(
+        {
+          UID      => $user->{UID},
+          TYPE     => 'tp',
+          ACTION   => $FORM{TP_ID},
+          D        => $day,
+          M        => $month,
+          Y        => $year,
+          DESCRIBE => "$message<br>
+                   $lang{FROM}: '$year-$month-$day'",
+          MODULE   => 'Voip'
+        }
+      );
+
+      if ( !_error_show( $shedule ) ){
+        $html->message( 'info', $lang{CHANGED}, $lang{CHANGED} );
+        $user->user_info( $user->{UID} );
+      }
+    }
+    else{
+      $Voip->user_change( { %FORM } );
+
+      if ( _error_show( $users ) ){
+        $html->message( 'info', $lang{CHANGED}, "$lang{CHANGED}" );
+        $Voip->user_info( $user->{UID} );
+
+        if ( !$Voip->{STATUS} && $FORM{GET_ABON} ){
+          voip_get_month_fee( $Voip );
+        }
+      }
+    }
+  }
+  elsif ( $FORM{del} ){
+    $shedule->del(
+      {
+        UID => $user->{UID},
+        ID  => $FORM{SHEDULE_ID}
+      }
+    );
+
+    $html->message( 'info', $lang{DELETED}, "$lang{DELETED} [$FORM{SHEDULE_ID}]" );
+  }
+
+  $shedule->info(
+    {
+      UID    => $user->{UID},
+      TYPE   => 'tp',
+      MODULE => 'Voip'
+    }
+  );
+
+  if ( $shedule->{TOTAL} > 0 ){
+    my $table = $html->table(
+      {
+        width      => '100%',
+        caption    => $lang{SHEDULE},
+        cols_align => [ 'left', 'left' ],
+        rows       =>
+        [ [ "$lang{TARIF_PLAN}:", "$shedule->{ACTION}" ],
+          [ "$lang{DATE}:", "$shedule->{D}-$shedule->{M}-$shedule->{Y}" ],
+          [ "$lang{ADMIN}:", "$shedule->{ADMIN_NAME}" ], [ "$lang{ADDED}:", "$shedule->{DATE}" ],
+          [ "ID:", "$shedule->{SHEDULE_ID}" ] ]
+      }
+    );
+    $tariffs->{TARIF_PLAN_SEL} = $table->show() . $html->form_input( 'SHEDULE_ID', "$shedule->{SHEDULE_ID}",
+      { TYPE => 'HIDDEN' } );
+    $tariffs->{ACTION} = 'del';
+    $tariffs->{LNG_ACTION} = $lang{DEL};
+  }
+  else{
+    $tariffs->{TARIF_PLAN_SEL} = $html->form_select(
+      'TP_ID',
+      {
+        SELECTED       => $user->{TP_ID},
+        SEL_LIST       => $Voip->tp_list( { COLS_NAME => 1 } ),
+        SEL_KEY        => 'tp_id',
+        SEL_VALUE      => 'id,name',
+        NO_ID          => 1,
+        MAIN_MENU      => get_function_index( 'voip_tp' ),
+        MAIN_MENU_ARGV => "TP_ID=$Voip->{TP_ID}"
+      }
+    );
+
+    $tariffs->{PARAMS} .= form_period( $period );
+    $tariffs->{ACTION} = 'set';
+    $tariffs->{LNG_ACTION} = $lang{CHANGE};
+  }
+
+  #my $tp_index = get_function_index( 'voip_tp' );
+
+  $tariffs->{UID} = $attr->{USER_INFO}->{UID};
+  $tariffs->{TP_ID} = $user->{TP_NUM};
+  $tariffs->{TP_NAME} = ($user->{TP_NUM}) ? "$user->{TP_NUM}:$user->{TP_NAME} " : q{};
+
+  print $html->tpl_show( templates( 'form_chg_tp' ), $tariffs );
+
+  return 1;
+}
+
+#**********************************************************
+=head2 voip_users_list()
+
+=cut
+#**********************************************************
+sub voip_users_list{
+
+  my @service_status = ($lang{ENABLE}, $lang{DISABLE}, $lang{ALLOW_ANSWER}, $lang{DISABLE} . ':' . $lang{NON_PAYMENT});
+  if ( $FORM{TP_ID} ){
+    $LIST_PARAMS{TP_ID} = $FORM{TP_ID};
+    $pages_qs .= "&TP_ID=$FORM{TP_ID}";
+  }
+
+  $Voip->{STATUS_SEL} = $html->form_select(
+    'DISABLE',
+    {
+      SELECTED => $FORM{DISABLE} || '',
+      SEL_HASH => {
+        '' => $lang{ALL},
+        0  => $service_status[0],
+        1  => $service_status[1],
+        2  => $service_status[2],
+        3  => $service_status[3],
+      },
+      NO_ID    => 1,
+      STYLE    => \@service_status_colors,
+    }
+  );
+
+  $Voip->{GROUP_SEL} = sel_groups();
+  $Voip->{TP_SEL} = $html->form_select(
+    'TP_ID',
+    {
+      SELECTED    => $FORM{TP_ID},
+      SEL_LIST    => $Voip->tp_list( { COLS_NAME => 1 } ),
+      SEL_KEY     => 'tp_id',
+      SEL_VALUE   => 'id,name',
+      NO_ID       => 1,
+      SEL_OPTIONS => { '' => $lang{ALL} },
+      MAIN_MENU   => get_function_index( 'voip_tp' ),
+    }
+  );
+
+  if ( $FORM{search_form} ){
+    form_search( { SEARCH_FORM =>
+        $html->tpl_show( _include( 'voip_users_search', 'Voip' ), { %{$Voip}, %FORM }, { OUTPUT2RETURN => 1 } ) } );
+  }
+
+  #print $html->letters_list( { pages_qs => $pages_qs } );
+
+  if ( $FORM{letter} ){
+    $LIST_PARAMS{LOGIN} = "$FORM{letter}*";
+    $pages_qs .= "&letter=$FORM{letter}";
+  }
+
+  my $status_bar;
+  for ( my $i = 0; $i <= 2; $i++ ){
+    my $name = $service_status[$i];
+    my $active = '';
+    if ( defined( $FORM{SERVICE_STATUS} ) && $FORM{SERVICE_STATUS} == $i && $FORM{SERVICE_STATUS} ne '' ){
+      $LIST_PARAMS{SERVICE_STATUS} = $FORM{SERVICE_STATUS};
+      $pages_qs .= "&SERVICE_STATUS=$i";
+      $status_bar .= ' ' . $html->b( $name );
+      $active = 'active';
+    }
+    else{
+      my $qs = $pages_qs;
+      $qs =~ s/\&SERVICE_STATUS=\d//;
+      $status_bar .= ' ' . $html->button( $name, $service_status_colors[$i], { class => "btn btn-default $active" } );
+    }
+  }
+
+  result_former(
+    {
+      INPUT_DATA        => $Voip,
+        FUNCTION        => 'user_list',
+        BASE_FIELDS     => 1,
+        DEFAULT_FIELDS  => 'LOGIN,FIO,DEPOSIT,CREDIT,NUMBER,TP_NAME,SERVICE_STATUS',
+        FUNCTION_FIELDS => 'form_payments',
+        EXT_TITLES      => {
+        'port'        => $lang{PORT},
+        'cid'         => 'CID',
+        'filter_id'   => 'Filter ID',
+        'tp_name'     => "$lang{TARIF_PLAN}",
+        'voip_status' => "$lang{STATUS}",
+        'number'      => "$lang{NUM}",
+      },
+        TABLE           => {
+        width   => '100%',
+        caption => "Voip $lang{USERS}",
+        qs      => $pages_qs,
+        header  => $status_bar,
+        ID      => 'VOIP_USERS_LIST',
+        #SHOW_COLS   => \%SEARCH_TITLES,
+        #ACTIVE_COLS => \%ACTIVE_TITLES,
+        EXPORT  => 1,
+        MENU    =>
+        "$lang{ADD}:index=" . get_function_index( 'form_wizard' ) . ':add' . ";$lang{SEARCH}:index=$index&search_form=1:search"
+        ,
+      },
+        MAKE_ROWS       => 1,
+        MODULE          => 'Voip',
+        TOTAL           => 1
+    }
+  );
+
+  if ( _error_show( $Voip ) ){
+    return 0;
+  }
+
+  return 1;
+}
+
+#**********************************************************
+=head2 voip_user($attr)
+
+=cut
+#**********************************************************
+sub voip_user{
+  my ($attr) = @_;
+
+  $Voip->{UID} = $FORM{UID};
+  my @service_status = ($lang{ENABLE}, $lang{DISABLE}, $lang{ALLOW_ANSWER}, $lang{DISABLE} . ':' . $lang{NON_PAYMENT});
+
+  voip_provision();
+
+  if ( $FORM{add} ){
+    if ( defined( $FORM{NUMBER} ) && $FORM{NUMBER} < 1 ){
+      $html->message( 'err', $lang{ERROR}, "$lang{ERR_WRONG_DATA} $lang{NUM}" );
+    }
+    else{
+      if ( $FORM{PROVISION_PORT} ){
+        my $list = $Voip->user_list(
+          {
+            PROVISION_PORT   => $FORM{PROVISION_PORT},
+            PROVISION_NAS_ID => $FORM{PROVISION_NAS_ID},
+            COLS_NAME        => 1
+          }
+        );
+
+        if ( $Voip->{TOTAL} > 0 && $list->[0]{uid} != $FORM{UID} ){
+          $html->message( 'err', $lang{ERROR},
+            "$lang{PORT}: $FORM{PROVISION_PORT}  $lang{EXIST}. $lang{LOGIN}: " . $html->button( "$list->[0]{login}",
+              "index=15&UID=" . $list->[0]{uid} ) );
+          return 0;
+        }
+      }
+
+      $Voip->user_add( { %FORM } );
+      if ( !$Voip->{errno} ){
+        $html->message( 'info', $lang{INFO}, "$lang{ADDED}" );
+        voip_get_month_fee( $Voip ) if (!$FORM{STATUS});
+
+        if ( $conf{VOIP_ASTERISK_USERS} ){
+          voip_mk_users_conf();
+        }
+      }
+    }
+  }
+  elsif ( $FORM{set} ){
+    if ( $FORM{PROVISION_PORT} ){
+      my $list = $Voip->user_list(
+        {
+          PROVISION_PORT   => $FORM{PROVISION_PORT},
+          PROVISION_NAS_ID => $FORM{PROVISION_NAS_ID},
+          COLS_NAME        => 1
+        }
+      );
+
+      if ( $Voip->{TOTAL} > 0 && $list->[0]{uid} != $FORM{UID} ){
+        $html->message( 'err', $lang{ERROR},
+          "$lang{PORT}: $FORM{PROVISION_PORT}  $lang{EXIST}. $lang{LOGIN}: " . $html->button( "$list->[0]{login}",
+            "index=15&UID=" . $list->[0]{uid} ) );
+        return 0;
+      }
+    }
+
+    $Voip->user_change( { %FORM } );
+    if ( !$Voip->{errno} ){
+      $html->message( 'info', $lang{INFO}, "$lang{CHANGED}" );
+      $Voip->{ACCOUNT_ACTIVATE} = $attr->{USER_INFO}->{ACTIVATE};
+
+      if ( !$FORM{STATUS} && ($FORM{GET_ABON} || !$FORM{TP_ID}) ){
+        voip_get_month_fee( $Voip );
+      }
+
+      if ( $conf{VOIP_ASTERISK_USERS} ){
+        voip_mk_users_conf();
+      }
+    }
+  }
+  elsif ( $FORM{del} && $FORM{COMMENTS} ){
+    $Voip->user_del();
+    if ( !$Voip->{errno} ){
+      $html->message( 'info', $lang{INFO}, "$lang{DELETED}" );
+    }
+  }
+
+  _error_show( $Voip );
+
+  my $user = $Voip->user_info( $FORM{UID} );
+
+  if ( $user->{TOTAL} < 1 ){
+    $html->message( 'info', $lang{INFO}, $lang{NOT_ACTIVE} );
+    $user = $Voip->defaults();
+    $user->{ACTION} = 'add';
+    $user->{LNG_ACTION} = $lang{ACTIVATE};
+    $user->{TP_NAME} = $html->form_select(
+      'TP_ID',
+      {
+        SELECTED  => $FORM{TP_ID},
+        SEL_LIST  => $Voip->tp_list( { COLS_NAME => 1 } ),
+        SEL_KEY   => 'tp_id',
+        SEL_VALUE => 'id,name',
+        NO_ID     => 1,
+        MENU      => get_function_index( 'voip_tp' )
+      }
+    );
+  }
+  else{
+    $user->{CHANGE_TP_BUTTON} = $html->button( $lang{CHANGE},
+      'UID=' . $user->{UID} . "&index=". get_function_index('voip_chg_tp'), { class => 'change' } );
+
+    $user->{DEL_BUTTON} =  $html->button( $lang{DEL}, "index=$index&del=1&UID=$user->{UID}",
+      {
+        MESSAGE => "$lang{DEL} $lang{SERVICE} Voip $lang{FOR} $lang{USER} $user->{UID}?",
+        class => 'btn btn-danger pull-right'
+      }
+    );
+#      $html->form_input( 'del', "$lang{DEL}",
+#      {
+#        TYPE => 'submit',
+#        class => 'btn btn-danger',
+#        MESSAGE => "$lang{DEL} Voip $lang{USER} $FORM{UID}?",
+#      }
+#    );
+    $user->{ACTION} = 'set';
+    $user->{LNG_ACTION} = $lang{CHANGE};
+  }
+
+  $user->{ALLOW_ANSWER} = ' checked' if ($user->{ALLOW_ANSWER} && $user->{ALLOW_ANSWER} == 1);
+  $user->{ALLOW_CALLS} = ' checked' if ($user->{ALLOW_CALLS} && $user->{ALLOW_CALLS} == 1);
+  $user->{STATUS_SEL} = $html->form_select(
+    'DISABLE',
+    {
+      SELECTED => $user->{DISABLE} || 0,
+      SEL_HASH => {
+        0 => $service_status[0],
+        1 => $service_status[1],
+        2 => $service_status[2],
+        3 => $service_status[3],
+      },
+      NO_ID    => 1,
+      STYLE    => \@service_status_colors,
+    }
+  );
+
+  if ( $user->{DISABLE} > 0 ){
+    $user->{STATUS_COLOR} = $service_status_colors[ $user->{DISABLE} ];
+  }
+
+  $user->{NAS_SEL} = $html->form_select(
+    'PROVISION_NAS_ID',
+    {
+      SELECTED       => $user->{PROVISION_NAS_ID} || $FORM{PROVISION_NAS_ID} || '',
+      SEL_LIST       => $Nas->list( { TYPE => 'ls_pap2t;ls_spa8000', COLS_NAME => 1, SHORT => 1, NAS_NAME => '_SHOW', PAGE_ROWS => 10000 } )
+      ,
+      SEL_KEY        => 'nas_id',
+      SEL_VALUE      => 'nas_name',
+      MAIN_MENU      => get_function_index( 'form_nas' ),
+      MAIN_MENU_ARGV => ($user->{NAS_ID}) ? "chg=$user->{NAS_ID}" : ''
+    }
+  );
+
+  $user->{PROVISION} = $html->tpl_show(
+    templates( 'form_show_hide' ),
+    {
+      CONTENT => $html->tpl_show( _include( 'voip_provision_user', 'Voip' ), $user, { OUTPUT2RETURN => 1 } ),
+      NAME    => 'Provision',
+      ID      => 'PROVISION',
+      PARAMS  => 'collapsed-box'
+    },
+    { OUTPUT2RETURN => 1 }
+  );
+
+  my %params = ();
+  if ( $attr ){
+    %params = %{ $attr };
+  }
+
+  $html->tpl_show( _include( 'voip_user', 'Voip' ), { %params, %{$user} } );
+
+  return 1;
+}
+
+#**********************************************************
+# Time intervals
+# form_intervals()
+#**********************************************************
+sub voip_nas{
+  $FORM{subf} = 18;
+  voip_tp();
+  return 1;
+}
+
+#*******************************************************************
+=head2 voip_online() - online users
+
+=cut
+#*******************************************************************
+sub voip_online{
+
+  my $message;
+
+  if ( $FORM{ping} ){
+    host_diagnostic($FORM{ping});
+  }
+  elsif ( $FORM{hangup} ){
+    # ($nas_id, $acct_session_id, $user_name)
+    my ($nas_id, $acct_session_id) = split( / /, $FORM{hangup});
+    $Nas->info( { NAS_ID => $nas_id, SECRETKEY => $conf{secretkey} } );
+
+    if (_error_show($Nas)){
+      return 0;
+    }
+
+    my $nas_port_id = 0;
+    require  Abills::Nas::Control;
+    my $Nas_cmd = Abills::Nas::Control->new( $db, \%conf );
+    my $ret = $Nas_cmd->hangup( $Nas, "$nas_port_id", "", "$acct_session_id" );
+
+    if ( $ret == 0 ){
+      $message = "$lang{NAS} ID: $nas_id
+                 $lang{NAS} IP: $Nas->{NAS_IP}
+                 $lang{PORT}: $nas_port_id
+                 $lang{SESSION_ID}: $acct_session_id
+                 $ret ";
+      sleep 3;
+    }
+    elsif ( $ret == 1 ){
+      $message = 'NAS NOT supported yet';
+    }
+
+    $html->message( 'info', $lang{INFO}, "$message" );
+  }
+  elsif ( $FORM{zapall} ){
+    $sessions->zap( 0, 0, 0, { ALL => 1, %FORM } );
+    $html->message( 'info', $lang{INFO}, "Zapped all sessions" );
+  }
+  elsif ( $FORM{zap} ){
+    my ($nas_id, $acct_session_id, $nas_port_id) = split( /[ +]+/, $FORM{zap}, 3 );
+    $sessions->zap( $nas_id, $acct_session_id );
+
+    if (_error_show($sessions)){
+      return 0;
+    }
+
+    $Nas->info( { NAS_ID => $nas_id, SECRETKEY => $conf{secretkey} } );
+    $message = "$lang{NAS}: $Nas->{NAS_IP} / $Nas->{NAS_INDENTIFIER}\n" . "$lang{PORT}: $nas_port_id\n" . "SESSION_ID: $acct_session_id\n";
+
+    $sessions->list(
+      {
+        ACCT_SESSION_ID => $acct_session_id,
+        NAS_ID          => $Nas->{NAS_ID}
+      }
+    );
+
+    if ( $sessions->{TOTAL} < 1 ){
+      $message .= $html->button( 'add to log', "index=$index&tolog=$acct_session_id&nas_id=$nas_id",
+        { BUTTON => 1 } ) . ' ' . $html->button( "$lang{DEL}",
+        "index=$index&del=$acct_session_id&nas_id=$nas_id&nas_port_id=$nas_port_id", { BUTTON => 1 } );
+    }
+    else{
+      $message = "$lang{EXIST}";
+      $sessions->{delete} = 1;
+      $sessions->online_del(
+        {
+          NAS_ID          => $nas_id,
+          ACCT_SESSION_ID => $acct_session_id
+        }
+      );
+    }
+
+    $html->message( 'info', $lang{CLOSED}, $message );
+  }
+  elsif ( $FORM{tolog} ){
+    my $ACCT_INFO = $sessions->online_info(
+      {
+        NAS_ID          => $FORM{nas_id},
+        ACCT_SESSION_ID => $FORM{tolog}
+      }
+    );
+
+    if ( $ACCT_INFO->{TOTAL} < 1 ){
+      $html->message( 'err', $lang{ERROR}, "$lang{NOT_EXIST} $lang{SESSION_ID} [$FORM{tolog}]" );
+      return 0;
+    }
+
+    require Voip_aaa;
+    $ACCT_INFO->{ACCT_STATUS_TYPE} = 'Stop';
+
+    $Nas->info(
+      {
+        NAS_ID    => $ACCT_INFO->{NAS_ID},
+        SECRETKEY => $conf{secretkey}
+      }
+    );
+
+    Voip_aaa->import();
+    my $Acct = Voip_aaa->new( $db, \%conf );
+    $Acct->accounting( $ACCT_INFO, $Nas, \%conf );
+
+    if ( $Acct->{errno} ){
+      $html->message( 'err', $lang{ERROR}, "[$Acct->{errno}] $Acct->{errstr}" );
+    }
+    else{
+      my $table = $html->table( { width => '100%' } );
+      while (my ($k, $v) = each %{$ACCT_INFO}) {
+        $table->addrow( "$k", $v );
+      }
+
+      #while(my($k, $v)=each %$Acct) {
+      #    $table->addrow($k, $v);
+      #  }
+      $html->message( 'info', $lang{ADDED}, $table->show() );
+    }
+
+    $sessions->online_del(
+      {
+        NAS_ID          => $ACCT_INFO->{NAS_ID},
+        ACCT_SESSION_ID => $ACCT_INFO->{ACCT_SESSION_ID}
+      }
+    );
+  }
+  elsif ( $FORM{del} || $FORM{dellist} ){
+    if ( $FORM{dellist} ){
+      my @sessions_list = split( /, /, $FORM{dellist} );
+      $sessions->online_del( { SESSIONS_LIST => \@sessions_list } );
+      $FORM{del} = $FORM{dellist};
+    }
+    else{
+      $sessions->online_del(
+        {
+          NAS_ID          => $FORM{nas_id},
+          ACCT_SESSION_ID => $FORM{del}
+        }
+      );
+    }
+
+    if ( !$sessions->{errno} ){
+      $html->message( 'info', $lang{DELETED}, "NAS_ID: ". ($FORM{nas_id} || q{})
+          ."\nACCT_SESSION_ID: ". ($FORM{del} || q{}) );
+    }
+  }
+
+  my $form_link = '';
+  my $cure = '';
+
+  if ( $FORM{ZAPED} ){
+    $LIST_PARAMS{ZAPED} = 1;
+    $form_link = $html->button( 'On line', "index=$index", { BUTTON => 1, IMG => ':button_activate.png' } );
+    $cure = 'Zap';
+  }
+  else{
+    $sessions->online( { ZAPED => 1 } );
+    $form_link = $html->button( $lang{ZAPED}, "index=$index&ZAPED=1",
+      { BUTTON => 1, IMG => ':button_del.png' } ) . " ($sessions->{TOTAL})";
+    $cure = 'Online';
+  }
+
+  $sessions->online( { %LIST_PARAMS } );
+  #my $dub_ports = $sessions->{dub_ports};
+  my $dub_logins = $sessions->{dub_logins};
+
+  my $table = $html->table(
+    {
+      caption    => "$cure",
+      width      => '100%',
+      title      =>
+      [ "$lang{USER}", "$lang{FIO}", "CALLED_STATION_ID", "CALLING_STATION_ID", "$lang{DURATION}", "$lang{TYPE}",
+        "CLIENT_IP_ADDRESS", "-",
+        "-", "-" ],
+      cols_align => [ 'left', 'left', 'right', 'right', 'right', 'right', 'right', 'right', 'right', 'center' ],
+      qs         => $pages_qs,
+    }
+  );
+
+  my $online = $sessions->{nas_sorted};
+  my $nas_list = $Nas->list({ PAGE_ROWS => 10000 });
+  my @call_types = ("$lang{ANSWER}", "$lang{ORIGIN}");
+  foreach my $nas_row ( @{$nas_list} ){
+    next if (!defined( $online->{ $nas_row->[0] } ));
+
+    $table->{rowcolor} = $_COLORS[0];
+    $table->{extra} = "colspan='9' class='small'";
+    $table->addrow( "$nas_row->[0]:" . $html->button( $html->b( $nas_row->[1] ),
+        "index=" . get_function_index( 'form_nas' ) . "&NAS_ID=$nas_row->[0]" ) . ":$nas_row->[4]" );
+
+    my $l = $online->{ $nas_row->[0] };
+    my $bg;
+    foreach my $line ( @{$l} ){
+      undef($table->{rowcolor});
+      undef($table->{extra});
+      if ( defined( $dub_logins->{ $line->[0] } ) ){ $bg = '#FFFF00'; }
+
+      #    elsif (defined($dub_ports->{$nas_row->[4]}{$line->[2]})) { $bg='#00FF40';    }
+      elsif ( $line->[9] == 3 ){ $bg = '#FF0000'; }
+
+      my $zap = $html->button( 'Z', "index=$index&zap=$nas_row->[0]+$line->[10]", { TITLE => 'Zap', class => 'del' } );
+      my $hangup = ($FORM{ZAPED})  ? $html->form_input( 'dellist', "$line->[10]",
+          { TYPE => 'checkbox' } ) : $html->button( 'H',
+          "index=$index&hangup=$nas_row->[0]+$line->[2]+$line->[9]+$line->[0]", { TITLE => 'Hangup', class => 'off' } );
+
+      my $user_info = '';
+
+      my $call_type = ($line->[5] == 0) ? $html->color_mark( $call_types[ $line->[5] ],
+          "$_COLORS[7]" )               : $call_types[ $line->[5] ];
+      $table->addrow( $html->button( $line->[0], "index=11&UID=$line->[9]", { TITLE => "$user_info" } ), $line->[1],
+        $line->[2], $line->[3], $line->[4], $call_type, $line->[6],
+        $html->button( 'P', "index=$index&ping=$line->[6]", { TITLE => 'Ping', BUTTON => 1 } ), "$zap", "$hangup" );
+    }
+  }
+
+  my $table2 = $html->table(
+    {
+      width      => '100%',
+      cols_align => [ 'right', 'right', 'right' ],
+      rows       => [ [ "$lang{TOTAL}:", $html->b( $sessions->{TOTAL} ), "$form_link" ] ]
+    }
+  );
+
+  my $total = $table2->show();
+  my $output = $total . $table->show();
+
+  $table = $html->table(
+    {
+      width       => '100%',
+      title_plain =>
+      [ "$lang{REFRESH} (sec): " . $html->form_input( 'REFRESH', int( ($FORM{REFRESH}) ? $FORM{REFRESH} : 0 ),
+          { SIZE => 4 } ), $html->form_input( 'SHOW', $lang{SHOW}, { TYPE => 'SUBMIT' } ) ],
+      cols_align  => [ 'center:noprint', 'center:noprint' ],
+    }
+  );
+
+  if ( $FORM{ZAPED} ){
+    $output = $html->form_main(
+      {
+        CONTENT => $output,
+        HIDDEN  => {
+          index => "$index",
+          ZAPED => 1
+        },
+        SUBMIT  => { go => "$lang{DEL}" },
+        METHOD  => 'GET'
+      }
+    );
+  }
+  else{
+    $output .= $html->form_main(
+      {
+        CONTENT => $table->show(),
+        HIDDEN  => { index => "$index" },
+        METHOD  => 'GET'
+      }
+    );
+
+    $output .= $html->button( 'Zap All', "index=$index&zapall=1",
+      { IMG => ':tech_work.png', MESSAGE => "Do you realy want ZAP all sessions ?" } );
+  }
+
+  print $output;
+
+  return 1;
+}
+
+#**********************************************************
+=head2 voip_sessions() - Show sessions from log
+
+=cut
+#**********************************************************
+sub voip_sessions{
+  my ($list) = @_;
+
+  if ( !defined( $FORM{sort} ) ){
+    if ( !$FORM{UID} ){
+      $LIST_PARAMS{SORT} = 2;
+    }
+    else{
+      $LIST_PARAMS{SORT} = 1;
+    }
+    $LIST_PARAMS{DESC} = 'DESC';
+  }
+
+  #Session List
+  if ( !$list ){
+    $sessions->{SEL_NAS} = $html->form_select(
+      'NAS_ID',
+      {
+        SELECTED       => $FORM{NAS_ID},
+        SEL_LIST       => $Nas->list( { %LIST_PARAMS, COLS_NAME => 1, PAGE_ROWS => 10000 } ),
+        SEL_KEY        => 'nas_id',
+        SEL_VALUE      => 'nas_name',
+        MAIN_MENU      => get_function_index( 'form_nas' ),
+        MAIN_MENU_ARGV => "NAS_ID=$FORM{NAS_ID}",
+        SEL_OPTIONS    => { '' => $lang{ALL} },
+      }
+    );
+
+    form_search( { SEARCH_FORM => $html->tpl_show( _include( 'voip_sessions_search', 'Voip' ), { %FORM, %{$sessions} },
+        { OUTPUT2RETURN => 1 } ) } );
+  }
+
+  if ( $FORM{del} && $FORM{COMMENTS} ){
+    if ( !defined( $permissions{3}{1} ) ){
+      $html->message( 'err', $lang{ERROR}, 'ACCESS DENY' );
+      return 0;
+    }
+
+    my ($uid, $session_id, $nas_id, $session_start_date, $session_start_time, $sum, $login) = split( / /, $FORM{del},
+      7 );
+
+    $sessions->del( $uid, $session_id, $nas_id, "$session_start_date $session_start_time" );
+    if ( !$sessions->{errno} ){
+      $html->message( 'info', $lang{DELETED},
+        "$lang{LOGIN}: $login" . $html->br() . "SESSION_ID: $session_id" . $html->br() . "NAS_ID: $nas_id" . $html->br() . "SESSION_START: $session_start_date $session_start_time" . $html->br() . "$lang{SUM}: $sum" );
+      form_back_money( 'log', $sum, { UID => $uid } );    #
+      return 0;
+    }
+  }
+
+  _error_show($sessions);
+
+  my Abills::HTML $table;
+  ($table, $list) = result_former(
+    {
+      INPUT_DATA        => $sessions,
+        FUNCTION        => 'list',
+        #BASE_FIELDS     => 0,
+        DEFAULT_FIELDS  =>
+        (($user->{UID}) ? 'DATE,DURATION,CALLING_STATION_ID,CALLED_STATION_ID,TP_ID,IP,CID,SUM' : (((!$FORM{UID}) ? 'LOGIN,' : '') . 'DATE,DURATION,CALLING_STATION_ID,CALLED_STATION_ID,TP_ID,IP,SUM,NAS_ID'))
+        ,
+        FUNCTION_FIELDS => 'detail,del',
+        EXT_TITLES      => {
+        'ip'               => 'IP',
+        'port_id'          => $lang{PORT},
+        'filter_id'        => 'Filter ID',
+        'tp_id'            => "$lang{TARIF_PLAN}",
+        'service_status'   => "$lang{STATUS}",
+        'terminate_cause'  => 'TC',
+        'start'            => "$lang{START}",
+        'duration'         => "$lang{DURATION}",
+        'sum'              => "$lang{SUM}",
+        'nas_id'           => $lang{NAS},
+        calling_station_id => 'CALLING_STATION_ID',
+        called_station_id  => 'CALLED_STATION_ID'
+      },
+        TABLE           => {
+        width        => '100%',
+        caption      => "$lang{SESSIONS}",
+        qs           => $pages_qs,
+        recs_on_page => $LIST_PARAMS{PAGE_ROWS},
+        ID           => 'DV_SESSIONS',
+        EXPORT       => 1,
+      },
+    }
+  );
+
+  if ( $sessions->{TOTAL} < 1 ){
+    $html->message( 'info', $lang{INFO}, "$lang{NO_RECORD}" );
+    return 0;
+  }
+
+  foreach my $line ( @{$list} ){
+    my $delete = ($permissions{3}{1})
+      ? $html->button(
+        $lang{DEL},
+        "index=" . get_function_index( 'voip_stats' ) . "$pages_qs&del=$line->{uid}+$line->{acct_session_id}+$line->{nas_id}+$line->{start}+$line->{sum}+$line->{login}"
+        ,
+        {
+          MESSAGE        => "$lang{DEL} $lang{SESSION} $lang{SESSION_ID} " . ($line->{acct_session_id}) . "?",
+          class          => 'del',
+          NO_LINK_FORMER => 1
+        }
+      )
+      : '';
+
+    my @fields_array = ();
+    for ( my $i = 0; $i < $sessions->{SEARCH_FIELDS_COUNT}; $i++ ){
+      if ( $sessions->{COL_NAMES_ARR}->[$i] eq 'login' && $line->{uid} ){
+        $line->{login} = $html->button( $line->{login}, "index=11&UID=$line->{uid}" );
+      }
+      elsif ( $sessions->{COL_NAMES_ARR}->[$i] eq 'terminate_cause' ){
+        $line->{terminate_cause} = $ACCT_TERMINATE_CAUSES{ $line->{terminate_cause} };
+      }
+      push @fields_array, $line->{ $sessions->{COL_NAMES_ARR}->[$i] };
+    }
+
+    $table->addrow( @fields_array, $html->button( "D",
+        "index=" . get_function_index( ($user->{UID}) ? 'voip_user_stats' : 'voip_stats' ) . "&UID=$line->{uid}" . "&SESSION_ID=$line->{acct_session_id}"
+        , { TITLE => "$lang{DETAIL}", class => 'stats' } ), $delete );
+  }
+
+  print $table->show();
+
+  return 1;
+}
+
+#**********************************************************
+=head2 voip_use_allmonthes();
+
+=cut
+#**********************************************************
+sub voip_use_allmonthes{
+
+  $FORM{allmonthes} = 'y';
+  voip_use();
+
+  return 1;
+}
+
+#**********************************************************
+=head2 voip_use();
+
+=cut
+#**********************************************************
+sub voip_use{
+  reports(
+    {
+      DATE          => $FORM{DATE},
+        REPORT      => '',
+        EX_PARAMS   => {
+        DATE   => "$lang{DATE}",
+        USERS  => "$lang{USERS}",
+        ADMINS => "$lang{ADMINS}",
+
+      },
+        PERIOD_FORM => 1,
+    }
+  );
+  my ($table_sessions);
+  my $type = $FORM{type};
+
+  #Day reposrt
+  if ( defined( $FORM{DATE} ) ){
+
+    #Used Fraffic
+    $table_sessions = $html->table(
+      {
+        width      => '100%',
+        caption    => "$lang{SESSIONS}",
+        title      => [ "$lang{DATE}", "$lang{USERS}", "$lang{SESSIONS}", $lang{DURATION}, $lang{SUM} ],
+        cols_align => [ 'right', 'left', 'right', 'right', 'right' ],
+        qs         => $pages_qs
+      }
+    );
+
+    my $list = $sessions->reports( { %LIST_PARAMS } );
+    foreach my $line ( @{$list} ){
+      $table_sessions->addrow( $html->b( $line->[0] ),
+        $html->button( "$line->[1]", "index=11&subf=22&UID=$line->[5]&DATE=$line->[0]" ), $line->[2], $line->[3],
+        $html->b( $line->[4] ) );
+    }
+  }
+  else{
+    #Used Traffic
+    $table_sessions = $html->table(
+      {
+        width      => '100%',
+        caption    => $lang{SESSIONS},
+        title      => [ $lang{DATE}, $lang{USERS}, $lang{SESSIONS}, $lang{DURATION}, $lang{SUM} ],
+        cols_align => [ 'right', 'right', 'right', 'right', 'right' ],
+        qs         => $pages_qs
+      }
+    );
+
+    my $list = $sessions->reports( { %LIST_PARAMS } );
+    foreach my $line ( @{$list} ){
+      $table_sessions->addrow( $html->button( $line->[0], "index=$index&$type=$line->[0]$pages_qs" ),
+        $line->[1],
+        $line->[2],
+        $line->[3],
+        $html->b( $line->[4] ) );
+    }
+  }
+
+  my $table = $html->table(
+    {
+      width      => '100%',
+      caption    => $lang{SESSIONS},
+      cols_align => [ 'right', 'right', 'right', 'right', 'right', 'right' ],
+      rows       =>
+      [ [ "$lang{USERS}: " . $html->b( $sessions->{USERS} ), "$lang{SESSIONS}: " . $html->b( $sessions->{SESSIONS} ),
+          "$lang{DURATION}: " . $html->b( $sessions->{DURATION} ), "$lang{SUM}: " . $html->b( $sessions->{SUM} ) ] ],
+      rowcolor   => $_COLORS[2]
+    }
+  );
+
+  print $table_sessions->show() . $table->show();
+
+  return 1;
+}
+
+#**********************************************************
+=head2 voip_error() - show errors
+
+=cut
+#**********************************************************
+sub voip_error{
+  my ($attr) = @_;
+  my $login = '';
+
+  my %log_levels_rev = reverse %Log::log_levels;
+  my @ACTIONS = ('', 'AUTH', 'ACCT', 'HANGUP', 'CALCULATION', 'CMD');
+
+  if ( $attr->{USER_INFO} ){
+    #my $user = $attr->{USER_INFO};
+    $Voip->user_info( $attr->{USER_INFO}->{UID} );
+
+    $login = $Voip->{NUMBER};
+    $LIST_PARAMS{LOGIN_EXPR} = $Voip->{NUMBER};
+  }
+  elsif ( $FORM{LOGIN_EXPR} ){
+    $login = $FORM{LOGIN_EXPR};
+    $LIST_PARAMS{LOGIN_EXPR} = $FORM{LOGIN_EXPR};
+    $pages_qs .= "&LOGIN_EXPR=$FORM{LOGIN_EXPR}";
+  }
+  elsif ( $FORM{UID} ){
+    voip_user();
+    return 0;
+  }
+
+  #Sql Part
+  if ( $conf{ERROR2DB} ){
+    my %nas_ids = (
+      '' => '',
+      0  => 'UNKNOWN',
+    );
+
+    my $list = $Nas->list(
+      {
+        TYPE      => 'asterisk,gnugk,cisco_voip,eltex_smg',
+        PAGE_ROWS => 10000,
+        COLS_NAME => 1
+      }
+    );
+
+    foreach my $line ( @{$list} ){
+      $nas_ids{ $line->{nas_id} } = $line->{nas_name};
+    }
+
+    $Voip->{LOG_TYPE_SEL} = $html->form_select(
+      'LOG_TYPE',
+      {
+        SELECTED => $FORM{LOG_TYPE},
+        SEL_HASH => { '' => '', %log_levels_rev },
+        NO_ID    => 1
+      }
+    );
+
+    $Voip->{NAS_ID_SEL} = $html->form_select(
+      'NAS_ID',
+      {
+        SELECTED => $FORM{NAS_ID},
+        SEL_HASH => \%nas_ids,
+        NO_ID    => 1
+      }
+    );
+
+    $Voip->{ACTIONS_SEL} = $html->form_select(
+      'ACTION',
+      {
+        SELECTED  => $FORM{ACTION},
+        SEL_ARRAY => \@ACTIONS,
+      }
+    );
+
+    form_search( { SEARCH_FORM =>
+        $html->tpl_show( _include( 'voip_errors_search', 'Voip' ), { %FORM, %{$Voip} }, { OUTPUT2RETURN => 1 } ) } );
+
+    if ( !$FORM{sort} ){
+      $LIST_PARAMS{SORT} = 1;
+      $LIST_PARAMS{DESC} = 'DESC';
+    }
+
+    if ( $FORM{search} ){
+      $LIST_PARAMS{INTERVAL} = "$FORM{FROM_DATE}/$FORM{TO_DATE}";
+    }
+
+    $LIST_PARAMS{NAS_ID} = join( ';', keys %nas_ids );
+
+    $list = $Log->log_list( { %LIST_PARAMS, COLS_NAME => 1 } );
+    my $table = $html->table(
+      {
+        caption    => $lang{TOTAL},
+        width      => '100%',
+        cols_align => [ 'right', 'right' ],
+      }
+    );
+
+    my $total = 0;
+    foreach my $line ( @{ $Log->{list} } ){
+      $table->addrow( $log_levels_rev{ $line->{log_type} }, $line->{count} );
+      $total += $line->{count};
+    }
+
+    $table->addrow( $lang{TOTAL}, $total );
+
+    print $table->show();
+
+    $table = $html->table(
+      {
+        caption => "Internet $lang{ERROR}",
+        width   => '100%',
+        title   => [ $lang{DATE}, "$lang{TYPE}", "$lang{ACTION}", "$lang{USER}", "$lang{TEXT}", "NAS" ],
+        pages   => $total,
+        qs      => $pages_qs,
+        ID      => 'VOIP_ERRORS',
+        EXPORT  => ' XML:&xml=1',
+        MENU    => "$lang{SEARCH}:index=$index&search_form=1:search",
+      }
+    );
+
+    foreach my $line ( @{$list} ){
+      my $message = $line->{message};
+
+      if ( $line->{log_type} < 5 ){
+        $message = $html->color_mark( $line->{message}, "$_COLORS[6]" );
+      }
+      elsif ( $line->{action} eq 'GUEST_MODE' ){
+        $message = $html->color_mark( $line->{message}, "$_COLORS[8]" );
+        $line->{action} = $html->color_mark( $line->{action}, "$_COLORS[8]" );
+      }
+
+      $table->addrow( $line->{date}, $log_levels_rev{ $line->{log_type} }, $line->{action},
+        $html->button( $line->{user},
+          "index=" . (get_function_index( 'voip_users_list' )) . "&NUMBER=$line->{user}&search=1&search_form=1" ),
+        $message, $nas_ids{ $line->{nas_id} } );
+    }
+
+    print $table->show();
+  }
+
+  return 0 if (in_array( 'Dv', \@MODULES ));
+
+  #File part
+  if ( !-f $conf{LOGFILE} ){
+    $html->message( 'info', "$lang{INFO} $conf{LOGFILE}", $lang{NOT_EXIST} );
+    return 0;
+  }
+
+  if ( defined( $FORM{LOG_TYPE} ) ){
+    $pages_qs .= "&LOG_TYPE=$FORM{LOG_TYPE}";
+  }
+
+  my ($list, $types, $totals) = show_log(
+    "$login",
+    "$conf{LOGFILE}",
+    {
+      DATE      => $FORM{DATE},
+      LOG_TYPE  => $log_levels_rev{ $FORM{LOG_TYPE} },
+      PG        => $PG,
+      PAGE_ROWS => 25                                    #$PAGE_ROWS
+    }
+  );
+
+  my $table = $html->table(
+    {
+      caption => "System $lang{ERROR}",
+      width   => '100%',
+      pages   => $totals,
+      qs      => $pages_qs,
+      ID      => 'DV_ERRORS'
+    }
+  );
+
+  foreach my $line ( @{$list} ){
+    if ( $line =~ m/LOG_WARNING/i ){
+      $line = $html->color_mark( $line, '#FF0000' );
+    }
+
+    $table->addrow( $line );
+  }
+  print $table->show();
+
+  $table = $html->table(
+    {
+      width      => '100%',
+      cols_align => [ 'right', 'right' ]
+    }
+  );
+
+  $table->addrow( $html->button( "$lang{TOTAL}", "index=$index&$pages_qs" ), $totals );
+  while (my ($k, $v) = each %{$types}) {
+    $table->addrow( $html->button( $k, "index=$index&LOG_TYPE=$k$pages_qs" ), $v );
+  }
+
+  $table->addrow( $lang{SIZE}, int2byte( (-s $conf{LOGFILE}) ) ) if ($login eq '');
+
+  print $table->show();
+
+  return 1;
+}
+
+#**********************************************************
+=head2 voip_stats($attr) stats
+
+=cut
+#**********************************************************
+sub voip_stats{
+  my ($attr) = @_;
+
+  my $uid = 0;
+
+  if ( defined( $attr->{USER_INFO} ) ){
+    my $user = $attr->{USER_INFO};
+
+    $uid = $user->{UID};
+    $LIST_PARAMS{UID} = $uid;
+    if ( !defined( $FORM{sort} ) ){
+      $LIST_PARAMS{SORT} = 2;
+      $LIST_PARAMS{DESC} = 'DESC';
+    }
+
+    if ( defined( $FORM{OP_SID} ) and $FORM{OP_SID} eq $COOKIES{OP_SID} ){
+      $html->message( 'err', $lang{ERROR}, "$lang{EXIST} $FORM{OP_SID} eq $COOKIES{OP_SID}" );
+    }
+    elsif ( $FORM{bm} ){
+      use Bills;
+      my $Bill = Bills->new( $db );
+      $Bill->action( 'add', "$FORM{BILL_ID}", $FORM{sum} );
+      if ( _error_show( $Bill ) ){
+        $html->message( 'info', $lang{INFO}, "$lang{ADDED}: SUM $FORM{sum}, BILL_ID: $FORM{BILL_ID}" );
+      }
+    }
+    elsif ( $FORM{SESSION_ID} ){
+      $pages_qs .= "&SESSION_ID=$FORM{SESSION_ID}";
+      voip_session_detail( { USER_INFO => $attr->{USER_INFO} } );
+
+      return 0;
+    }
+  }
+
+  _error_show( $sessions );
+
+  if ( $FORM{rows} ){
+    $LIST_PARAMS{PAGE_ROWS} = $FORM{rows};
+    $conf{list_max_recs} = $FORM{rows};
+    $pages_qs .= "&rows=$conf{list_max_recs}";
+  }
+
+  #PEriods totals
+  my $list = $sessions->periods_totals( { %LIST_PARAMS } );
+
+  if ( !defined( $sessions->{sum_4} ) ){
+    $html->message( 'info', $lang{INFO}, "$lang{NO_RECORD}" );
+    return 0;
+  }
+
+  my $table = $html->table(
+    {
+      width       => '100%',
+      title_plain => [ "$lang{PERIOD}", "$lang{DURATION}", "$lang{SUM}" ],
+      cols_align  => [ 'left', 'right', 'right' ],
+      rowcolor    => $_COLORS[1]
+    }
+  );
+
+  for ( my $i = 0; $i < 5; $i++ ){
+    $table->addrow( $html->button( "$PERIODS[$i]", "index=$index&period=$i$pages_qs" ), "$sessions->{'duration_'. $i}",
+      $sessions->{ 'sum_' . $i } );
+  }
+  print $table->show();
+
+  $table = $html->table(
+    {
+      width       => '100%',
+      title_plain => [ "$lang{FROM}: ", $html->date_fld2( 'FROM_DATE', { MONTHES => \@MONTHES } ), "$lang{TO}: ",
+        $html->date_fld2( 'TO_DATE', { MONTHES => \@MONTHES } ), "$lang{ROWS}: ",
+        $html->form_input( 'rows', int( $conf{list_max_recs} ), { SIZE => 4 } ),
+        $html->form_input( 'show', $lang{SHOW}, { TYPE => 'submit' } ) ],
+    }
+  );
+
+  print $html->form_main(
+      {
+        CONTENT => $table->show( { OUTPUT2RETURN => 1 } ),
+        HIDDEN  => {
+          sid   => $sid,
+          index => $index,
+          UID   => $uid
+        }
+      }
+    );
+
+  voip_stats_calculation( $sessions );
+
+  if ( defined( $FORM{show} ) ){
+    $LIST_PARAMS{INTERVAL} = "$FORM{FROM_DATE}/$FORM{TO_DATE}";
+    $pages_qs .= "&show=1&FROM_DATE=$FORM{FROM_DATE}&TO_DATE=$FORM{TO_DATE}";
+  }
+  elsif ( defined( $FORM{period} ) ){
+    $LIST_PARAMS{PERIOD} = int( $FORM{period} );
+    $pages_qs .= "&period=$FORM{period}";
+  }
+  elsif ( $FORM{DATE} ){
+    $LIST_PARAMS{DATE} = $FORM{DATE};
+    $pages_qs .= "&DATE=$FORM{DATE}";
+  }
+
+  if ( !defined( $FORM{sort} ) ){
+    $LIST_PARAMS{SORT} = 2;
+    $LIST_PARAMS{DESC} = 'DESC';
+  }
+
+  #Session List
+  $list = $sessions->list( { %LIST_PARAMS } );
+  $table = $html->table(
+    {
+      width       => '640',
+      rowcolor    => $_COLORS[1],
+      caption     => $lang{TOTAL},
+      title_plain => [ "$lang{SESSIONS}", "$lang{DURATION}", "$lang{SUM}" ],
+      cols_align  => [ 'right', 'right', 'right' ],
+      rows        => [ [ $sessions->{TOTAL}, $sessions->{DURATION}, $sessions->{SUM} ] ],
+    }
+  );
+  print $table->show();
+
+  voip_sessions( $list, $sessions ) if ($sessions->{TOTAL} > 0);
+
+  return 1;
+}
+
+#*******************************************************************
+=head2 voip_session_detail($attr) - Session Detail
+
+=cut
+#*******************************************************************
+sub voip_session_detail{
+  my ($attr) = @_;
+  my $user;
+
+  if ( defined( $attr->{USER_INFO} ) ){
+    $user = $attr->{USER_INFO};
+    $LIST_PARAMS{LOGIN} = $user->{LOGIN};
+    #	if ($FORM{RECALC}) {
+    #		$sessions->session_detail({ %FORM });
+    #
+    #    use Billing;
+    #    my $Billing = Billing->new($db, $CONF);
+    #
+    #    my($uid,
+    #     $SUM,
+    #     $BILL_ID,
+    #     $TARIF_PLAN,
+    #     $TIME_TARIF,
+    #     $TRAF_TARIF) = $Billing->session_sum($sessions->{LOGIN},
+    #                                          $sessions->{START_UNIXTIME},
+    #                                          $sessions->{DURATION},
+    #                                            {  OUTBYTE  =>  $sessions->{SENT},
+    #                                               INBYTE   =>  $sessions->{RECV},
+    #                                               OUTBYTE2 =>  $sessions->{SENT2},
+    #                                               INBYTE2  =>  $sessions->{RECV2}
+    #                                             },
+    #                                          {
+    #                                          	disable_rt_billing => 1,
+    #                                          	TP_NUM             => $sessions->{TP_ID}
+    #                                           }
+    #                                          );
+    #
+    #    my $change = '';
+    #
+    #    if ($sessions->{SUM} != $SUM) {
+    #      $change = "$lang{CHANGE}  ". $html->button($lang{YES}, "index=$index&RECALC=1&SESSION_ID=$FORM{SESSION_ID}&UID=$FORM{UID}&change=1", { BUTTON => 1 }). ' ?';
+    #
+    #      if ($FORM{change}) {
+    #        use Bills;
+    #        my $Bill = Bills->new($db);
+    #        $Bill->action('add', "$sessions->{BILL_ID}", $sessions->{SUM}) if ($sessions->{SUM});
+    #        $Bill->action('take', "$sessions->{BILL_ID}", $SUM) if ($SUM > 0);
+    #
+    #        $sessions->query($db, "UPDATE dv_log SET sum='$SUM' WHERE acct_session_id='$sessions->{SESSION_ID}';", 'do');
+    #
+    #        if($bill->{errno}) {
+    #          $html->message('err', $lang{ERROR}, "[$bill->{errno}] $err_strs{$bill->{errno}}");
+    #         }
+    #        else {
+    #          $html->message('info', $lang{INFO}, "$lang{ADDED}: SUM $FORM{sum}, BILL_ID: $FORM{BILL_ID}");
+    #         }
+    #      	$change = "$lang{CHANGED}";
+    #       }
+    #     }
+    #
+    #		$html->message('info', "$lang{RECALCULATE}", "$lang{TARIF_PLAN}: $TARIF_PLAN, $lang{SUM}: $sessions->{SUM} -> $SUM  $change");
+    #	 }
+  }
+  elsif ( defined( $LIST_PARAMS{LOGIN} ) ){
+
+  }
+  elsif ( $FORM{UID} ){
+    voip_user();
+    return 0;
+  }
+
+  my %ACCT_TERMINATE_CAUSES_VALUE = reverse %ACCT_TERMINATE_CAUSES;
+
+  $sessions->session_detail( { %FORM } );
+  $sessions->{ACCT_TERMINATE_CAUSE} = "$sessions->{ACCT_TERMINATE_CAUSE} : " . $ACCT_TERMINATE_CAUSES_VALUE{ $sessions->{ACCT_TERMINATE_CAUSE} };
+  $sessions->{RECALC} = $html->button( $lang{RECALCULATE},
+    "index=$index&RECALC=1&SESSION_ID=$FORM{SESSION_ID}&UID=$FORM{UID}", { BUTTON => 1 } );
+
+  $sessions->{ROUTE_ID} = $html->button( $sessions->{ROUTE_ID},
+    "&ROUTE_ID=$sessions->{ROUTE_ID}&index=" . get_function_index( 'voip_routes' ) );
+
+  $html->tpl_show( _include( 'voip_session_detail', 'Voip' ), { %{$sessions}, } );
+
+  return 1;
+}
+
+#*******************************************************************
+# WHERE period
+# base_state($where, $period);
+#*******************************************************************
+sub voip_stats_calculation{
+  my ($sessions_) = @_;
+
+  $sessions_->calculation( { %LIST_PARAMS } );
+
+  my $table = $html->table(
+    {
+      width       => '640',
+      rowcolor    => $_COLORS[1],
+      title_plain => [ "-", "$lang{MIN}", "$lang{MAX}", "$lang{AVG}" ],
+      cols_align  => [ 'left', 'right', 'right', 'right' ],
+      rows        => [ [ $lang{DURATION}, $sessions_->{MIN_DUR}, $sessions_->{MAX_DUR}, $sessions_->{AVG_DUR} ],
+        [ $lang{SUM}, $sessions_->{MIN_SUM}, $sessions_->{MAX_SUM}, $sessions_->{AVG_SUM} ] ]
+    }
+  );
+
+  print $table->show();
+
+  return 1;
+}
+
+#**********************************************************
+=head2 voip_user_stats()
+
+=cut
+#**********************************************************
+sub voip_user_stats{
+
+  if ( !defined( $FORM{sort} ) ){
+    $LIST_PARAMS{SORT} = 2;
+    $LIST_PARAMS{DESC} = 'DESC';
+  }
+
+  my $uid = $FORM{UID} || 0;
+
+  if ( $FORM{rows} ){
+
+    $LIST_PARAMS{PAGE_ROWS} = $FORM{rows};
+    $conf{list_max_recs} = $FORM{rows};
+    $pages_qs .= "&rows=$conf{list_max_recs}";
+  }
+
+  #PEriods totals
+  my $list = $sessions->periods_totals( { %LIST_PARAMS } );
+  my $table = $html->table(
+    {
+      width       => '100%',
+      caption     => $lang{PERIOD},
+      title_plain => [ "$lang{PERIOD}", "$lang{DURATION}", "$lang{SUM}" ],
+      cols_align  => [ 'left', 'right', 'right' ],
+      ID          => 'PERIODS'
+    }
+  );
+
+  if ( !defined( $sessions->{sum_4} ) ){
+    $html->message( 'info', $lang{INFO}, $lang{NO_RECORD} );
+    return 1;
+  }
+
+  for ( my $i = 0; $i < 5; $i++ ){
+    $table->addrow( $html->button( "$PERIODS[$i]", "index=$index&period=$i$pages_qs" ), "$sessions->{'duration_'. $i}",
+      $sessions->{ 'sum_' . $i } );
+  }
+  print $table->show();
+
+  $table = $html->table(
+    {
+      width    => '100%',
+      rowcolor => $_COLORS[0],
+      rows     => [
+        [
+          "$lang{FROM}: ", $html->date_fld2( 'FROM_DATE', { MONTHES => \@MONTHES } ),
+          "$lang{TO}: ", $html->date_fld2( 'TO_DATE', { MONTHES => \@MONTHES } ),
+          "$lang{ROWS}: ",
+          $html->form_input( 'rows', int( $conf{list_max_recs} ), { SIZE => 4, OUTPUT2RETURN => 1 } ),
+          $html->form_input( 'show', $lang{SHOW}, { TYPE => 'submit', OUTPUT2RETURN => 1 } )
+        ]
+      ],
+    }
+  );
+
+  print $html->form_main(
+      {
+        CONTENT => $table->show( { OUTPUT2RETURN => 1 } ),
+        HIDDEN  => {
+          sid   => $sid,
+          index => $index,
+          UID   => $uid
+        }
+      }
+    );
+
+  voip_stats_calculation( $sessions );
+
+  if ( defined( $FORM{show} ) ){
+    $pages_qs .= "&show=1&FROM_DATE=$FORM{FROM_DATE}&TO_DATE=$FORM{TO_DATE}";
+  }
+  elsif ( defined( $FORM{period} ) ){
+    $LIST_PARAMS{PERIOD} = int( $FORM{period} );
+    $pages_qs .= "&period=$FORM{period}";
+  }
+
+  #Session List
+  $list = $sessions->list( { %LIST_PARAMS } );
+
+  $table = $html->table(
+    {
+      width       => '640',
+      caption     => $lang{TOTAL},
+      rowcolor    => $_COLORS[1],
+      title_plain => [ "$lang{SESSIONS}", "$lang{DURATION}", "$lang{SUM}" ],
+      cols_align  => [ 'right', 'right', 'right' ],
+      rows        => [ [ $sessions->{TOTAL}, $sessions->{DURATION}, $sessions->{SUM} ] ],
+      ID          => 'VOIP_TOTALS'
+    }
+  );
+  print $table->show();
+
+  voip_sessions( $list, $sessions ) if ($sessions->{TOTAL} > 0);
+
+  return 1;
+}
+
+#**********************************************************
+=head2 voip_user_info();
+
+=cut
+#**********************************************************
+sub voip_user_info{
+  my $user = $Voip->user_info( $LIST_PARAMS{UID} );
+
+  if ( $user->{TOTAL} < 1 ){
+    $html->message( 'info', $lang{INFO}, "$lang{NOT_ACTIVE}" );
+    return 0;
+  }
+
+  $html->tpl_show( _include( 'voip_user_info', 'Voip' ), $Voip );
+
+  return 1;
+}
+
+#**********************************************************
+=head2 voip_user_routes()
+
+=cut
+#**********************************************************
+sub voip_user_routes{
+
+  my $user = $Voip->user_info( $LIST_PARAMS{UID} );
+
+  require Tariffs;
+  Tariffs->import();
+  my $Voip_tp = Tariffs->new( $db, \%conf, $admin );
+  $WEEKDAYS[0] = $lang{ALL};
+  my $list = $Voip_tp->ti_list( { TP_ID => $user->{TP_ID} } );
+  my @caption = ($lang{PREFIX}, $lang{ROUTES}, "$lang{STATUS}");
+  my @aligns = ('left', 'left', 'center');
+  my @interval_ids = ();
+  my $intervals = 0;
+  foreach my $line ( @{$list} ){
+    #push @caption, "$lang{SUM} (Min): ". $WEEKDAYS[$line->[1]] .$html->br().  sec2time($line->[2], {str => 1}). '-' . sec2time($line->[3], {str => 1});
+    push @caption,
+      $html->b( $WEEKDAYS[ $line->[1] ] ) . $html->br() . sec2time( $line->[2], { format => 1 } ) . '-' . sec2time(
+        $line->[3], { format => 1 } );
+    push @aligns, 'center';
+    push @interval_ids, $line->[0];
+  }
+  $intervals = $Voip_tp->{TOTAL};
+
+  $list = $Voip->rp_list( { %LIST_PARAMS } );
+  my %prices = ();
+  foreach my $line ( @{$list} ){
+    $prices{"$line->[0]"}{"$line->[1]"} = $line->[3];
+  }
+
+  $pages_qs .= "&routes=$FORM{routes}" if ($FORM{routes});
+  $list = $Voip->routes_list( { %LIST_PARAMS } );
+
+  my $table = $html->table(
+    {
+      width      => '100%',
+      caption    => $lang{ROUTES},
+      title      => \@caption,
+      cols_align => \@aligns,
+      qs         => $pages_qs,
+      pages      => $Voip->{TOTAL},
+      ID         => 'VOIP_ROUTES_PRICES',
+    }
+  );
+
+  my $price = 0;
+  foreach my $line ( @{$list} ){
+    my @l = ();
+    for ( my $i = 0; $i < $intervals; $i++ ){
+      if ( defined( $prices{"$interval_ids[$i]"}{"$line->[4]"} ) ){
+        $price = $prices{ $interval_ids[$i] }{ $line->[4] };
+      }
+      else{
+        $price = "0.00";
+        $price .= " $interval_ids[$i] $line->[4] -0" if ($debug > 0);
+      }
+      push @l, $price;
+    }
+    $table->addrow( "$line->[0]", "$line->[1]", $status[ $line->[2] ], @l );
+  }
+
+  print $table->show();
+
+  return 1;
+}
+
+#**********************************************************
+=head2 voip_daily_fees($attr) daily_fees
+
+=cut
+#**********************************************************
+sub voip_daily_fees{
+  my ($attr) = @_;
+
+  my $debug = $attr->{DEBUG} || 0;
+  my $debug_output = '';
+  $debug_output .= "Voip: Daily periodic\n" if ($debug > 1);
+
+  $LIST_PARAMS{TP_ID} = $attr->{TP_ID} if ($attr->{TP_ID});
+  my %VOIP_LIST_PARAMS = ();
+  $VOIP_LIST_PARAMS{LOGIN} = $attr->{LOGIN} if ($attr->{LOGIN});
+  $VOIP_LIST_PARAMS{EXT_BILL} = 1 if ($conf{BONUS_EXT_FUNCTIONS});
+
+  $ADMIN_REPORT{DATE} = $DATE if (!$ADMIN_REPORT{DATE});
+  #my ($y, $m, $d) = split( /-/, $ADMIN_REPORT{DATE}, 3 );
+
+  my $tp_list = $tariffs->list(
+    {
+      %LIST_PARAMS,
+      MODULE    => 'Voip',
+      COLS_NAME => 1
+    }
+  );
+
+  foreach my $tp ( @{$tp_list} ){
+    my $TP_ID = $tp->{id};
+    my $postpaid = $tp->{payment_type} || $tp->{postpaid_daily_fee};
+    my $daily_fee = $tp->{day_fee};
+
+    $debug_output .= "TP ID: $tp->{id} DF: $daily_fee POSTPAID: $postpaid\n" if ($debug > 1);
+    if ( $daily_fee > 0 ){
+      my $ulist = $Voip->user_list(
+        {
+          ACTIVATE       => "<=$DATE",
+          EXPIRE         => "0000-00-00,>$DATE",
+          VOIP_EXPIRE    => "0000-00-00,>$DATE",
+          SERVICE_STATUS => '0',
+          LOGIN_STATUS   => 0,
+          TP_ID          => $tp->{tp_id},
+          COLS_NAME      => 1,
+          REDUCTION      => '_SHOW',
+          BILL_ID        => '_SHOW',
+          ACTIVATE       => '_SHOW',
+          DEPOSIT        => '_SHOW',
+          CREDIT         => '_SHOW',
+          STATUS         => '_SHOW',
+          COLS_UPPER     => 1
+        }
+      );
+
+      foreach my $u ( @{$ulist} ){
+        $debug_output .= " Login: $u->{LOGIN} ($u->{UID}) REDUCTION: $u->{REDUCTION} DEPOSIT: $u->{DEPOSIT} CREDIT $u->{CREDIT} ACTIVE: $u->{ACTIVATE}\n" if ($debug > 3);
+
+        if ( $postpaid || ($u->{DEPOSIT} + $u->{CREDIT} > 0 && $u->{VOIP_STATUS} > 0) ){
+          my %FEES_PARAMS = (
+            DESCRIBE => "Voip: $lang{DAY_FEE} ($TP_ID)",
+            DATE     => "$ADMIN_REPORT{DATE} $TIME",
+            METHOD   => 1
+          );
+
+          $fees->take( $u, $daily_fee, \%FEES_PARAMS );
+        }
+      }
+    }
+  }
+
+  $DEBUG .= $debug_output;
+  return $debug_output;
+}
+
+#**********************************************************
+=head2 voip_monthly_fees($attr) - monthly_fees
+
+=cut
+#**********************************************************
+sub voip_monthly_fees{
+  my ($attr) = @_;
+
+  my $debug = $attr->{DEBUG} || 0;
+  my $debug_output = '';
+  $debug_output .= "Voip: Monthly periodic payments\n" if ($debug > 1);
+
+  use Users;
+  my $users = Users->new( $db, $admin, \%conf );
+
+  $LIST_PARAMS{TP_ID} = $attr->{TP_ID} if ($attr->{TP_ID});
+  my %VOIP_LIST_PARAMS = ();
+  $VOIP_LIST_PARAMS{LOGIN} = $attr->{LOGIN} if ($attr->{LOGIN});
+  $VOIP_LIST_PARAMS{EXT_BILL} = 1 if ($conf{BONUS_EXT_FUNCTIONS});
+
+  $ADMIN_REPORT{DATE} = $DATE if (!$ADMIN_REPORT{DATE});
+  my ($y, $m, $d) = split( /-/, $ADMIN_REPORT{DATE}, 3 );
+
+  if ( $debug > 6 ){
+    $Voip->{debug} = 1;
+  }
+
+  my $list = $tariffs->list(
+    {
+      %LIST_PARAMS,
+      MODULE     => 'Voip',
+      COLS_NAME  => 1,
+      COLS_UPPER => 1
+    }
+  );
+  my $date_unixtime = POSIX::mktime( 0, 0, 0, $d, ($m - 1), $y - 1900, 0, 0, 0 );
+
+  foreach my $TP_INFO ( @{$list} ){
+    $TP_INFO->{POSTPAID} = $TP_INFO->{PAYMENT_TYPE} || $TP_INFO->{POSTPAID_MONTHLY_FEE};
+    $debug_output .= "TP ID: $TP_INFO->{TP_ID} MF: $TP_INFO->{MONTH_FEE} POSTPAID: $TP_INFO->{POSTPAID}\n" if ($debug > 1);
+
+    if ( $TP_INFO->{MONTH_FEE} > 0 ){
+      my $ulist = $Voip->user_list(
+        {
+          ACTIVATE       => "<=$DATE",
+          EXPIRE         => "0000-00-00,>$DATE",
+          VOIP_EXPIRE    => "0000-00-00,>$DATE",
+          SERVICE_STATUS => '0;2',
+          LOGIN_STATUS   => 0,
+          TP_ID          => $TP_INFO->{TP_ID},
+          PAGE_ROWS      => 10000000,
+          COLS_NAME      => 1,
+          REDUCTION      => '_SHOW',
+          BILL_ID        => '_SHOW',
+          ACTIVATE       => '_SHOW',
+          DEPOSIT        => '_SHOW',
+          CREDIT         => '_SHOW',
+          %VOIP_LIST_PARAMS,
+          COLS_UPPER     => 1
+        }
+      );
+
+      foreach my $user ( @{$ulist} ){
+        $debug_output .= " Login: $user->{LOGIN} ($user->{UID}) REDUCTION: $user->{REDUCTION} DEPOSIT: $user->{deposit} CREDIT $user->{CREDIT} ACTIVE: $user->{ACTIVATE}\n" if ($debug > 3);
+        my %FEES_PARAMS = (
+          DESCRIBE => "Voip: $lang{MONTH_FEE} ($TP_INFO->{TP_ID})",
+          DATE     => $ADMIN_REPORT{DATE},
+          METHOD   => 1
+        );
+
+        if ( $user->{ACTIVATE} eq '0000-00-00' and $d == 1 ){
+          if ( $TP_INFO->{POSTPAID} || $user->{DEPOSIT} + $user->{CREDIT} > 0 ){
+            $fees->take( $user, $TP_INFO->{MONTH_FEE}, \%FEES_PARAMS );
+          }
+          elsif ( $conf{VOIP_ONEMONTH_INCOMMING_ALLOW} ){
+            my $change_status = ($user->{VOIP_STATUS} == 0) ? 2 : 1;
+            $Voip->user_change( { UID => $user->{UID}, DISABLE => $change_status } );
+            $debug_output .= " CHANGE STATUS: $user->{VOIP_STATUS} -> $change_status\n" if ($debug > 3);
+          }
+        }
+        elsif ( $user->{ACTIVATE} ne '0000-00-00' ){
+          if ( $TP_INFO->{POSTPAID} || $user->{DEPOSIT} + $user->{CREDIT} > 0 ){
+            my ($activate_y, $activate_m, $activate_d) = split( /-/, $user->{ACTIVATE}, 3 );
+            my $active_unixtime = POSIX::mktime( 0, 0, 0, $activate_d, ($activate_m - 1), $activate_y - 1900, 0, 0, 0 );
+
+            if ( $date_unixtime - $active_unixtime > 30 * 86400 ){
+              $fees->take( $user, $TP_INFO->{MONTH_FEE}, \%FEES_PARAMS );
+              $users->change( $user->{UID}, { ACTIVATE => $DATE, UID => $user->{UID} } );
+            }
+          }
+          elsif ( $conf{VOIP_ONEMONTH_INCOMMING_ALLOW} ){
+            my $change_status = ($user->{VOIP_STATUS} == 0) ? 2 : 1;
+            $Voip->user_change( { UID => $user->{UID}, DISABLE => $change_status } );
+            $debug_output .= " CHANGE STATUS: $user->{VOIP_STATUS} -> $change_status\n" if ($debug > 3);
+          }
+        }
+      }
+    }
+  }
+
+  $DEBUG .= $debug_output;
+  return $debug_output;
+}
+
+#**********************************************************
+=head2 voip_users_warning_messages()
+
+=cut
+#**********************************************************
+sub voip_users_warning_messages{
+
+  my %LIST_PARAMS = (USERS_WARNINGS => 'y');
+  my $list = $Voip->user_list( { %LIST_PARAMS } );
+
+  $ADMIN_REPORT{USERS_WARNINGS} = sprintf( "%-14s| %4s|%-20s| %9s| %8s|\n", $lang{LOGIN}, 'TP', $lang{TARIF_PLAN},
+    $lang{DEPOSIT},
+    $lang{CREDIT} ) . "---------------------------------------------------------------\n";
+  return 0 if ($Voip->{TOTAL} < 1);
+  my %USER_INFO = ();
+
+  foreach my $line ( @{$list} ){
+
+    #u.id, u.email, u.tp_id, u.credit, u.deposit, tp.name, tp.uplimit
+
+    $USER_INFO{LOGIN} = $line->[0];
+    $USER_INFO{TP_NAME} = $line->[5];
+    $USER_INFO{TP_ID} = $line->[2];
+    $USER_INFO{DEPOSIT} = $line->[4];
+    $USER_INFO{CREDIT} = $line->[3];
+
+    my $email = ((!defined( $line->[1] )) || $line->[1] eq '') ? (($conf{USERS_MAIL_DOMAIN}) ? "$line->[0]\@$conf{USERS_MAIL_DOMAIN}" : '') : "$line->[1]";
+
+    if ( $email eq '' ){
+      next;
+    }
+
+    $ADMIN_REPORT{USERS_WARNINGS} .= sprintf( "%-14s| %4d|%-20s| %9.4f| %8.2f|\n", $USER_INFO{LOGIN}, $USER_INFO{TP_ID},
+      $USER_INFO{TP_NAME}, $USER_INFO{DEPOSIT}, $USER_INFO{CREDIT} );
+
+    my $message = $html->tpl_show( _include( 'dv_users_warning_messages', 'Dv' ), \%USER_INFO, { notprint => 'yes' } );
+
+    sendmail( "$conf{ADMIN_MAIL}", "$email", "������������ ������� ����������.", "$message", "$conf{MAIL_CHARSET}",
+      "2 (High)" );
+  }
+
+  $ADMIN_REPORT{USERS_WARNINGS} .= "---------------------------------------------------------------
+$lang{TOTAL}: $Voip->{TOTAL}\n";
+
+  return 1;
+}
+
+#**********************************************************
+=head2 voip_gk_console() voip_gk_console
+
+=cut
+#**********************************************************
+sub voip_gk_console{
+
+  #use Nas;
+  #my $nas = Nas->new( $db, \%conf );
+
+  my $list = $Nas->list( { TYPE => 'gnugk', PAGE_ROWS => 10000 } );
+  my $table = $html->table(
+    {
+      caption    => "$lang{NAS}",
+      width      => '100%',
+      title      => [ "#", "$lang{NAME}", 'NAS-Identifier', 'IP' ],
+      cols_align => [ 'right', 'left', 'left', 'right' ],
+      qs         => $pages_qs,
+      ID         => 'NAS_INFO'
+    }
+  );
+
+  #my ($host, $user, $password);
+  foreach my $line ( @{$list} ){
+    if ( $FORM{NAS_ID} && $line->[0] eq $FORM{NAS_ID} ){
+      $table->{rowcolor} = $_COLORS[4];
+    }
+    else{
+      undef($table->{rowcolor});
+    }
+
+    $table->addrow( $html->button( "$line->[0]", "index=$index&NAS_ID=$line->[0]" ), $line->[1], $line->[2],
+      $line->[3] );
+  }
+  print $table->show();
+
+  if ( $FORM{NAS_ID} ){
+
+    my %gk_commands = (
+      help                         => 'help',
+      unregisteralias              => 'unregisteralias',
+      PrintAllRegistrations        => 'PrintAllRegistrations, r, ? - Show all registered endpoints',
+      PrintAllRegistrationsVerbose => 'PrintAllRegistrationsVerbose, rv, ?? - Show details of all registered endpoints',
+      PrintCurrentCalls            =>
+      "PrintCurrentCalls, c, ! - Show all current calls using the same ACF syntax as in call establishment. ",
+      PrintCurrentCallsVerbose     => "PrintCurrentCallsVerbose, cv, !!  - Show details of all current calls.",
+      Find                         => "Find, f - Find a registered endpoint by an alias or a prefix. ",
+      FindVerbose                  =>
+      "FindVerbose, fv - Find details of a registered endpoint by an alias or a prefix. ",
+      UnregisterIP                 => "Forcedly unregister an endpoint by IP and call signalling port. ",
+      UnregisterAllEndpoints       => "Forcedly unregister all registered endpoints",
+
+      who                          => 'who',
+      statistics                   => 'statistics',
+      shutdown                     => 'shutdown',
+      debug                        => 'debug',
+      disconnectalias              => 'disconnectalias',
+      disconnectcall               => 'disconnectcall',
+      disconnectendpoint           => 'disconnectendpoint',
+      disconnectip                 => 'disconnectip',
+      disconnectsession            => 'disconnectsession',
+      version                      => 'version',
+      reload                       => 'reload',
+
+    );
+
+    if ( $FORM{command} ) {
+      $Nas->info( { NAS_ID => $FORM{NAS_ID} } );
+      my @commands = ();
+
+      require Abills::Nas::Control;
+      Abills::Nas::Control->import();
+      #my $Nas_cmd = Abills::Nas::Control->new($db, \%conf);
+
+      push @commands, "login:\t$Nas->{NAS_MNG_USER}";
+      push @commands, "assword:\t$Nas->{NAS_MNG_PASSWORD}";
+      push @commands, ";\t$FORM{command}";
+      push @commands, ";\tquit";
+
+      my $result = Abills::Nas::Control::telnet_cmd( "$Nas->{NAS_MNG_IP_PORT}", \@commands, { debug => 1 } );
+      my $total = 0;
+      my @rows = split( /\n/, $result );
+      my @registred = ();
+
+      if ( $FORM{command} =~ /\!|CurrentCalls/ ){
+        $table = $html->table(
+          {
+            width      => '100%',
+            title      =>
+            [ 'NUMBER', 'ACF', 'Caller_IP:Port', 'Caller_EPID', 'CRV', 'DestinationInfo', 'SrcInfo', 'IsAnswered', '-' ]
+            ,
+            cols_align => [ 'right', 'center', 'right', 'left', 'left', 'center' ],
+            qs         => $pages_qs,
+            caption    => 'Associated'
+          }
+        );
+
+        @rows = split( /\n/, $result );
+
+        foreach my $line ( @rows ){
+          if ( $line =~ /Dial/ ){
+            #print "#      Caller_Aliases|Callee_Aliases|Bandwidth|Connected_Time <r>";
+            @registred = split( /\|/, $line );
+            $table->addrow( @registred );
+            $total++;
+          }
+          elsif ( $line =~ /ACF/ ){
+            @registred = split( /\|/, $line );
+
+            #ACF|Caller_IP:Port|Caller_EPID|CRV|DestinationInfo|SrcInfo|IsAnswered;
+            #ACF|Callee_IP:Port|Callee_EPID|CRV|DestinationInfo|SrcInfo|IsAnswered;
+            $table->addrow( '&nbsp;', @registred,
+              $html->button( "H", "index=$index&NAS_ID=$FORM{NAS_ID}&command=disconnectcall+$registred[4]",
+                { TITLE => 'Hangup', BUTTON => 1 } ) );
+          }
+        }
+        print $table->show();
+
+        $table = $html->table(
+          {
+            caption    => 'Commands',
+            width      => '100%',
+            cols_align => [ 'right', 'right' ],
+            rows       => [ [ "$lang{TOTAL}:", $html->b( $total ) ] ]
+          }
+        );
+
+        print $table->show();
+
+        #CurrentCalls
+        #Call No. 1 | CallID 06 20 60 00 00 60 40 10 00 00 00 0a f4 53 db fd | 5 | 175
+        #Dial 600:dialedDigits
+        #ACF|192.168.101.23:2832|9868_ag1|8354|600:dialedDigits|101:dialedDigits|false;
+        #ACF|192.168.101.18:1720|9870_ag1|41122|600:dialedDigits|101:dialedDigits|true;
+        #Number of Calls: 1 Active: 0 From Neighbor: 0 From Parent: 0
+
+      }
+      elsif ( $FORM{command} =~ /\?|PrintAllRegistrations$/ ){
+        $table = $html->table(
+          {
+            width      => '100%',
+            title      => [ "#", "IP", 'NUMBER', "$lang{TYPE}", "ID", '' ],
+            cols_align => [ 'right', 'right', 'left', 'center', 'left', 'center' ],
+            qs         => $pages_qs,
+            caption    => 'Associated'
+          }
+        );
+
+        foreach my $line ( @rows ){
+          if ( $line =~ /RCF/ ){
+            @registred = split( /\|/, $line );
+            push @registred, $html->button( 'H', "index=$index&NAS_ID=$FORM{NAS_ID}&command=UnregisterIP+$registred[1]",
+                { TITLE => 'Hangup', BUTTON => 1 } );
+            $table->addrow( @registred );
+          }
+        }
+        print $table->show();
+
+        $table = $html->table(
+          {
+            width      => '100%',
+            cols_align => [ 'right', 'right' ],
+            rows       => [ [ "$lang{TOTAL}:", "<b>$total</b>" ] ]
+          }
+        );
+        print $table->show();
+      }
+      else{
+        $result =~ s/\n/<br>/g;
+        $html->message( 'info', $lang{INFO}, "$result" );
+      }
+    }
+
+    print $html->form_main(
+        {
+          CONTENT => $html->form_input( 'command', "$FORM{command}" ),
+          HIDDEN  => {
+            index  => "$index",
+            NAS_ID => "$FORM{NAS_ID}"
+          },
+          SUBMIT  => { go => "$lang{SHOW}" }
+        }
+      );
+
+    $table = $html->table(
+      {
+        caption    => 'Commands',
+        width      => '100%',
+        title      => [ "_COMMAND", "_HELP" ],
+        cols_align => [ 'left', 'left' ]
+      }
+    );
+
+    foreach my $k ( sort keys %gk_commands ){
+      $table->addrow( $html->button( "$k", "index=$index&NAS_ID=$FORM{NAS_ID}&command=$k" ), $gk_commands{$k} );
+    }
+    print $table->show();
+  }
+
+  return 1;
+}
+
+#***********************************************************
+=head2 oip_sheduler($type, $action, $uid) - voip_sheduler
+
+=cut
+#***********************************************************
+sub voip_sheduler{
+  my ($type, $action, $uid) = @_;
+
+  $Voip->user_info( $uid );
+  if ( $type eq 'tp' ){
+    $Voip->user_change(
+      {
+        UID   => $uid,
+        TP_ID => $action
+      }
+    );
+  }
+
+  return 1;
+}
+
+#***********************************************************
+=head2 voip_mk_users_conf($attr) - Add asterisk user
+
+=cut
+#***********************************************************
+sub voip_mk_users_conf{
+  my ($attr) = @_;
+
+  my $content = '';
+
+  my $list = $Voip->user_list(
+    {
+      PAGE_ROWS => 100000,
+      CID       => '_SHOW',
+      NUMBER    => '_SHOW',
+      PASSWORD  => '_SHOW',
+      IP        => '_SHOW',
+      FIO       => '_SHOW',
+      REDUCTION => '_SHOW',
+      BILL_ID   => '_SHOW',
+      ACTIVATE  => '_SHOW',
+      DEPOSIT   => '_SHOW',
+      CREDIT    => '_SHOW',
+      STATUS    => '_SHOW',
+      CID       => '_SHOW',
+      COLS_NAME => 1
+    }
+  );
+
+  foreach my $line ( @{$list} ){
+    my %info = (
+      LOGIN     => $line->{login},
+      FIO       => $line->{fio},
+      NUMBER    => $line->{number},
+      CALLER_ID => $line->{cid},
+      PASSWORD  => $line->{password},
+      HOST      => ($line->{ip} eq '0.0.0.0') ? 'dynamic' : $line->{ip},
+      DATE      => $DATE,
+      TIME      => $TIME
+    );
+    $content .= $html->tpl_show( _include( 'voip_users_conf', 'Voip' ), \%info,
+      { OUTPUT2RETURN => 1, CONFIG_TPL => 1 } );
+  }
+
+  if ( $conf{VOIP_ASTERISK_USERS} ){
+    my $dir_name = dirname( $conf{VOIP_ASTERISK_USERS} );
+    my $filename = $conf{VOIP_ASTERISK_USERS};
+    $filename =~ s/$dir_name\///;
+    file_op(
+      {
+        WRITE      => 1,
+          FILENAME => $filename,
+          PATH     => $dir_name,
+          CONTENT  => $content
+      }
+    );
+  }
+
+  if ( $conf{VOIP_ASTERISK_RESTART} ){
+    cmd(
+      $conf{VOIP_ASTERISK_RESTART},
+      {
+        PARAMS  => { %FORM, %{ ($attr) ? $attr : {} }, },
+        SET_ENV => 1
+      }
+    );
+  }
+
+  return 1;
+}
+
+#***********************************************************
+=head2 voip_report
+
+=cut
+#***********************************************************
+sub voip_report{
+  my ($type, $attr) = @_;
+  my $REPORT = "Module: Voip\n";
+
+  %LIST_PARAMS = %{ $attr->{LIST_PARAMS} } if (defined( $attr->{LIST_PARAMS} ));
+
+  return $REPORT;
+}
+
+#**********************************************************
+=head2
+
+=cut
+#**********************************************************
+sub voip_payments_maked{
+  my ($attr) = @_;
+
+  $user = $attr->{USER_INFO} if ($attr->{USER_INFO});
+
+  if ( !$FORM{DISABLE} ){
+    $Voip->user_info( $attr->{USER_INFO}->{UID} );
+    if ( $Voip->{TOTAL} < 1 ){
+      return 0;
+    }
+    elsif(! $Voip->{TP_NUM}) {
+      return 0;
+    }
+
+    my $deposit = $attr->{USER_INFO}->{DEPOSIT} + (($attr->{USER_INFO}->{CREDIT} && $attr->{USER_INFO}->{CREDIT} > 0) ? $attr->{USER_INFO}->{CREDIT} : ($Voip->{TP_CREDIT} || 0 ));
+    my $abon_fees = $Voip->{MONTH_ABON} + $Voip->{DAY_ABON};
+
+    if ($attr->{USER_INFO}->{REDUCTION} && $attr->{USER_INFO}->{REDUCTION} > 0) {
+      $abon_fees = $abon_fees * (100 - $attr->{USER_INFO}->{REDUCTION}) / 100;
+    }
+
+    if ( $Voip->{DISABLE} > 1 && $deposit > $abon_fees ){
+      $Voip->user_change(
+        {
+          UID     => $attr->{USER_INFO}->{UID},
+          TP_ID   => $Voip->{TP_ID},
+          DISABLE => 0
+        }
+      );
+
+      $Voip->{ACCOUNT_ACTIVATE} = $attr->{USER_INFO}->{ACTIVATE} || '0000-00-00';
+      voip_get_month_fee( $Voip, $attr );
+    }
+  }
+
+  voip_mk_users_conf();
+
+  return 1;
+}
+
+#**********************************************************
+=head2 voip_provision($attr) -  Provision
+
+=cut
+#**********************************************************
+sub voip_provision{
+
+  my $list = $Nas->list( { TYPE => 'ls_pap2t;ls_spa8000', COLS_NAME => 1 } );
+
+  my $hosts = '';
+  foreach my $line ( @{$list} ){
+    $hosts .= $html->tpl_show(
+      _include( 'voip_provision_dhcp_host', 'Voip' ),
+      {
+        NAS_ID   => $line->{nas_id},
+        HOSTNAME => $line->{nas_name},
+        MAC      => $line->{mac},
+        IP       => $line->{nas_ip},
+        ROUTERS  => '',
+      },
+      { OUTPUT2RETURN => 1 }
+    );
+  }
+
+  my $conf = $html->tpl_show( _include( 'voip_provision_dhcp_conf', 'Voip' ), { HOSTS => $hosts },
+    { OUTPUT2RETURN => 1 } );
+
+  if ( open( my $fh, '>', "$base_dir/Abills/templates/provision_dhcp.conf" ) ){
+    print $fh "$conf\n";
+    close( $fh );
+  }
+  else{
+
+  }
+
+  return 1;
+}
+
+#**********************************************************
+=head2 voip_get_month_fee($Voip, $attr)
+
+=cut
+#**********************************************************
+sub voip_get_month_fee {
+  my ($Voip, $attr) = @_;
+
+  my %total_sum = (
+    ACTIVATE  => 0,
+    MONTH_FEE => 0
+  );
+
+  if ( $user->{UID} ){
+    $users = $user;
+  }
+  else{
+    $users = Users->new( $db, $admin, \%conf );
+    $user = $users->info( $Voip->{UID} );
+  }
+
+  #Get active price
+  if ( $Voip->{TP_INFO}->{ACTIV_PRICE} && $Voip->{TP_INFO}->{ACTIV_PRICE} > 0 ){
+    my $date = ($user->{ACTIVATE} ne '0000-00-00') ? $user->{ACTIVATE} : $DATE;
+    my $time = ($user->{ACTIVATE} ne '0000-00-00') ? '00:00:00' : $TIME;
+
+    if ( !$Voip->{OLD_STATUS} || $Voip->{OLD_STATUS} == 2 ){
+      $fees->take(
+        $user,
+        $Voip->{TP_INFO}->{ACTIV_PRICE},
+        {
+          DESCRIBE => "$lang{ACTIVATE} $lang{TARIF_PLAN}",
+          DATE     => "$date $time"
+        }
+      );
+      $total_sum{ACTIVATE} = $Voip->{TP_INFO}->{ACTIV_PRICE};
+      $html->message( 'info', $lang{INFO}, "- $lang{ACTIVATE} $lang{TARIF_PLAN}" ) if ($html);
+    }
+  }
+
+  #Get month fee
+  if ($Voip->{TP_INFO}->{MONTH_FEE} && $Voip->{TP_INFO}->{MONTH_FEE} > 0 ){
+    my $sum = $Voip->{TP_INFO}->{MONTH_FEE};
+
+    if ( $Voip->{TP_INFO}->{EXT_BILL_ACCOUNT} ){
+      if ( $user->{EXT_BILL_ID} ){
+        if ( !$conf{BONUS_EXT_FUNCTIONS} || ($conf{BONUS_EXT_FUNCTIONS} && $user->{EXT_BILL_DEPOSIT} > 0) ){
+          $user->{MAIN_BILL_ID} = $user->{BILL_ID};
+          $user->{BILL_ID} = $user->{EXT_BILL_ID};
+        }
+      }
+    }
+
+    my $message = '';
+
+    #Current Month
+    my ($y, $m, $d) = split( /-/, $DATE, 3 );
+
+    my ($active_y, $active_m, $active_d) = split( /-/, $Voip->{ACCOUNT_ACTIVATE} || $users->{ACTIVATE}, 3 );
+
+    if ( int( "$y$m$d" ) < int( "$active_y$active_m$active_d" ) ){
+      return \%total_sum;
+    }
+
+    if ( $Voip->{TP_INFO}->{PERIOD_ALIGNMENT} && !$Voip->{TP_INFO}->{ABON_DISTRIBUTION} ){
+      $message = "$lang{MONTH_ALIGNMENT}, ";
+      my $days_in_month = ($m != 2 ? (($m % 2) ^ ($m > 7)) + 30 : (!($y % 400) || !($y % 4) && ($y % 25) ? 29 : 28));
+
+      if ( $Voip->{ACCOUNT_ACTIVATE} && $Voip->{ACCOUNT_ACTIVATE} ne '0000-00-00' ){
+        $days_in_month = ($active_m != 2 ? (($active_m % 2) ^ ($active_m > 7)) + 30 : (!($active_y % 400) || !($active_y % 4) && ($active_y % 25) ? 29 : 28));
+        $d = $active_d;
+      }
+      $conf{START_PERIOD_DAY} = 1 if (!$conf{START_PERIOD_DAY});
+      my $calculation_days = ($d < $conf{START_PERIOD_DAY}) ? $conf{START_PERIOD_DAY} - $d : $days_in_month - $d + $conf{START_PERIOD_DAY};
+
+      $sum = sprintf( "%.2f", ($sum / $days_in_month) * $calculation_days );
+    }
+
+    return \%total_sum if ($sum == 0);
+
+    my $periods = 0;
+    if ( int( $active_m ) > 0 && int( $active_m ) < $m ){
+      $periods = $m - $active_m;
+      if ( int( $active_d ) > int( $d ) ){
+        $periods--;
+      }
+      $active_m++;
+    }
+    elsif ( int( $active_m ) > 0 && (int( $active_m ) >= int( $m ) && int( $active_y ) < int( $y )) ){
+      $periods = 12 - $active_m + $m;
+      if ( int( $active_d ) > int( $d ) ){
+        $periods--;
+      }
+    }
+
+    #Make reduction
+    if ( $user->{REDUCTION} > 0 && $Voip->{TP_INFO}->{REDUCTION_FEE} ){
+      $sum = $sum * (100 - $users->{REDUCTION}) / 100;
+    }
+
+    $message .= "Voip: $lang{MONTH_FEE_SHORT} $Voip->{TP_INFO}->{NAME} ($Voip->{TP_INFO}->{ID})";
+
+    if ( $Voip->{TP_INFO}->{ABON_DISTRIBUTION} ){
+      $sum = $sum / (($m != 2 ? (($m % 2) ^ ($m > 7)) + 30 : (!($y % 400) || !($y % 4) && ($y % 25) ? 29 : 28)));
+      $message .= " - $lang{ABON_DISTRIBUTION}";
+    }
+
+    if ( $Voip->{ACCOUNT_ACTIVATE} && $Voip->{ACCOUNT_ACTIVATE} ne '0000-00-00' && ($Voip->{OLD_STATUS} == 5) ){
+
+      #if activation in cure month curmonth
+      if ( $periods == 0 || ($periods == 1 && $d < $active_d) ){
+        $periods = -1;
+      }
+      else{
+        $periods -= 1;
+      }
+    }
+
+    $m = $active_m if ($active_m > 0);
+
+    for ( my $i = 0; $i <= $periods; $i++ ){
+      if ( $m > 12 ){
+        $m = 1;
+        $active_y = $active_y + 1;
+      }
+
+      $m = sprintf( "%.2d", $m );
+
+      if ( $i > 0 ){
+        if ( $user->{REDUCTION} > 0 && $Voip->{TP_INFO}->{REDUCTION_FEE} ){
+          $sum = $Voip->{TP_INFO}->{MONTH_FEE} * (100 - $users->{REDUCTION}) / 100;
+        }
+
+        #$message = "$lang{MONTH_FEE}: $sum ($Voip->{TP_INFO}->{ID})";
+        $message = "Voip: $lang{MONTH_FEE_SHORT} $Voip->{TP_INFO}->{NAME} ($Voip->{TP_INFO}->{ID})";
+
+        if ( $Voip->{ACCOUNT_ACTIVATE} ){
+          $DATE = $Voip->{ACCOUNT_ACTIVATE};
+          my $end_period = POSIX::strftime( '%Y-%m-%d',
+            localtime( (POSIX::mktime( 0, 0, 0, $active_d, ($m - 1), ($active_y - 1900), 0, 0, 0 ) + 30 * 86400) ) );
+          $message .= " ($DATE-$end_period)";
+
+          $users->change(
+            $Voip->{UID},
+            {
+              ACTIVATE => "$DATE",
+              UID      => $Voip->{UID}
+            }
+          );
+          $Voip->{ACCOUNT_ACTIVATE} = POSIX::strftime( '%Y-%m-%d',
+            localtime( (POSIX::mktime( 0, 0, 0, $active_d, ($m - 1), ($active_y - 1900), 0, 0, 0 ) + 31 * 86400) ) );
+        }
+        else{
+          $DATE = "$active_y-$m-01";
+          my $days_in_month = ($m != 2 ? (($m % 2) ^ ($m > 7)) + 30 : (!($active_y % 400) || !($active_y % 4) && ($active_y % 25) ? 29 : 28));
+          $message .= " ($DATE-$active_y-$m-$days_in_month)";
+        }
+      }
+      elsif ( $Voip->{ACCOUNT_ACTIVATE} && $Voip->{ACCOUNT_ACTIVATE} ne '0000-00-00' ){
+        if ( $Voip->{TP_INFO}->{PERIOD_ALIGNMENT} ){
+          $users->change(
+            $Voip->{UID},
+            {
+              ACTIVATE => '0000-00-00',
+              UID      => $Voip->{UID}
+            }
+          );
+        }
+        elsif ( $Voip->{OLD_STATUS} == 5 ){
+          $users->change(
+            $Voip->{UID},
+            {
+              ACTIVATE => ($conf{DV_CURDATE_ACTIVATE}) ? $DATE : "$active_y-$m-$active_d",
+              UID      => $Voip->{UID}
+            }
+          );
+        }
+        else{
+          $DATE = "$active_y-$m-$active_d";
+        }
+        my $end_period = POSIX::strftime( '%Y-%m-%d',
+          localtime( (POSIX::mktime( 0, 0, 0, $active_d, ($m - 1), ($active_y - 1900), 0, 0, 0 ) + 30 * 86400) ) );
+        $Voip->{ACCOUNT_ACTIVATE} = POSIX::strftime( '%Y-%m-%d',
+          localtime( (POSIX::mktime( 0, 0, 0, $active_d, ($m - 1), ($active_y - 1900), 0, 0, 0 ) + 31 * 86400) ) );
+        $message .= " ($active_y-$m-$active_d-$end_period)";
+      }
+      else{
+        my $days_in_month = ($m != 2 ? (($m % 2) ^ ($m > 7)) + 30 : (!($active_y % 400) || !($active_y % 4) && ($active_y % 25) ? 29 : 28));
+        my $start_date = ($Voip->{TP_INFO}->{PERIOD_ALIGNMENT}) ? (($Voip->{ACCOUNT_ACTIVATE} && $Voip->{ACCOUNT_ACTIVATE} ne '0000-00-00') ? $Voip->{ACCOUNT_ACTIVATE} : $DATE) : "$y-$m-01";
+        $message .= " ($start_date-$y-$m-$days_in_month)";
+      }
+
+      $TIME = "00:00:00";
+      if ( $conf{EXT_BILL_ACCOUNT} ){
+        if ( $user->{EXT_BILL_DEPOSIT} < $sum && $user->{MAIN_BILL_ID} ){
+          $sum = $sum - $user->{EXT_BILL_DEPOSIT};
+          $fees->take(
+            $users,
+            $user->{EXT_BILL_DEPOSIT},
+            {
+              DESCRIBE => $message,
+              METHOD   => ($Voip->{TP_INFO}->{FEES_METHOD}) ? $Voip->{TP_INFO}->{FEES_METHOD} : 1,
+              DATE     => "$DATE $TIME"
+            }
+          );
+          $user->{BILL_ID} = $user->{MAIN_BILL_ID};
+          $user->{MAIN_BILL_ID} = undef;
+        }
+      }
+
+      if ( $sum > 0 ){
+        $fees->take(
+          $users, $sum,
+          {
+            DESCRIBE => $message,
+            METHOD   => ($Voip->{TP_INFO}->{FEES_METHOD}) ? $Voip->{TP_INFO}->{FEES_METHOD} : 1,
+            DATE     => "$DATE $TIME"
+          }
+        );
+
+        $total_sum{MONTH_FEE} += $sum;
+        if ( $fees->{errno} ){
+          $html->message( 'err', $lang{ERROR}, "[$fees->{errno}] $fees->{errstr}" ) if (!$attr->{QUITE});
+        }
+        else{
+          $html->message( 'info', $lang{INFO}, $message ) if ($html && !$attr->{QUITE});
+        }
+      }
+
+      $m++;
+    }
+  }
+
+  return \%total_sum;
+}
+
+#**********************************************************
+=head2 voip_ivr_log()
+
+=cut
+#**********************************************************
+sub voip_ivr_log{
+  #my ($attr) = @_;
+
+  if ( !$FORM{sort} ){
+    $LIST_PARAMS{SORT} = 1;
+    $LIST_PARAMS{DESC} = 'DESC';
+  }
+
+  if ( $FORM{change} ){
+
+  }
+
+  my %ivr_status = (
+    0 => 'Unauth',
+    1 => 'Auth',
+    2 => 'Error',
+    3 => 'Tech message',
+    4 => 'Complete'
+  );
+
+  $Voip->{STATUS_SEL} = $html->form_select(
+    'STATUS',
+    {
+      SELECTED => $FORM{STATUS} || '',
+      SEL_HASH => {
+        '' => $lang{ALL},
+        %ivr_status
+      },
+      NO_ID    => 1,
+      STYLE    => \@service_status_colors,
+    }
+  );
+
+  if ( $FORM{search_form} ){
+    form_search( { SEARCH_FORM =>
+        $html->tpl_show( _include( 'voip_ivr_search', 'Voip' ), { %{$Voip}, %FORM }, { OUTPUT2RETURN => 1 } ) } );
+  }
+
+  my @status_vals = ();
+  foreach my $id (sort keys(%ivr_status)) {
+    push @status_vals, $ivr_status{$id};
+  }
+
+  result_former({
+    INPUT_DATA      => $Voip,
+    FUNCTION        => 'log_list',
+    BASE_FIELDS     => 2,
+    DEFAULT_FIELDS  => 'ID,DATETIME,CALL_PHONE,CALL_COMMENT,STATUS,UID',
+    FUNCTION_FIELDS => 'change,del',
+    EXT_TITLES      => {
+      call_phone    => $lang{PHONE},
+      call_comment  => $lang{COMMENTS},
+      datetime => "$lang{DATE} $lang{TIME}",
+      ip       => 'IP',
+      duration => $lang{DURATION},
+      status   => $lang{STATUS},
+    },
+    TABLE           => {
+      width   => '100%',
+      caption => "IVR",
+      qs      => $pages_qs,
+      #header  => $status_bar,
+      ID      => 'VOIP_USERS_LIST',
+      #SHOW_COLS   => \%SEARCH_TITLES,
+      #ACTIVE_COLS => \%ACTIVE_TITLES,
+      EXPORT  => 1,
+      MENU    => "$lang{SEARCH}:index=$index&search_form=1:search",
+    },
+    STATUS_VALS     => \@status_vals,
+    MAKE_ROWS       => 1,
+    MODULE          => 'Voip',
+    TOTAL           => 1
+  });
+
+  return 1;
+}
+
+#**********************************************************
+=head2 voip_ivr_menu() - Voip IVR menu
+
+=cut
+#**********************************************************
+sub voip_ivr_menu{
+
+  $Voip->{ACTION} = 'add';
+  $Voip->{LNG_ACTION} = $lang{ADD};
+
+  if ( $FORM{import} ){
+    if ( $FORM{add} ){
+      my $import_info = import_former( \%FORM );
+      my $total = $#{ $import_info } + 1;
+      foreach my $_info ( @{$import_info} ){
+        $Voip->ivr_menu_add( $_info );
+        if ( _error_show( $Voip ) ){
+          return 0;
+        }
+      }
+
+      $html->message( 'info', $lang{INFO},
+        "$lang{ADDED}\n $lang{FILE}: $FORM{UPLOAD_FILE}{filename}\n Size: $FORM{UPLOAD_FILE}{Size}\n Count: $total" );
+      return 1
+    }
+
+    my $import_fields = $html->form_select( 'IMPORT_FIELDS', {
+      SELECTED  => $FORM{IMPORT_FIELDS},
+      SEL_ARRAY => [
+
+      ],
+      EX_PARAMS => 'multiple="multiple"'
+    });
+
+    my $encode = $html->form_select(
+      'ENCODE',
+      {
+        SELECTED  => $FORM{ENCODE},
+        SEL_ARRAY => [ '', 'win2utf8', 'utf82win', 'win2koi', 'koi2win', 'win2iso', 'iso2win', 'win2dos', 'dos2win' ],
+      }
+    );
+
+    my $extra_row = $html->tpl_show( templates( 'form_row' ), {
+      ID    => 'ENCODE',
+      NAME  => $lang{ENCODE},
+      VALUE => $encode
+    },
+    { OUTPUT2RETURN => 1 } );
+
+    $html->tpl_show( templates( 'form_import' ), {
+      #IMPORT_FIELDS     => 'LOGIN,CONTRACT_ID,FIO,PHONE,ADDRESS_STREET,ADDRESS_BUILD,ADDRESS_FLAT,PASPORT_NUM,PASPORT_GRANT',
+      CALLBACK_FUNC     => 'voip_ivr_menu',
+      IMPORT_FIELDS_SEL => $import_fields,
+      EXTRA_ROWS        => $extra_row
+    });
+
+    return 1;
+  }
+  elsif ( $FORM{add} ){
+    $Voip->ivr_menu_add( { %FORM } );
+    if ( !$Voip->{errno} ){
+      $html->message( 'info', $lang{INFO}, "$lang{ADDED}" );
+    }
+  }
+  elsif ( $FORM{change} ){
+    $Voip->ivr_menu_change( { %FORM } );
+    if ( !$Voip->{errno} ){
+      $html->message( 'info', $lang{INFO}, "$lang{CHANGED}" );
+    }
+  }
+  elsif ( $FORM{chg} ){
+    $Voip->ivr_menu_info( { %FORM, ID => $FORM{chg} } );
+    if ( !$Voip->{errno} ){
+      $html->message( 'info', $lang{INFO}, "$lang{CHANGING}" );
+    }
+    $Voip->{ACTION} = 'change';
+    $Voip->{LNG_ACTION} = $lang{CHANGE};
+  }
+  elsif ( $FORM{del} && $FORM{COMMENTS} ){
+    $Voip->ivr_menu_del( { ID => $FORM{del} } );
+    if ( !$Voip->{errno} ){
+      $html->message( 'info', $lang{INFO}, "$lang{DELETED}" );
+    }
+  }
+
+  _error_show( $Voip );
+
+  my $list = $Voip->ivr_menu_list( { MAIN_ID => 0, NUMBER => '_SHOW', NAME => '_SHOW', COLS_NAME => 1 } );
+  my %menu_hash = ();
+  foreach my $line ( @{$list} ){
+    if ( $line->{number} ){
+      $menu_hash{$line->{number}} = $line->{name};
+    }
+  }
+
+  $Voip->{MAIN_ID_SEL} = $html->form_select(
+    'MAIN_ID',
+    {
+      SELECTED    => $Voip->{MAIN_ID},
+      SEL_LIST    => $list,
+      SEL_KEY     => 'number',
+      SEL_VALUE   => 'id,number,name',
+      NO_ID       => 1,
+      SEL_OPTIONS => { '' => $lang{MAIN_MENU} },
+    }
+  );
+
+  $Voip->{DISABLE} = 'checked' if ($Voip->{DISABLE});
+  $html->tpl_show( _include( 'voip_ivr_menu', 'Voip' ), $Voip );
+
+  delete( $Voip->{COL_NAMES_ARR} );
+  my $table;
+  ($table, $list) = result_former(
+    {
+      INPUT_DATA        => $Voip,
+        FUNCTION        => 'ivr_menu_list',
+        BASE_FIELDS     => 1,
+        DEFAULT_FIELDS  => 'MAIN_ID,NUMBER,NAME,DISABLE,COMMENTS',
+        FUNCTION_FIELDS => 'change,del',
+        SKIP_USER_TITLE => 1,
+        EXT_TITLES      => {
+        id         => '#',
+        main_id    => $lang{MAIN},
+        number     => $lang{NUM},
+        name       => $lang{NAME},
+        disable    => $lang{DISABLE},
+        function   => $lang{FUNCTION},
+        comments   => $lang{COMMENTS},
+        audio_file => $lang{AUDIO_FILE}
+      },
+        TABLE           => {
+        width   => '100%',
+        caption => "IVR $lang{MENU}",
+        qs      => $pages_qs,
+        #header  => $status_bar,
+        ID      => 'VOIP_IVR_MENU',
+        EXPORT  => 1,
+        IMPORT  => "$SELF_URL?get_index=voip_ivr_menu&import=1&header=2",
+      },
+        SELECT_VALUE    => {
+        disable => {
+          0 => "$lang{ENABLE}",
+          1 => "$lang{DISABLE}"
+        },
+        main_id => \%menu_hash
+      },
+        MAKE_ROWS       => 1,
+        #MODULE       => 'Voip',
+        TOTAL           => 1
+    }
+  );
+
+  return 1;
+}
+
+
+1
+

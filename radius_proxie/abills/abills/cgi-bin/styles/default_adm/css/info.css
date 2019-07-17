@@ -1,0 +1,60 @@
+.comments-wrapper {
+    border: 1px solid silver;
+    padding: 10px;
+}
+
+.comment-wrapper {
+    padding: 5px;
+    margin-bottom: 5px;
+    border: 1px solid silver;
+
+    border-radius: 5px;
+}
+
+.comment-text {
+    font-weight: 600;
+    font-size: 1.2em;
+}
+
+.comment-info {
+    font-weight: 400;
+    font-size: 0.9em;
+}
+
+.glyphicon {
+    cursor: pointer;
+}
+
+.info-images {
+    /* Masonry container */
+    -moz-column-count: 2;
+    -moz-column-gap: 1em;
+    -webkit-column-count: 2;
+    -webkit-column-gap: 1em;
+    column-count: 2;
+    column-gap: 1em;
+}
+
+.info-image {
+    /* Masonry bricks or child elements */
+    position: relative;
+    background-color: #eee;
+    display: inline-block;
+    margin: 0 0 1em;
+    width: 100%;
+
+    cursor: pointer;
+}
+
+.info-image .image-controls {
+    position: absolute;
+    right: 0.5em;
+    top: 0.5em;
+
+    font-size: 1.5em;
+    z-index: auto;
+}
+
+.info-image .image-controls:hover {
+    color: red;
+}

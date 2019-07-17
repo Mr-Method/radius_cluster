@@ -1,0 +1,20 @@
+$lang{LIGHT}='Свет';
+$lang{WATER}='Вода';
+$lang{GAS}='Газ';
+$lang{PUBLIC_UTILITIES}='Коммунальные услуги';
+$lang{INFO_ALREADY_ADDED}='Информация за эту дату уже есть в системе';
+$lang{CANT_CHANGE}='Невозможно изменить данные';
+$lang{COMMUNAL}='Квартплата';
+$lang{INPUT_MONEY}='Введите оплаченую сумму';
+$lang{INPUT_COUNTER}='Введите показатель счетчика';
+$lang{ORGANIZER}='Органайзер';
+$lang{DATE}='Дата';
+$lang{KWT}='кВт';
+$lang{M3}='м^3';
+$lang{GRN}='грн';
+$lang{CALC_COST}='Рассчитать стоимость';
+$lang{CHECK_CORRECTNESS}='Проверьте правильность';
+$lang{NEW_DATA_FOR}='Новые показатели за ';
+$lang{GREATER_THEN}=' больше чем за ';
+$lang{SMALLER_THEN}=' меньше чем за ';
+1

@@ -1,0 +1,49 @@
+%FUNCTIONS_LIST = (
+  "01:0:CRM:null:"                                                => 5,
+  "02:1:$lang{ADD_CASHBOX}:crm_cashbox_main:"                     => 5,
+
+  "04:1:$lang{SPENDING}:crm_cashbox_spending_add:"                => 5,
+  "08:4:$lang{DOCS}:crm_spending_document:ID"                     => 5,
+  "07:4:$lang{ADD} $lang{TYPE}:crm_cashbox_spending_type:"        => 5,
+  "05:1:$lang{COMING}:crm_cashbox_coming_add:"                    => 5,
+  "06:5:$lang{ADD} $lang{TYPE}:crm_cashbox_coming_type:"          => 5,
+  "09:5:$lang{DOCS}:crm_coming_document:ID"                       => 5,
+  "10:1:$lang{SALARY}:null:"                                      => 5,
+  "31:10:$lang{WORKING_TIME_NORMS}:crm_working_time_norms:"       => 5,
+  "11:10:$lang{BET}:crm_admins_bet:"                              => 5,
+  "12:10:$lang{PRINT}:crm_pay_salary::EXTERNAL"                   => 8,
+  "13:1:$lang{REFERENCE_WORKS}:crm_reference_works:"              => 5,
+
+  "14:0:CRM:null:"                                                => 4,
+
+  "15:0:$lang{LEADS}:null:"                                       => 1,
+  "16:15:$lang{LEADS}:crm_leads:"                                 => 1,
+  "17:15:$lang{SEARCH}:crm_lead_search:"                          => 1,
+  "18:16:$lang{INFO}:crm_lead_info:LEAD_ID"                       => 1,
+  "23:16:Short Lead Info:crm_short_info:PHONE"                    => 1,
+  "25:16:Lead Convert:crm_lead_convert:FROM_LEAD_ID"              => 1,
+  # delete if works
+  # "27:16:$lang{BIND_USER}:crm_lead_add_user:TO_LEAD_ID"           => 1,
+
+
+  "20:1:$lang{SOURCE} $lang{ADD}:crm_source_types:"               => 5,
+  "21:14:CRM:crm_report_list:"                                    => 4,
+  "30:14:$lang{BALANCE} $lang{IN_CASHBOX}:crm_cashbox_balance:"   => 4,
+  "22:14:$lang{LEADS}:crm_reports_leads:"                         => 4,
+  "24:14:$lang{LEADS} $lang{PROGRESS}:crm_leads_progress_report:" => 4,
+  "28:14:$lang{COMING_REPORT}:crm_coming_reports"                 => 4,
+  "29:14:$lang{SPENDING_REPORT}:crm_spending_reports"             => 4,
+  "26:14:$lang{SALES_FUNNEL}:crm_sales_funnel"                    => 4,
+
+  "26:1:$lang{ACTION}:crm_actions_main"                           => 5,
+
+  "40:0:$lang{SALARY}:crm_salary:"                      => 8,
+  "41:40:$lang{PRINT}:crm_print_payment_statement:AID"  => 8,
+#  "42:40:Show Payed Salary:crm_show_payed_salaries"     => 8,
+
+  "50:0:CRM:crm_user_service:UID"                                 => 20,
+);
+
+if ($permissions{7} && $permissions{7}{2}) {
+  $FUNCTIONS_LIST{"19:1:$lang{PROGRESS_BAR}:crm_progressbar_steps:"} = 5;
+}

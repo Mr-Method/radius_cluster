@@ -1,0 +1,327 @@
+#!perl
+=head1 NAME
+
+ Admin notepad
+
+=cut
+use strict;
+use warnings FATAL => 'all';
+
+our ($db, $admin, %conf, $html, %lang, @WEEKDAYS, @state_colors, @MONTHES);
+
+use Notepad;
+use Abills::Defs;
+use Abills::Experimental;
+
+
+
+my $Notepad = Notepad->new( $db, $admin, \%conf );
+
+my @STATUS = ($lang{ACTIVE}, $lang{CLOSED}, $lang{INWORK});
+my @REAL_WEEKDAYS = @WEEKDAYS;
+$lang{HOLIDAY} = shift @REAL_WEEKDAYS; # Removed confusing first element
+
+#**********************************************************
+=head2 notepad_new()
+
+=cut
+#**********************************************************
+sub notepad_new {
+  my ($attr) = @_;
+
+  if ( $attr->{AID} ) {
+    $Notepad->notepad_new( $attr );
+    if ( $Notepad->{TOTAL} && $Notepad->{TODAY} + $Notepad->{ACTIVE} > 0 ) {
+      return "(" . (($Notepad->{TODAY}) ? $html->color_mark( $Notepad->{TODAY}, $_COLORS[6] )
+                                        : $Notepad->{TODAY}) . "/$Notepad->{ACTIVE})";
+    }
+  }
+
+  return '';
+}
+
+#**********************************************************
+=head2 notepad_main()
+
+=cut
+#**********************************************************
+sub notepad_main {
+
+  if ( !defined( $FORM{NOTE_STATUS} ) ) {
+    $FORM{NOTE_STATUS} = 'ALL';
+  }
+
+  my %TEMPLATE_NOTE = ();
+  my $show_add_form = 1;
+
+  my $check_notepad_form_params = sub {
+    if (!$FORM{TEXT} && !$FORM{SUBJECT}) {
+      $html->message( 'info', $lang{INFO}, "$lang{ERR_FIELDS_FOR_NOTIFIED_AND_SUBJECT_ARE_REQUIRED}" );
+    }
+
+    if ( $FORM{TEXT} && !$FORM{SUBJECT} ) {
+      $FORM{SUBJECT} = substr( $FORM{TEXT}, 0, 20 ) . '...';
+    }
+
+  };
+
+  if ( $FORM{add} ) {
+
+    $check_notepad_form_params->();
+
+    $Notepad->notes_add( { %FORM } );
+    $show_add_form = !show_result( $Notepad, $lang{ADDED} );
+
+    if ( !_error_show($Notepad) ) {
+      $show_add_form = 1;
+    }
+  }
+  elsif ( $FORM{change} ) {
+
+    # CHANGE_STATUS used for quick AJAX status change
+    if ( $FORM{CHANGE_STATUS} ) {
+      $Notepad->notes_change( { %FORM } );
+
+      print ( _error_show($Notepad) ? 'ERROR' : 'OK' );
+
+      return 1;
+    }
+
+    $Notepad->notes_change( { %FORM } );
+    show_result( $Notepad, $lang{CHANGED} );
+    $show_add_form = 1;
+  }
+  elsif ( $FORM{chg} ) {
+    my $tp_info = $Notepad->notes_info($FORM{chg});
+    if ( !_error_show($Notepad) ) {
+      $html->message( 'info', $lang{INFO}, "$lang{CHANGING}" );
+      %TEMPLATE_NOTE = %{$tp_info};
+      $show_add_form = 1;
+    }
+  }
+  elsif ( $FORM{del} && $FORM{COMMENTS} ) {
+    $Notepad->notes_del( { ID => $FORM{del} } );
+    if ( !_error_show($Notepad) ) {
+      notepad_redirect_with_message($lang{DELETED});
+    }
+  }
+
+  if ( $show_add_form ) {
+    # Update Notepad object with selects
+    notepad_add_form(\%TEMPLATE_NOTE);
+  }
+
+  my @status_bar = (
+    "$lang{ALL}:index=$index&NOTE_STATUS=ALL",
+    "$lang{ACTIVE}:index=$index&NOTE_STATUS=0",
+    "$lang{CLOSED}:index=$index&NOTE_STATUS=1",
+    "$lang{INWORK}:index=$index&NOTE_STATUS=2"
+  );
+
+  if (defined $FORM{NOTE_STATUS} && $FORM{NOTE_STATUS} ne 'ALL'){
+    $LIST_PARAMS{NOTE_STATUS} = $FORM{NOTE_STATUS};
+  }
+
+  my ($table, $list) = result_former({
+    INPUT_DATA      => $Notepad,
+    FUNCTION        => 'notes_list',
+    DEFAULT_FIELDS  => 'ID,NOTIFIED,CREATED,ADDED,NOTE_STATUS,SUBJECT,AID',
+    FUNCTION_FIELDS => 'change,del',
+    SKIP_USER_TITLE => 1,
+    EXT_FIELDS      => 0,
+    HIDDEN_FIELDS => 'AID',
+    FILTER_COLS => {
+      notified => 'notepad_result_former_filter_notified'
+    },
+    STATUS_VALS     => \@STATUS,
+    EXT_TITLES      => {
+      id      => '#',
+      notified => $lang{DATE} . '/' . $lang{TIME},
+      created => $lang{CREATED},
+      note_status  => $lang{STATUS},
+      subject => $lang{SUBJECT}
+    },
+    TABLE           => {
+      header  => $html->table_header( \@status_bar ),
+      caption => $lang{NOTEPAD},
+      ID      => 'NOTEPAD_NOTES',
+      EXPORT  => 1,
+      MENU    => "$lang{ADD}:index=$index&show_add_form=1:add"
+    },
+    MAKE_ROWS       => 1,
+    SEARCH_FORMER   => 1,
+    MODULE          => 'Notepad',
+  });
+
+  print $table->show();
+
+  return 1;
+}
+
+#**********************************************************
+=head2 notepad_result_former_filter_notified()
+
+=cut
+#**********************************************************
+sub notepad_result_former_filter_notified {
+ my ($value) = @_;
+ return $lang{PERIODICALLY} if $value eq '0000-00-00 00:00:00';
+ return $value;
+}
+
+#**********************************************************
+=head2 notepad_redirect_with_message()
+
+=cut
+#**********************************************************
+sub notepad_redirect_with_message {
+  if ( !$Notepad->{errno} ) {
+    $html->tpl_show(
+      _include( 'notepad_redirect', 'Notepad' ),
+      {
+        SECTION => '',
+        MESSAGE => "$_[0]",
+      }
+    );
+  }
+}
+
+#**********************************************************
+=head2 notepad_events()
+
+=cut
+#**********************************************************
+sub notepad_events {
+  my ($attr) = @_;
+  my @result_array = ();
+
+  if ( $attr->{CLIENT_INTERFACE} ) {return ''};
+
+  my $active_list = $Notepad->active_periodic_reminders_list( { DEBUG => $FORM{DEBUG}, SHOW_ALL_COLUMNS => 1 } );
+  _error_show( $Notepad );
+
+  if ( $FORM{DEBUG} ) {
+    use Data::Dumper;
+    print '<hr> $Notepad->active_periodic_reminders_list ' . Dumper $active_list;
+  }
+
+  my $list = $Notepad->notes_list( { PAGE_ROWS => 3,
+      AID                                      => $admin->{AID},
+      STATUS                                   => 0,
+      DATE                                     => "<$DATE $TIME;>0000-00-00",
+      %LIST_PARAMS,
+      COLS_NAME                                => 1,
+      SHOW_ALL_COLUMNS => 1
+    } );
+
+  my $notepad_index = get_function_index( 'notepad_main' );
+
+  foreach my $line ( (@{$list}, @{$active_list}) ) {
+    push ( @result_array, notepad_event_to_json( $line, $notepad_index ) );
+  }
+
+  return join( ", ", @result_array );
+}
+
+#**********************************************************
+=head2 notepad_event_to_json($message)
+
+  Function to format message to JSON structure needed in AMessageChecker
+
+  Arguments:
+    $note - hash_ref of message from DB
+      subject   - Subject of note
+      message   - Text of note
+      id        - ID of note
+
+    $notepad_index - index to see note
+
+  Returns:
+    JSON structure for message
+
+=cut
+#**********************************************************
+sub notepad_event_to_json {
+  my ($note, $notepad_index) = @_;
+
+  $note->{SUBJECT} ||= $note->{subject} || '';
+  $note->{TEXT} ||= $note->{text} || '';
+  $note->{id} ||= '';
+
+  $note->{SUBJECT} =~ s/["]/\\"/g;
+  $note->{TEXT} =~ s/["]/\\"/g;
+  $note->{TEXT} =~ s/\r\n|\n/ /gm;
+
+  return qq{
+        {
+          "TYPE"        : "MESSAGE",
+          "TITLE"       : "$note->{SUBJECT}",
+          "TEXT"        : "$note->{TEXT}",
+          "ID"          : $note->{id},
+          "NOTICED_URL" : "?qindex=$notepad_index&header=2&STATUS=2&change=1&ID=$note->{id}&CHANGE_STATUS=1",
+          "EXTRA"       : "$SELF_URL?index=$notepad_index&chg=$note->{id}",
+          "MODULE"      : "Notepad"
+        }
+      };
+}
+
+sub notepad_add_form {
+  my ($attr) = @_;
+
+  $attr->{STATUS} = $html->form_select(
+    "STATUS",
+    {
+      SELECTED     => $attr->{STATUS},
+      SEL_ARRAY    => \@STATUS,
+      ARRAY_NUM_ID => 1,
+      NO_ID        => 1
+    }
+  );
+
+  $attr->{MDAY_SELECT} = $html->form_select( 'MONTH_DAY', {
+      SELECTED    => $attr->{MONTH_DAY},
+      SEL_OPTIONS => { '' => '' }
+    } );
+
+  $attr->{MONTH_SELECT} = $html->form_select( 'MONTH', {
+      SELECTED     => $attr->{MONTH},
+      SEL_ARRAY    => [ '--', @MONTHES ],
+      ARRAY_NUM_ID => 1,
+      NO_ID        => 1,
+      SEL_OPTIONS  => { '' => '' }
+    } );
+
+  $attr->{YEAR_SELECT} = $html->form_select( 'YEAR', {
+      SELECTED    => $attr->{YEAR},
+      SEL_OPTIONS => { '' => '' }
+    } );
+
+  $attr->{WEEK_DAY_SELECT} = $html->form_select( 'WEEK_DAY', {
+      SELECTED     => $attr->{WEEK_DAY},
+      SEL_ARRAY    => [ '--', @REAL_WEEKDAYS ],
+      ARRAY_NUM_ID => 1,
+      NO_ID        => 1,
+      SEL_OPTIONS  => { '' => '' }
+    } );
+
+  $attr->{HOLIDAYS_CHECKED} = $attr->{HOLIDAYS} ? 'checked' : '';
+
+  $attr->{MONTH_DAY} ||= '';
+  $attr->{YEAR} ||= '';
+
+  $attr->{DATETIMEPICKER} = $html->form_datetimepicker('NOTIFIED', $attr->{NOTIFIED});
+
+  $html->tpl_show(
+    _include( 'notepad_main_form', 'Notepad' ),
+    {
+      %$attr,
+      ALIGN => 'right',
+      ACTION     => ($FORM{chg}) ? 'change' : 'add',
+      ACTION_LNG => ($FORM{chg}) ? $lang{CHANGE} : $lang{ADD},
+    }
+  );
+
+  return 1;
+}
+
+1;

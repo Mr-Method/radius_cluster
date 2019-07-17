@@ -1,0 +1,203 @@
+#!perl
+
+=head1 NAME
+
+  Discounts
+
+=cut
+my $VERSION = 0.01;
+use Discounts;
+use Abills::Base;
+require Abills::Defs;
+# use strict;
+use warnings FATAL => 'all';
+
+my $Discounts = Discounts->new($db, $admin, \%conf);
+
+#**********************************************************
+=head2 discounts_add_discounts() -
+
+  Arguments:
+    attr -
+  Returns:
+
+  Examples:
+
+=cut
+#**********************************************************
+sub discounts_add_discounts {
+  my ($attr) = @_;
+  my $action = 'add';
+  my $action_lang = "$lang{ADD}";
+  my %DISCOUNT;
+
+  if($FORM{add}){
+    $Discounts->add_discount({%FORM});
+    if(!$Discounts->{errno}){
+      $html->message("success", "$lang{SUCCESS}", "$lang{DISCOUNT_ADDED}");
+    }
+    else{
+      $html->message("err", "$lang{ERROR}", "$lang{DISCOUNT_NOT_ADDED}");
+    }
+  }
+  elsif($FORM{change}){
+
+    $Discounts->change_discount({%FORM});
+    if(!$Discounts->{errno}){
+      $html->message("success", "$lang{SUCCESS}", "$lang{DISCOUNT_CHANGED}");
+    }
+    else {
+      $html->message("err", "$lang{ERROR}", "$lang{DISCOUNT_NOT_CHANGED}");
+    }
+  }
+
+  if($FORM{chg}){
+    my $discount_info = $Discounts->info_discount({ID => $FORM{chg}});
+    $html->message("info", "$lang{CHANGE_DATA}");
+
+    if(!$Discounts->{errno}){
+      $action = 'change';
+      $action_lang = "$lang{CHANGE}";
+      $DISCOUNT{NAME} = $discount_info->{NAME};
+      $DISCOUNT{SIZE} = $discount_info->{SIZE};
+      $DISCOUNT{COMMENTS} = $discount_info->{COMMENTS};
+      $DISCOUNT{ID}       = $FORM{chg};
+    }
+  }
+
+  if($FORM{del}){
+    $Discounts->delete_discount({ID => $FORM{del}});
+
+    if(!$Discounts->{errno}){
+      $html->message("success", "$lang{SUCCESS}", "$lang{DISCOUNT_DELETED}");
+    }
+    else {
+      $html->message("err", "$lang{ERROR}", "$lang{DISCOUNT_NOT_DELETED}");
+    }
+  }
+
+
+  $html->tpl_show(_include('discounts_add_discounts', 'Discounts'),{
+    %DISCOUNT,
+    ACTION      => $action,
+    ACTION_LANG => $action_lang,
+  });
+
+  result_former(
+    {
+      INPUT_DATA      => $Discounts,
+      FUNCTION       => 'list_discount',
+      BASE_FIELDS     => 4,
+      DEFAULT_FIELDS  => "id, name, size, comments",
+      FUNCTION_FIELDS => 'change, del',
+      EXT_TITLES      => {
+        'name'          => $lang{NAME},
+        'id'            => 'ID',
+        'size'          => "$lang{SIZE}(%)",
+        'comments'      => $lang{COMMENTS}
+      },
+      TABLE => {
+        width   => '100%',
+        caption => "$lang{DISCOUNTS}",
+        qs      => $pages_qs,
+        ID      => 'DISCOUNTS',
+        header  => '',
+        EXPORT  => 1,
+        #MENU    => "$lang{ADD}:index=" . get_function_index('ring_rule_add') . ':add' . ";$lang{SEARCH}:index=$index&search_form=1:search;",
+      },
+      #SELECT_VALUE    => {
+      # every_month => { 0 => "$lang{NO}:text-danger",
+      #             1 => "$lang{YES}:text-primary"
+      #           },
+     #},
+      MAKE_ROWS     => 1,
+      SEARCH_FORMER => 1,
+      MODULE        => 'Discounts',
+      TOTAL         => 1
+    }
+  );
+
+  return 1;
+}
+
+#**********************************************************
+=head2 discounts_user_service() -
+
+  Arguments:
+    $attr -
+  Returns:
+
+  Examples:
+
+=cut
+#**********************************************************
+sub discounts_user_service {
+  my ($attr) = @_;
+
+  if($FORM{change}){
+    $Discounts->discount_user_change(\%FORM);
+
+    if(!$Discounts->{errno}){
+      $html->message('success', "$lang{SUCCESS}", "$lang{DISCOUNT_CHANGED}");
+    }
+    else{
+      $html->message('err', "$lang{ERROR}", "$lang{DISCOUNT_NOT_CHANGED}");
+    }
+  }
+
+  my $discounts_list = $Discounts->user_discounts_list({%FORM, COLS_NAME => 1});
+
+  # _bp("List", $discounts_list);
+
+  my $table = $html->table(
+    {
+      width      => '100%',
+      caption    => "$lang{DISCOUNTS}",
+      title      => [ '-', "$lang{NAME}","$lang{SIZE}(%)", $lang{DATE}, $lang{COMMENTS} ],
+      #FIELDS_IDS => $Tags->{COL_NAMES_ARR},
+      cols_align => [ 'left', 'left', 'left', 'left' ],
+      qs         => $pages_qs,
+      ID         => 'DISCOUNT_USER',
+    }
+  );
+
+  foreach my $line (@$discounts_list) {
+    $table->addrow(
+      #$line->{id}.
+      $html->form_input(
+        'IDS',
+        $line->{id},
+        {
+          TYPE  => 'CHECKBOX',
+          STATE => ($line->{date}) ? 1 : undef
+        }
+      ),
+      $line->{name},
+      $line->{size},
+      $line->{date},
+      $line->{comments}
+    );
+  }
+
+  my $action = $html->form_input('change', "$lang{CHANGE}", { TYPE => 'submit' });
+
+  $table->{extra} = 'colspan=5 align=\'center\'';
+  $table->addrow($action);
+
+  print $html->form_main(
+    {
+      CONTENT => $table->show({ OUTPUT2RETURN => 1 }),
+      HIDDEN  => {
+        index => $index,
+        UID   => $FORM{UID},
+      },
+      NAME     => 'DISCOUNT_USER',
+      ID       => 'DISCOUNT_USER'
+    }
+  );
+
+  return 1;
+}
+
+
+1

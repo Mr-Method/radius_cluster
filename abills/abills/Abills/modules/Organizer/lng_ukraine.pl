@@ -1,0 +1,20 @@
+$lang{LIGHT}='Світло';
+$lang{WATER}='Вода';
+$lang{GAS}='Газ';
+$lang{PUBLIC_UTILITIES}='Комунальні послуги';
+$lang{INFO_ALREADY_ADDED}='Інформація за цю дату є в системі';
+$lang{CANT_CHANGE}='Неможливо змінити дані';
+$lang{COMMUNAL}='Квартплата';
+$lang{INPUT_MONEY}='Введіть сумму грошей';
+$lang{INPUT_COUNTER}='Введіть показник лічильника';
+$lang{ORGANIZER}='Органайзер';
+$lang{DATE}='Дата';
+$lang{KWT}='кВт';
+$lang{M3}='м^3';
+$lang{GRN}='грн';
+$lang{CALC_COST}='Розрахувати вартість';
+$lang{CHECK_CORRECTNESS}='Провірьте правильність';
+$lang{NEW_DATA_FOR}='Нові дані за ';
+$lang{GREATER_THEN}=' більші ніж за ';
+$lang{SMALLER_THEN}=' меньші ніж за ';
+1

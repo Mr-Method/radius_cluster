@@ -1,0 +1,8 @@
+%FUNCTIONS_LIST  = (
+        "01:0:$lang{ECONOMIZER}:null:"                  => 5,
+        "02:1:Tariffs:e_tariffs:"                          => 5,
+);
+
+%USER_FUNCTION_LIST = ("01:0:$lang{ECONOMIZER}:null:"           => 0,
+                       "02:1:$lang{ECONOMIZER}:e_user:"         => 0,
+                       "03:1:$lang{STATISTICS}:e_statistics:"  => 0,);

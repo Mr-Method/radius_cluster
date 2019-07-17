@@ -1,0 +1,19 @@
+#Iner_ID : Main or Sub or if -1 user menu func list
+our ($admin);
+$admin->{EVENTS_ENABLED} = 1;
+
+%FUNCTIONS_LIST = (
+  "1:0:$lang{EVENTS}:events_main:"                           => 5,
+  "2:1:$lang{STATE}:events_state_main:"                      => 5,
+  "3:1:$lang{PRIORITY}:events_priority_main:"                => 5,
+  "4:1:$lang{ACCESS}:events_privacy_main:"                   => 5,
+  "4:1:$lang{GROUP}:events_group_main:"                      => 5,
+  
+  "5:1::events_unsubscribe:AJAX"                             => 5,
+  
+  
+  "6:1:$lang{NOTIFICATION_TYPE}:events_priority_send_types:" => 5,
+
+);
+
+1

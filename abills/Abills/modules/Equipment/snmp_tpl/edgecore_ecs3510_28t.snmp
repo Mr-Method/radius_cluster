@@ -1,0 +1,61 @@
+{
+  "DEVICE": "edge_core",
+  "FDB": "1",
+  "FDB_MODE": "",
+  "FDB_IGNORE_PORTS": "20",
+  "info": {
+    "UPTIME": {
+      "NAME": "Uptime",
+      "OIDS": ".1.3.6.1.2.1.1.3.0",
+      "PARSER": ""
+    },
+    "CPU_LOAD": {
+      "NAME": "CPU LOAD",
+      "OIDS": ".1.3.6.1.4.1.171.12.1.1.6.3.0",
+      "PARSER": ""
+    },
+    "FIRMWARE": {
+      "NAME": "FIRMWARE",
+      "OIDS": ".1.3.6.1.4.1.259.10.1.27.1.1.3.1.6.1",
+      "PARSER": ""
+    },
+    "DECRIBE": {
+      "NAME": "DECRIBE",
+      "OIDS": ".1.3.6.1.2.1.1.1.0",
+      "PARSER": ""
+    },
+    "SERIAL": {
+      "NAME": "SERIAL",
+      "OIDS": ".1.3.6.1.4.1.259.10.1.27.1.1.3.1.10.1",
+      "PARSER": ""
+    }
+  },
+  "ports": {
+    "PORTMULTTX": {
+      "NAME": "Multicast TX",
+      "OIDS": ".1.3.6.1.2.1.31.1.1.1.4",
+      "PARSER": "int2byte"
+    },
+    "PORTMULTRX": {
+      "NAME": "Multicast RX",
+      "OIDS": ".1.3.6.1.2.1.31.1.1.1.2",
+      "PARSER": "int2byte"
+    },
+    "PORTBRODTX": {
+      "NAME": "Broadcast TX",
+      "OIDS": ".1.3.6.1.2.1.31.1.1.1.5",
+      "PARSER": "int2byte"
+    },
+    "PORTBRODRX": {
+      "NAME": "Broadcast RX",
+      "OIDS": ".1.3.6.1.2.1.31.1.1.1.3.1",
+      "PARSER": "int2byte"
+    },
+    "PAIR_LENGTH": {
+      "NAME": "Pair length",
+      "OIDS": ".1.3.6.1.4.1.171.12.58.1.1.1.8",
+      "PARSER": ""
+    }
+  }
+}
+

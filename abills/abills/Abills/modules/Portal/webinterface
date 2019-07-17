@@ -1,0 +1,893 @@
+#!perl
+
+=head1 NAME
+
+ User portal
+
+=cut
+
+
+use strict;
+use warnings FATAL => 'all';
+use Portal;
+use Abills::Base qw(in_array convert);
+use Tags;
+our (
+  $db,
+  $admin,
+  %conf,
+  %lang,
+  $html,
+  %permissions,
+  @REGISTRATION,
+  $users
+);
+
+my $Portal = Portal->new($db, $admin, \%conf);
+
+
+#***********************************************************
+=head2 portal_manage_menu() -  Portal manage menu
+
+=cut
+#***********************************************************
+sub portal_manage_menu {
+  if ($FORM{message}) {
+    $html->message('info', $lang{INFO}, "$FORM{message}");
+  }
+
+  $Portal->{ACTION}     = 'add';
+  $Portal->{ACTION_LNG} = $lang{ADD};
+  $Portal->{TITLE_NAME} = $lang{ADD_MENU};
+
+  if (!$FORM{STATUS} or $FORM{STATUS} == 0) {
+    $Portal->{SHOWED} = '';
+    $Portal->{HIDDEN} = 'checked=\'checked\'';
+  }
+  else {
+    $Portal->{SHOWED} = 'checked=\'checked\'';
+    $Portal->{HIDDEN} = '';
+  }
+
+  if ($FORM{add}) {
+    if ($FORM{NAME}) {
+      $Portal->portal_menu_add({%FORM});
+      if (!$Portal->{errno}) {
+
+        #$html->message('info', $lang{INFO}, "$lang{ADDED}");
+        $html->tpl_show(
+          _include('portal_redirect', 'Portal'),
+          {
+            SECTION => '',
+            MESSAGE => "$lang{ADDED}",
+          }
+        );
+      }
+    }
+    else {
+      $html->message('info', $lang{INFO}, "$lang{FIELDS_FOR_NAME_ARE_REQUIRED}");
+      $html->tpl_show(_include('portal_menu_add', 'Portal'), { %$Portal, %FORM });
+    }
+  }
+  elsif ($FORM{del}) {
+    my $list = $Portal->portal_articles_list({ ARTICLE_ID => $FORM{del}, COLS_NAME => 1 });
+
+    if (defined($list->[0]->{id})) {
+
+      $html->message('info', $lang{INFO}, "$lang{CANT_DELETE_ERROR}");
+    }
+    else {
+      $Portal->portal_menu_del({ ID => $FORM{del} });
+      if (!$Portal->{errno}) {
+        $html->message('info', $lang{INFO}, "$lang{DELETED}");
+      }
+    }
+  }
+  elsif ($FORM{change}) {
+    if ($FORM{NAME}) {
+      $Portal->portal_menu_change({%FORM});
+      if (!$Portal->{errno}) {
+        $html->tpl_show(
+          _include('portal_redirect', 'Portal'),
+          {
+            SECTION => '',
+            MESSAGE => $lang{CHANGED},
+          }
+        );
+      }
+    }
+    else {
+      $Portal->{ACTION}     = 'change';
+      $Portal->{ACTION_LNG} = $lang{CHANGE};
+      $Portal->{TITLE_NAME} = $lang{CHANGE_MENU};
+      $html->message('info', $lang{INFO}, "$lang{FIELDS_FOR_NAME_ARE_REQUIRED}");
+      $html->tpl_show(_include('portal_menu_add', 'Portal'), { %$Portal, %FORM });
+    }
+  }
+  elsif ($FORM{chg}) {
+    $Portal->{ACTION}     = 'change';
+    $Portal->{ACTION_LNG} = $lang{CHANGE};
+    $Portal->{TITLE_NAME} = $lang{CHANGE_MENU};
+
+    $Portal->portal_menu_info({ ID => $FORM{chg}, });
+
+    if (! $Portal->{STATUS}) {
+      $Portal->{SHOWED} = '';
+      $Portal->{HIDDEN} = 'checked=\'checked\'';
+    }
+    else {
+      $Portal->{SHOWED} = 'checked=\'checked\'';
+      $Portal->{HIDDEN} = '';
+    }
+  }
+
+  if (!$FORM{add} and !$FORM{change}) {
+    $html->tpl_show(_include('portal_menu_add', 'Portal'), $Portal);
+  }
+
+  result_former({
+     INPUT_DATA      => $Portal,
+     FUNCTION        => 'portal_menu_list',
+     BASE_FIELDS     => 5,
+     FUNCTION_FIELDS => 'change,del',
+     SKIP_USER_TITLE => 1,
+     EXT_TITLES      => {
+       name   => $lang{NAME},
+       url    => 'URL',
+       date   => $lang{ADDED},
+       status => $lang{STATUS}
+     },
+     TABLE           => {
+       width      => '100%',
+       caption    => "$lang{MENU}",
+       qs         => $pages_qs,
+       ID         => 'PORTAL_TYPES',
+       EXPORT     => 1,
+       MENU       => "$lang{ADD}:index=$index&add_form=1&$pages_qs:add",
+     },
+     SELECT_VALUE    => {
+       status => { 0 => "$lang{HIDDEN}:text-danger",
+                   1 => "$lang{SHOWED}:text-primary"
+                 },
+     },
+     MAKE_ROWS    => 1,
+     SEARCH_FORMER=> 1,
+     TOTAL        => 1
+  });
+
+  return 1;
+}
+
+#***********************************************************
+=head2 portal_articles()-  Portal articles
+
+=cut
+#***********************************************************
+sub portal_articles {
+  my $Address = Address->new($db, $admin, \%conf);
+
+  if ($FORM{message}) {
+    $html->message('info', $lang{INFO}, "$FORM{message}");
+  }
+
+  $Portal->{ACTION}     = 'add';
+  $Portal->{ACTION_LNG} = $lang{ADD};
+  $Portal->{TITLE_NAME} = $lang{ADD_ARTICLE};
+
+  my @IMPORTANCE_STATUS = ("$lang{NORMAL}","$lang{CRITICAL}");
+
+  my $importance_select =  $html->form_select(
+  'IMPORTANCE',
+  {
+    SELECTED       => $FORM{IMPORTANCE},
+    SEL_ARRAY      => \@IMPORTANCE_STATUS,
+    ARRAY_NUM_ID   => 1,
+    SEL_VALUE      => 'name',
+    NO_ID          => 1
+  });
+
+  my $tags_list;
+  my $Tags;
+  if(in_array('Tags', \@MODULES)){
+    use Tags;
+    $Tags = Tags->new($db, $admin, \%conf);
+    $tags_list = $Tags->list({COLS_NAME => 1, NAME => '_SHOW'});
+
+    $Portal->{TAGS} = $html->form_select('TAGS',
+    {
+      SELECTED     => $Portal->{TAGS},
+      SEL_LIST     => $tags_list,
+      SEL_KEY      => 'id',
+      SEL_VALUE    => 'name',
+      NO_ID        => 1,
+      SEL_OPTIONS  => {"" => ""}
+    });
+  }
+  else{
+    $Portal->{TAGS} = "Tags $lang{DISABLED}";
+  }
+
+  my $domains_list;
+  my $Multidoms;
+  if(in_array('Multidoms', \@MODULES)){
+    load_module('Multidoms');
+    $Multidoms = Multidoms->new($db, $admin, \%conf);
+    $domains_list = $Multidoms->multidoms_domains_list({COLS_NAME => 1, NAME => '_SHOW'});
+
+    $Portal->{DOMAIN_ID} = $html->form_select('DOMAIN_ID',
+    {
+      SELECTED     => $Portal->{DOMAIN_ID},
+      SEL_LIST     => $domains_list,
+      SEL_KEY      => 'id',
+      SEL_VALUE    => 'name',
+      NO_ID        => 1,
+      SEL_OPTIONS  => {"" => ""}
+    });
+  }
+  else{
+    $Portal->{DOMAIN_ID} = "Multidoms $lang{DISABLED}";
+  }
+
+
+  my $group_select = sel_groups();
+
+  $Portal->{GROUPS} = $group_select;
+  $Portal->{IMPORTANCE_STATUS} = $importance_select;
+  $Portal->{ADRESS_FORM} = $html->tpl_show(templates('form_address_search'),
+                                            $Address,
+                                            { OUTPUT2RETURN => 1 });
+
+  my $PORTAL_MENU_ID = $Portal->{PORTAL_MENU_ID} = $html->form_select(
+    "PORTAL_MENU_ID",
+    {
+      SELECTED   => $FORM{PORTAL_MENU_ID},
+      SEL_LIST   => $Portal->portal_menu_list({ NOT_URL => 1, COLS_NAME => 1 }),
+      SEL_OPTIONS=> { '' => $lang{CHOOSE_MENU} },
+      NO_ID      => 1
+    }
+  );
+
+  if (!$FORM{STATUS} or $FORM{STATUS} == 0) {
+    $Portal->{SHOWED} = '';
+    $Portal->{HIDDEN} = 'checked=\'checked\'';
+  }
+  else {
+    $Portal->{SHOWED} = 'checked=\'checked\'';
+    $Portal->{HIDDEN} = '';
+  }
+
+  if ($FORM{ON_MAIN_PAGE}) {
+    $Portal->{ON_MAIN_PAGE_CHECKED} = 'checked=\'checked\'';
+  }
+
+  if ($FORM{add}) {
+    if ($FORM{TITLE} && $FORM{CONTENT} && $FORM{PORTAL_MENU_ID}) {
+      $Portal->portal_article_add({%FORM});
+      if (!$Portal->{errno}) {
+
+        $html->tpl_show(
+          _include('portal_redirect', 'Portal'),
+          {
+            SECTION => '',
+            MESSAGE => "$lang{ADDED}",
+          }
+        );
+      }
+    }
+    else {
+      $html->message('info', $lang{INFO}, "$lang{FIELDS_FOR_TITLE_TEXT_MENU_ARE_REQUIRED}");
+      $html->tpl_show(
+        _include('portal_article_add', 'Portal'),
+        {
+          %$Portal,
+          %FORM,
+          ALIGN          => 'right',
+          PORTAL_MENU_ID => $PORTAL_MENU_ID,
+        }
+      );
+    }
+  }
+  elsif ($FORM{del}) {
+    $Portal->portal_article_del({ ID => $FORM{del} });
+    if (!$Portal->{errno}) {
+      $html->message('info', $lang{INFO}, "$lang{DELETED}");
+    }
+
+  }
+  elsif ($FORM{change}) {
+    if ($FORM{TITLE} && $FORM{CONTENT} && $FORM{PORTAL_MENU_ID}) {
+
+      if($FORM{RESET} && $FORM{RESET} == 1){
+        $FORM{DISTRICT_ID} = 0;
+        $FORM{STREET_ID} = 0;
+      }
+
+      $Portal->portal_article_change({%FORM});
+      if (!$Portal->{errno}) {
+        $html->tpl_show(
+          _include('portal_redirect', 'Portal'),
+          {
+            SECTION => '',
+            MESSAGE => "$lang{CHANGED}",
+          }
+        );
+      }
+    }
+    else {
+      $Portal->{ACTION}     = 'change';
+      $Portal->{ACTION_LNG} = $lang{CHANGE};
+      $Portal->{TITLE_NAME} = $lang{CHANGE_MENU};
+      $html->message('info', $lang{INFO}, "$lang{FIELDS_FOR_TITLE_TEXT_MENU_ARE_REQUIRED}");
+      $html->tpl_show(
+        _include('portal_article_add', 'Portal'),
+        {
+          %$Portal,
+          %FORM,
+          ALIGN          => 'right',
+          PORTAL_MENU_ID => $PORTAL_MENU_ID,
+
+        }
+      );
+    }
+  }
+  elsif ($FORM{chg}) {
+    $Portal->{ACTION}     = 'change';
+    $Portal->{ACTION_LNG} = $lang{CHANGE};
+    $Portal->{TITLE_NAME} = $lang{CHANGE_MENU};
+
+    $Portal->portal_article_info({ ID => $FORM{chg}, });
+
+    $PORTAL_MENU_ID = $Portal->{PORTAL_MENU_ID} = $html->form_select(
+      "PORTAL_MENU_ID",
+      {
+        SELECTED    => $Portal->{PORTAL_MENU_ID},
+        SEL_LIST    => $Portal->portal_menu_list({ NOT_URL => 1, COLS_NAME => 1 }),
+        NO_ID       => 1,
+        SEL_OPTIONS => { '' => $lang{CHOOSE_MENU} }
+      }
+    );
+
+    if (! $Portal->{STATUS}) {
+      $Portal->{SHOWED} = '';
+      $Portal->{HIDDEN} = 'checked=\'checked\'';
+    }
+    else {
+      $Portal->{SHOWED} = 'checked=\'checked\'';
+      $Portal->{HIDDEN} = '';
+    }
+
+    if ($Portal->{ON_MAIN_PAGE}) {
+      $Portal->{ON_MAIN_PAGE_CHECKED} = 'checked=\'checked\'';
+    }
+
+    if(! $Portal->{ARCHIVE}) {
+      $Portal->{SHOWED_ARCHIVE} = '';
+      $Portal->{HIDDEN_ARCHIVE} = 'checked=\'checked\'';
+    }
+    else {
+      $Portal->{SHOWED_ARCHIVE} = 'checked=\'checked\'';
+      $Portal->{HIDDEN_ARCHIVE} = '';
+    }
+
+    $Portal->{IMPORTANCE_STATUS} =  $html->form_select(
+      'IMPORTANCE',
+      {
+        SELECTED       => $Portal->{IMPORTANCE},
+        SEL_ARRAY      => \@IMPORTANCE_STATUS,
+        ARRAY_NUM_ID   => 'id',
+        SEL_VALUE      => 'name',
+        NO_ID          => 1
+      });
+
+    $Portal->{TAGS} = $html->form_select(
+      'TAGS',
+      {
+        SELECTED       => $Portal->{TAGS},
+        SEL_LIST       => $tags_list,
+        SEL_KEY        => 'id',
+        SEL_VALUE      => 'name',
+        NO_ID          => 1,
+        SEL_OPTIONS    => {"" => ""}
+      });
+
+    $Portal->{DOMAIN_ID} = $html->form_select(
+      'DOMAIN_ID',
+      {
+        SELECTED       => $Portal->{DOMAIN_ID},
+        SEL_LIST       => $domains_list,
+        SEL_KEY        => 'id',
+        SEL_VALUE      => 'name',
+        NO_ID          => 1,
+        SEL_OPTIONS    => {"" => ""}
+      });
+
+    $Portal->{GROUPS} = sel_groups({ GID => $Portal->{GID}});
+    my %info = ();
+    if($Portal->{DISTRICT_ID}){
+      $info{ADDRESS_DISTRICT} = ($Address->district_info({ID => $Portal->{DISTRICT_ID}}))->{NAME};
+    }
+
+    if($Portal->{STREET_ID}){
+      $info{ADDRESS_STREET} = ($Address->street_info({ID => $Portal->{STREET_ID}}))->{NAME};
+    }
+
+    $Portal->{ADRESS_FORM} = $html->tpl_show(templates('form_address_search'),
+                                            { %info,
+                                              DISTRICT_ID       => $Portal->{DISTRICT_ID},
+                                              STREET_ID         => $Portal->{STREET_ID},
+                                            }, { OUTPUT2RETURN     => 1 });
+  }
+
+  if (!$FORM{add} and !$FORM{change}) {
+
+    $html->tpl_show(
+      _include('portal_article_add', 'Portal'),
+      {
+        %$Portal,
+        ALIGN          => 'right',
+        PORTAL_MENU_ID => $PORTAL_MENU_ID,
+      }
+    );
+  }
+
+  my $table = $html->table(
+    {
+      width      => '100%',
+      caption    => $lang{ARTICLES},
+      title      => [ $lang{MENU},
+                      $lang{TITLE},
+                      $lang{DATE_PUBLICATE},
+                      $lang{DATE_END_PUBLICATE},
+                      $lang{STATUS},
+                      $lang{ON_MAIN_PAGE},
+                      $lang{USER_PORTAL},
+                      $lang{IMPORTANCE},
+                      $lang{GROUPS},
+                      $lang{TAGS},
+                      $lang{DOMAINS},
+                      $lang{DISTRICTS},
+                      $lang{ADDRESS_STREET},
+                      '-', '-' ],
+      cols_align => [ 'left', 'left', 'left', 'left', 'right','right', 'center', 'center', 'center' ],
+      ID         => 'PORTAL_TYPES',
+    }
+  );
+
+  my @STATUS     = ('<strong style=\'color:red\'>' . $lang{HIDDEN} . '</strong>',
+                '<strong style=\'color:#090\'>' . $lang{SHOWED} . '</strong>');
+  my @ARCHIVE    = ("<span class='label label-danger label-sm'>$lang{TO_ARCHIVE}</span>",
+                "<span class='label label-success label-sm'>$lang{SHOW}</span>");
+  my @IMPORTANCE = ("<span class='label label-success label-sm'>$lang{NORMAL}</span>",
+                "<span class='label label-danger label-sm'>$lang{CRITICAL}</span>");
+
+  my $list = $Portal->portal_articles_list({ COLS_NAME => 1 });
+
+  foreach my $line (@$list) {
+      
+    my $tag_name;
+    if(in_array('Tags', \@MODULES)){
+      my $tag_info = $Tags->info($line->{tags});
+      if($Tags->{TOTAL}){
+        $tag_name   = $tag_info->{NAME};
+      }
+    }
+
+    my $domain_name;
+    if(in_array('Multidoms', \@MODULES)){
+      my $domain_info = $Multidoms->multidoms_domain_info({ID => $line->{domain_id}});
+      if($Multidoms->{TOTAL}){
+        $domain_name   = $domain_info->{NAME};
+      }
+    }
+  
+    $table->addrow(
+      $line->{name},
+      $line->{title},    # (length($line->[1]) > 30 ) ? substr ($line->[1], 0, 21) . '...' : $line->[1],
+      $line->{date},
+      $line->{end_date},
+      ($line->{status} && $STATUS[ $line->{status} ]) ? $STATUS[ $line->{status} ] : $line->{status},
+      ($line->{on_main_page} && $line->{on_main_page} == 1) ? $lang{YES} : $lang{NO},
+      ($line->{archive} && $ARCHIVE[ $line->{archive} ]) ? $ARCHIVE[ $line->{archive} ] : $line->{archive},
+      ($line->{importance} && $IMPORTANCE[ $line->{importance} ]) ? $IMPORTANCE[ $line->{importance} ] : $line->{importance},
+      $line->{gp_name},
+      $tag_name,
+      $domain_name,
+      $line->{dis_name},
+      $line->{st_name},
+      $html->button($lang{INFO}, "index=$index&chg=$line->{id}", { class => 'change' }),
+      (defined($permissions{0}{5})) ? $html->button($lang{DEL}, "index=$index&del=$line->{id}", { MESSAGE => "$lang{DEL} ". ($line->{title}|| q{}) . "?", class => 'del' }) : ''
+    );
+  }
+
+  print $table->show();
+
+  return 1;
+}
+
+#***********************************************************
+=head2 portal_user_cabinet()  User cabinet news
+
+=cut
+#***********************************************************
+sub portal_user_cabinet {
+  #my ($attr) = @_;
+
+  my $list = $Portal->portal_articles_list({ ARCHIVE => 0, COLS_NAME  => 1 });
+
+  my %USER_NEWS;        # данные в шаблон user_news
+  my @NORMAL;           # массив новостей с уровнем важности "Нормальный"
+  my @IMPORTANT;        # массив новостей с уровнем важности "Важный"
+  my $indicators = 0;   # количество индикаторов
+  my $active = 0;       # активный слайд
+  my $not_show = 0;
+
+  my $Tags;
+  if(in_array('Tags', \@MODULES)) {
+    $Tags = Tags->new( $db, $admin, \%conf );
+  }
+  my $array_elem_num = 0;
+  foreach my $item (@$list) {
+    if($item->{etimestamp} && ($item->{etimestamp} <= time && $item->{utimestamp} < time)){
+      delete $list->[$array_elem_num];
+    }
+    $array_elem_num++;
+  }
+
+  foreach my $item (@$list) {
+    # если дата окончания новости больше меньше чем сегодняшняя дата, то показываем новости
+    # или если новость не в архиве
+    if ($item->{etimestamp} && ($item->{etimestamp} >= time && $item->{utimestamp} < time)) {
+      # если група подходит или не обьявлена в новости
+
+      if (!$item->{gid} || $item->{gid} == $user->{GID}) {
+        if(!$item->{domain_id} || ($FORM{DOMAIN_ID} && $item->{domain_id} == $FORM{DOMAIN_ID}) || ($LIST_PARAMS{DOMAIN_ID} && $item->{domain_id} == $LIST_PARAMS{DOMAIN_ID}) || ( $user->{DOMAIN_ID} && $item->{domain_id} == $user->{DOMAIN_ID})){
+        # проверка на адресс
+        if ((!$item->{dis_name} || $item->{dis_name} eq $user->{ADDRESS_DISTRICT})
+          && (!$item->{st_name} || $item->{st_name} eq $user->{ADDRESS_STREET})
+          && (!$item->{dis_name} || $item->{dis_name} eq $user->{ADDRESS_DISTRICT})
+        ) {
+          my $tag_check;
+          if ($Tags) {
+            $tag_check = $Tags->tags_user( { COLS_NAME => 1, UID => $user->{UID}, TAG_ID => $item->{tags} } );
+          }
+          if (defined($tag_check->[0]->{date}) || !$item->{tags}) {
+            # если новость срочная
+            if ($item->{importance} == 1) {
+              my $short_description = $item->{short_description} || '';
+              if ((length $short_description) > 600) {
+                $short_description = substr($short_description, 0, 600);
+              }
+
+              my $important = $html->tpl_show( _include('portal_user_content', 'Portal'),
+                {
+                  TITLE             => $item->{title},
+                  SHORT_DESCRIPTION => $short_description,
+                  COLOR             => "#FFFFCC",
+                  ACTIVE            => ($active == 0) ? 'active' : '',
+                  HREF              => "$SELF_URL?article=".$item->{id},
+                  IMPORTANT => 'important',
+                },
+                { OUTPUT2RETURN => 1,
+                  ID            => 'ARTICLE_'. $item->{id}
+                } );
+
+              unshift(@IMPORTANT, $important);
+              $indicators++;
+              $active++;
+            }
+            else {
+              my $short_description = $item->{short_description} || '';
+              if ((length $short_description) > 600) {
+                $short_description = substr($short_description, 0, 600);
+              }
+
+              my $normal = $html->tpl_show( _include('portal_user_content', 'Portal'),
+                {
+                  TITLE             => $item->{title},
+                  SHORT_DESCRIPTION => $short_description,
+                  ACTIVE            =>
+                    ((((scalar @$list) - 1 - $not_show) == $indicators) && $active == 0) ? 'active' : '',
+                  HREF              => "$SELF_URL?article=".$item->{id}
+                },
+                { OUTPUT2RETURN => 1,
+                  ID            => 'ARTICLE_'. $item->{id}
+                } );
+              unshift(@NORMAL, $normal);
+              $indicators++;
+            }
+          } else { $not_show++};
+        } else { $not_show++};
+        } else{ $not_show++};
+      } else { $not_show++};
+    } else { $not_show++};
+  }
+
+  # список всех новостей по порядку важности
+  $USER_NEWS{CONTENT} .= join( ($FORM{json} ? ',' : '')   , @IMPORTANT, @NORMAL);
+  #$USER_NEWS{CONTENT} .= join( ($FORM{json} ? ',' : '')   , @NORMAL);
+
+  # индикаторы для карусели
+  for(my $i = 0; $i < $indicators; $i++){
+    if($i==0){
+        $USER_NEWS{INDICATORS} .= "<li data-target='#myCarousel' data-slide-to='$i' class='active'></li>";
+    }
+    else{
+      $USER_NEWS{INDICATORS} .= "<li data-target='#myCarousel' data-slide-to='$i' ></li>";
+    }
+  }
+
+  my $news_body = '';
+  if ($USER_NEWS{CONTENT}){
+    $news_body = $html->tpl_show(_include('portal_user_news', 'Portal'),
+                                              { %USER_NEWS },
+                                              { OUTPUT2RETURN     => 1 });
+  }
+
+  return $news_body;
+}
+
+#**********************************************************
+=head2 portal_start_page() -
+
+  Arguments:
+    $attr -
+  Returns:
+
+  Examples:
+
+=cut
+#**********************************************************
+sub portal_s_page {
+  my ($wrong_auth) = @_;
+  # my $lang = $conf{PORTAL_LANGUAGE};
+  my $lang = $FORM{language} || $html->{language} || 'english';
+  
+  do "../Abills/modules/Portal/lng_$lang.pl";
+  do "../language/$lang.pl";
+  my %LANG;
+  if ($conf{LANGS}) {
+    $conf{LANGS} =~ s/\n//g;
+    my (@lang_arr) = split(/;/, $conf{LANGS});
+    %LANG = ();
+    foreach my $l (@lang_arr) {
+      my $lang_name = q{};
+      ($lang, $lang_name) = split(/:/, $l);
+      $lang =~ s/^\s+//;
+      $LANG{$lang} = $lang_name;
+    }
+  }
+  our %QT_LANG;
+  our %OUTPUT;
+  $OUTPUT{HTML_STYLE} = 'default_adm';
+  $OUTPUT{SEL_LANGUAGE} = $html->form_select(
+    'language',
+    {
+      EX_PARAMS  => 'onChange="selectLanguage()"',
+      SELECTED   => $html->{language},
+      SEL_HASH   => \%LANG,
+      NO_ID      => 1,
+      EXT_PARAMS => { qt_locale => \%QT_LANG }
+    }
+  );
+
+  my $url = '';
+
+  my $list = $Portal->portal_menu_list({ MENU_SHOW => 1, COLS_NAME => 1 });
+  my @MENUS = ();
+  if ($list->[0]->{id}) {
+    foreach my $line (@$list) {
+
+      # Если поле url пустое, формируем меню
+      if ($line->{url} eq '') {
+        $url = "$SELF_URL?menu_category=" . $line->{id};
+      }
+
+      # Если поле url не пустое формируем внешнюю ссылку
+      else {
+        # Если строка содержит http:// выводим как есть
+        if ($line->{url} =~ m|http://*|) {
+          $url = $line->{url};
+        }
+        # Если строка не содержит http://  - добавляем
+        else {
+          $url = 'http://' . $line->{url};
+        }
+      }
+
+      # Если нажатое меню не совпадает с активным меню то выводим меню без выделения
+      if (!$FORM{menu_category} || $FORM{menu_category} != $line->{id}) {
+        push @MENUS, $html->tpl_show(
+          _include('portal_menu', 'Portal'),
+          {
+            HREF      => $url,
+            MENU_NAME => $line->{name},
+          },
+          { OUTPUT2RETURN => 1 }
+        );
+      }
+      else {
+        #  Выделение активного меню
+        push @MENUS, $html->tpl_show(_include('portal_menu_hovered', 'Portal'), { MENU_NAME => $line->{name}, }, { OUTPUT2RETURN => 1 });
+      }
+    }
+
+    $OUTPUT{MENU} = join(($FORM{json} ? ',' : ''), @MENUS);
+  }
+  else {
+    # Выводит  сообшение "В системе не созданы разделы"
+    $OUTPUT{MENU} = $lang{NO_MENU};
+  }
+
+  my @CONTENTS = ();
+  if ($FORM{menu_category}) {
+
+    # Собираем статьи в категории меню
+    $list = $Portal->portal_articles_list({ ARTICLE_ID => $FORM{menu_category}, COLS_NAME => 1 });
+    if ($list->[0]->{id}) {
+      my $total_articles = 0;
+      foreach my $line (@$list) {
+
+        # Проверка времени публикации статьи
+        if ($line->{utimestamp} && $line->{utimestamp} <= time()) {
+          if( !$line->{domain_id} || ($FORM{DOMAIN_ID} && $line->{domain_id}==$FORM{DOMAIN_ID}) ){
+          push @CONTENTS, $html->tpl_show(
+            _include('portal_content', 'Portal'),
+            {
+              HREF              => "$SELF_URL?article=" . $line->{id},
+              TITLE             => $line->{title},
+              DATE              => $line->{date},
+              SHORT_DESCRIPTION => $line->{short_description}
+            },
+            { OUTPUT2RETURN => 1 }
+          );
+          $total_articles++;
+        }
+        }
+      }
+
+      # Если количество статей - ноль
+      if ($total_articles <= 0) {
+        push @CONTENTS, $html->tpl_show(
+          _include('portal_article', 'Portal'),
+          {
+            TITLE   => '',
+            ARTICLE => $lang{NO_DATA}
+          },
+          { OUTPUT2RETURN => 1 }
+        );
+      }
+    }
+    else {
+      # Если в данной категории меню нет статтей выводим сообщение - "В этой категории пока нет данных"
+      push @CONTENTS, $html->tpl_show(
+        _include('portal_article', 'Portal'),
+        {
+          TITLE   => '',
+          ARTICLE => $lang{NO_DATA}
+        },
+        { OUTPUT2RETURN => 1 }
+      );
+    }
+  }
+  elsif ($FORM{article}) {
+    # Отображение статьи польностю
+    $list = $Portal->portal_articles_list({ ID => $FORM{article}, COLS_NAME => 1 });
+    if ($list->[0]->{id}) {
+      my $text_article = convert($list->[0]->{content}, { text2html => 1 });
+      my (@links) = $text_article =~ /\[link\](.+)\[\/link\]/gm;
+      my (@b_elements) = $text_article =~ /\[b\](.+?)\[\/b\]/gm;
+      my (@i_elements) = $text_article =~ /\[i\](.+?)\[\/i\]/gm;
+      my (@u_elements) = $text_article =~ /\[u\](.+?)\[\/u\]/gm;
+      
+      # do <b> elements
+      my @reworked_b_elements;
+      my $b_num = 0;
+      foreach my $b_element (@b_elements){
+        $reworked_b_elements[$b_num] = $html->element('b', $b_element, {OUTPUT2RETURN=>1});
+        #"<b>" . $b_element . "</b>";
+        $text_article =~ s/\[b\].+\[\/b\]/ $reworked_b_elements[$b_num]/;
+        $b_num++;
+      }
+
+      # do <i> elements
+      my @reworked_i_elements;
+      my $i_num = 0;
+      foreach my $i_element (@i_elements){
+        $reworked_i_elements[$i_num] = $html->element('i', $i_element, {OUTPUT2RETURN=>1});
+        #"<i>" . $i_element . "</i>";
+        $text_article =~ s/\[i\].+\[\/i\]/ $reworked_i_elements[$i_num]/;
+        $i_num++;
+      }
+
+      # do <u> elements
+      my @reworked_u_elements;
+      my $u_num = 0;
+      foreach my $u_element (@u_elements){
+        $reworked_u_elements[$u_num] = $html->element('ins', $u_element, {OUTPUT2RETURN=>1});
+        #"<ins>" . $u_element . "</ins>";
+        $text_article =~ s/\[u\].+\[\/u\]/ $reworked_u_elements[$u_num]/;
+        $u_num++;
+      }
+
+      # do links
+      my @reworked_links;
+      my $link_num = 0;
+      foreach my $link (@links){
+        my ($site, $text) = $link =~ /(.+)\|(.+)/i;
+        $reworked_links[$link_num] = $html->button("$text", undef, { GLOBAL_URL => $site, NO_LINK_FORMER => 1} );
+        # "<a href=" . $site . ">" . $text . "</a>";
+        $text_article =~ s/\[link\]$site\|$text\[\/link\]/ $reworked_links[$link_num]/;
+        $link_num++;
+      }
+
+      push @CONTENTS, $html->tpl_show(
+        _include('portal_article', 'Portal'),
+        {
+          TITLE   => $list->[0]->{title},
+          ARTICLE => $text_article
+        },
+        { OUTPUT2RETURN => 1 }
+      );
+    }
+  }
+  else {
+    # Отображает статьи на главной
+    $list = $Portal->portal_articles_list({ MAIN_PAGE => 1, COLS_NAME => 1 });
+    if ($list->[0]->{id}) {
+
+      # Если дата статьи меньше или такая же как текущая - выводим статью
+      foreach my $line (@$list) {
+        if ($line->{utimestamp} && $line->{utimestamp} <= time()) {
+          if( !$line->{domain_id} || ($FORM{DOMAIN_ID} && $line->{domain_id}==$FORM{DOMAIN_ID}) ){
+          push @CONTENTS, $html->tpl_show(
+            _include('portal_content', 'Portal'),
+            {
+              HREF              => "$SELF_URL?article=" . $line->{id},
+              TITLE             => $line->{title},
+              DATE              => $line->{date},
+              SHORT_DESCRIPTION => $line->{short_description}
+            },
+            { OUTPUT2RETURN => 1 }
+          );
+        }
+      }
+      }
+    }
+    else {
+      # Выводит сообщение - "В этой категории пока нет данных"
+      push @CONTENTS, $html->tpl_show(
+        _include('portal_article', 'Portal'),
+        {
+          TITLE   => '',
+          ARTICLE => $lang{NO_DATA}
+        },
+        { OUTPUT2RETURN => 1 }
+      );
+    }
+  }
+
+  if(@REGISTRATION){
+    $OUTPUT{REGISTRATION} = "<a class='' href='registration.cgi?module=$REGISTRATION[0]' title='$lang{REGISTRATION}' target='_blank'>$lang{REGISTRATION}</a>";
+  }
+
+  #wrong passwd
+  if($wrong_auth && $wrong_auth == 1){
+    $OUTPUT{WRONG_PASSWD}       = $html->message('err', '', $lang{ERR_WRONG_PASSWD});
+    $OUTPUT{WRONG_PASSWD_CHECK} = 1;
+  }
+  # wrogn social acc
+  elsif($wrong_auth && $wrong_auth == 2){
+    $OUTPUT{WRONG_PASSWD} = $html->message( 'err', $lang{ERROR}, $lang{ERR_UNKNOWN_SN_ACCOUNT});
+    $OUTPUT{WRONG_PASSWD_CHECK} = 2;
+  }
+
+  $OUTPUT{SOCIAL_AUTH_BLOCK} = make_social_auth_login_buttons();
+  $OUTPUT{CONTENT}           = join(($FORM{json} ? ',' : ''), @CONTENTS);
+
+  print $html->tpl_show(_include('portal_body', 'Portal'), { %OUTPUT });
+
+  return 1;
+}
+
+
+1;

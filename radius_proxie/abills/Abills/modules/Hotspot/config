@@ -1,0 +1,12 @@
+#Iner_ID : Main or Sub or if -1 user menu func list
+%FUNCTIONS_LIST = (
+  '1:0:Hotspot:null'                                      => 5,
+  "2:1:$lang{ADVERTISE}:hotspot_advertisements"           => 5,
+  "3:1:$lang{CONFIG} MikroTik:hotspot_ad_config_mikrotik" => 5,
+  '4:0:Hotspot:null'                                      => 4,
+  "5:4:$lang{VISITS}:hotspot_reports"                     => 4,
+  "6:4:$lang{ADVERTISE}:hotspot_ad_reports"               => 4,
+
+);
+
+1;

@@ -1,0 +1,251 @@
+/* ABillS Default CSS */
+body {
+
+}
+
+._red {
+    background-color: #f00;
+}
+
+._blue {
+    background-color: #8585f3;
+}
+
+._yellow {
+    background-color: #ff0;
+}
+
+._green {
+    background-color: #008000;
+}
+
+.main_body1 {
+    background-color: #f5f5f5;
+}
+
+.main_body2 {
+    background-color: #f0f;
+}
+
+.statusColor4 {
+    color: white !important;
+    background-color: #808080 !important;
+}
+
+.statusColor5 {
+    color: white !important;
+    background-color: #099 !important;
+}
+
+.statusColor6 {
+    color: white !important;
+    background-color: #87289e !important;
+}
+
+.statusColor4, .statusColor5, .statusColor6 {
+    background-image: none !important;
+    text-shadow: none !important;
+}
+
+.badge.alert-warning {
+    color: darkgrey;
+    font-weight: 600;
+}
+
+@media print {
+    a[href]:after {
+        content: none;
+    }
+}
+
+input[type='checkbox'].control-element {
+    margin-top: 7px !important;
+}
+
+input[type='checkbox'] {
+    cursor: pointer;
+}
+
+label.required:after {
+    content: ' *';
+    color: red;
+}
+
+textarea {
+    resize: vertical;
+}
+
+textarea.horizontal-resize {
+    resize: both;
+}
+
+table {
+    width: 100%;
+}
+
+/* The input. */
+input.mp_input {
+    outline: none;
+}
+
+/* Ordered list for display results. */
+ol.mp_list {
+    overflow: hidden;
+    position: absolute;
+    padding-left: 0;
+    width: 350px;
+    z-index: 99999;
+    /*border: 1px solid silver;*/
+    border-radius: 4px;
+}
+
+/* Each list item, regardless of success, error, etc. */
+ol.mp_list li:not(.disabled) {
+    cursor: pointer;
+}
+
+ol.mp_list li {
+    border-bottom: 1px solid silver;
+    left: 0;
+    right: 0;
+    width: 350px;
+    padding: 5px 10px;
+    margin-left: -5px;
+    /*margin: auto 10px;*/
+    display: block;
+}
+
+
+ol.mp_list li span.mp_address {
+    margin-right: 5px;
+}
+
+/* When a request is made that returns zero results. */
+ol.mp_list li.mp_no_results {
+  display : none;
+}
+
+/* When a request is made that doesn't meet the 'minChars' length option. */
+ol.mp_list li.mp_min_chars {
+  display : none;
+}
+
+/* When a request is made that fails during the ajax request. */
+ol.mp_list li.mp_error {
+  display : none;
+}
+
+.checkbox-block {
+  margin-left : 30px;
+  text-align: left;
+}
+
+.full-width {
+    width: 100%;
+}
+
+.file-input .file-visible {
+    cursor : pointer;
+}
+
+.navbar-form div.input-group > div.chosen-container {
+    min-width: 300px !important;
+}
+
+.box-body ul.pagination.pagination-sm {
+    margin: 0 !important;
+
+}.box-body ul.pagination.pagination-sm>li>a {
+    padding: 2px 5px;
+}
+
+
+.box-body .chosen-container.chosen-container-single {
+    width: 100% !important; /* or any value that fits your needs */
+}
+
+nav.navbar a.header-btn-link {
+    color: white;
+    padding: 15px 15px;
+    float: left;
+}
+
+/*Align last td (control buttons) to right side*/
+table.table.with-function-fields > tbody > tr > td:last-child {
+    text-align: right;
+}
+table.table.table-striped.table-hover.table-condensed > tbody > tr > td:last-child > a {
+    margin: 0 10px;
+}
+
+a {
+    cursor: pointer;
+}
+
+
+@media (max-width: 768px){
+    .nav>li>a {
+        padding: 10px 13px;
+    }
+}
+
+#up-btn {
+    z-index: 2600;
+    position: fixed;
+    right: 0;
+    bottom: 90px;
+    width: 34%;
+    margin-left: 90%;
+    opacity: 0.5;
+    filter: alpha(opacity=50);
+}
+
+#up-btn:hover {
+    opacity: 1;
+    filter: alpha(opacity=100);
+    cursor: pointer;
+}
+
+.up-btn-icon {
+    z-index: 2600;
+    position: absolute;
+    display: block;
+    right: 5px;
+    bottom: 0;
+    padding: 0 12px 4px;
+    font-size: 1.5em;
+}
+
+div.wrapper {
+    overflow: visible;
+}
+
+.form-horizontal .checkbox{
+    margin-bottom: 10px;
+}
+
+div.box-body > div.button-block > .btn {
+    margin: 0 5px;
+}
+
+.content-header > .breadcrumb > li + li:before {
+    content: '';
+    padding: 0 3px;
+}
+
+div.box-heading, div.box-header, .box-title  {
+    text-align: left;
+}
+
+h4.table-caption > a > span.fa {
+    margin-right : 5px;
+}
+
+.bg-red a, .bg-danger a {
+    color: #843534;
+    font-weight: 700;
+}
+
+.bg-red a:hover, .bg-danger a:hover {
+    text-decoration: underline;;
+}

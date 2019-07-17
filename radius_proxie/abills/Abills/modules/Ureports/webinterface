@@ -1,0 +1,1440 @@
+#!perl
+
+=head1 NAME
+
+  User reports webinterface
+    Sending reports via:
+      e-mail
+      sms (with Sms module)
+
+=cut
+
+use strict;
+use warnings FATAL => 'all';
+
+if ( form_purchase_module( {
+    HEADER          => $user->{UID},
+    MODULE          => 'Ureports',
+    REQUIRE_VERSION => 7.08,
+  } ) ){
+
+  exit;
+}
+
+use Dv;
+use Dv_Sessions;
+use Finance;
+use Fees;
+use Tariffs;
+use Abills::Base qw(sendmail in_array);
+
+our ($db,
+  $admin,
+  %conf,
+  $html,
+  %lang,
+  %permissions,
+  @bool_vals,
+  @MONTHES,
+  @WEEKDAYS,
+  %ADMIN_REPORT
+);
+
+my $Ureports = Ureports->new( $db, $admin, \%conf );
+my $fees = Fees->new( $db, $admin, \%conf );
+my $tariffs = Tariffs->new( $db, \%conf, $admin );
+
+my @service_status = ("$lang{ENABLE}", "$lang{DISABLE}", "$lang{NOT_ACTIVE}");
+my @service_type = ("E-mail", "SMS", "Fax");
+my %REPORTS = (
+  1  => "$lang{DEPOSIT_BELOW}",
+  2  => "$lang{DEPOSIT_CREDIT_BELOW}",
+
+  3  => "$lang{PREPAID_TRAFFIC_BELOW}",
+  4  => "$lang{DAY}: $lang{TRAFFIC_MORE}",
+  5  => "$lang{MONTH}: $lang{DEPOSIT} + $lang{CREDIT} + $lang{TRAFFIC}",
+
+  6  => "$lang{DAY}: $lang{DEPOSIT} + $lang{CREDIT} + $lang{TRAFFIC}",
+
+  7  => "$lang{CREDIT} $lang{EXPIRE}",
+  8  => "$lang{LOGIN} $lang{DISABLE} ",
+  9  => "Internet: $lang{DAYS_TO_EXPIRE}",
+  10 => "$lang{SMALL_DEPOSIT_FOR_NEXT_MONTH}",
+  11 => "$lang{SMALL_DEPOSIT_FOR_NEXT_MONTH} v2",
+  12 => "$lang{PAYMENTS_INFO}",
+  13 => "$lang{ALL_SERVICE_EXPIRE}",
+  14 => "$lang{DEPOSIT_NOTIFY_BEFORE_ABON}",
+  15 => "Internet $lang{DISABLE}",
+  16 => "$lang{NEXT_PERIOD_TP}",
+  #20 => ""
+);
+
+#**********************************************************
+=head2 ureports_users_list()
+
+=cut
+#**********************************************************
+sub ureports_users_list{
+  my ($attr) = @_;
+
+  if ( !$permissions{0}{2} ){
+    return 0;
+  }
+
+  if ( $FORM{add_form} ){
+
+  }
+  elsif ( $attr->{TP} ){
+    $LIST_PARAMS{TP_ID} = $FORM{TP_ID};
+  }
+  elsif ( $FORM{TP_ID} ){
+    $FORM{subf} = $index;
+    ureports_tp();
+    return 0;
+  }
+
+  $FORM{GROUP_SEL} = sel_groups();
+  $FORM{STATUS_SEL} = $html->form_select(
+    'STATUS',
+    {
+      SELECTED => $FORM{STATUS},
+      SEL_HASH => {
+        '' => "$lang{ALL}",
+        0  => $service_status[0],
+        1  => $service_status[1],
+        2  => $service_status[2]
+      },
+      NO_ID    => 1
+    }
+  );
+
+  if ( $FORM{search_form} ){
+    form_search( { SEARCH_FORM =>
+        $html->tpl_show( _include( 'ureports_users_search', 'Ureports' ), { %FORM }, { notprint => 1 } ) } );
+  }
+
+  #print $html->letters_list( { pages_qs => $pages_qs } );
+
+  if ( $FORM{letter} ){
+    $LIST_PARAMS{LOGIN} = "$FORM{letter}*";
+    $pages_qs .= "&letter=$FORM{letter}";
+  }
+  my Abills::HTML $table;
+  my $user_list;
+  ($table, $user_list) = result_former( {
+    DEFAULT_FIELDS    => 'LOGIN,FIO,TP_NAME,STATUS,TYPE,DESTINATION',
+      INPUT_DATA      => $Ureports,
+      FUNCTION        => 'user_list',
+      BASE_FIELDS     => 0,
+      FUNCTION_FIELDS => 'stats',
+      EXT_TITLES      => {
+      speed       => $lang{SPEED},
+      port        => $lang{PORT},
+      cid         => 'CID',
+      filter_id   => 'Filter ID',
+      tp_name     => $lang{TARIF_PLANS},
+      status      => "$lang{STATUS}",
+      type        => $lang{TYPE},
+      destination => $lang{DESTINATION}
+    },
+    TABLE           => {
+      width   => '100%',
+      caption => $lang{USERS},
+      qs      => $pages_qs,
+      ID      => 'UREPORTS_USERS',
+      EXPORT  => 1,
+      MENU    => "$lang{SEARCH}:index=$index&search_form=1:search;$lang{ADD}:index=$index&add_form=1:add",
+    },
+  } );
+
+  foreach my $line ( @{$user_list} ){
+    my @fields_array = ();
+
+    for ( my $i = 0; $i < $Ureports->{SEARCH_FIELDS_COUNT}; $i++ ){
+      my $val = '';
+      my $field_name = $Ureports->{COL_NAMES_ARR}->[$i];
+
+      if ( $field_name eq 'login' ){
+        $val = $html->button( $line->{login}, "index=11&UID=$line->{uid}" );
+      }
+      elsif ( $field_name eq 'status' ){
+        $val = ($line->{status}) ? $html->color_mark( $service_status[$line->{status}],
+            $_COLORS[6] )        : $service_status[$line->{status}];
+      }
+      elsif ( $field_name eq 'type' ){
+        $val = ($line->{type}) ? 'Sms' : 'E-mail';
+      }
+      else{
+        $val = $line->{$field_name};
+      }
+
+      push @fields_array, $val;
+    }
+
+    push @fields_array,
+      $html->button( $lang{STATS}, "index=" . (get_function_index( 'ureports_user' )) . "&UID=$line->{uid}",
+        { class => 'stats' } );
+
+    $table->addrow( @fields_array );
+  }
+
+  print $table->show();
+
+  $table = $html->table(
+    {
+      width      => '100%',
+      cols_align => [ 'right', 'right' ],
+      rows       => [ [ "$lang{TOTAL}: ", $html->b( $Ureports->{TOTAL} ) ] ]
+    }
+  );
+  print $table->show();
+
+  return 1;
+}
+
+#**********************************************************
+=head2  ureports_user($attr) - User managment
+
+=cut
+#**********************************************************
+sub ureports_user{
+  my ($attr) = @_;
+
+  if ( form_purchase_module( {
+      MODULE          => 'Ureports',
+      REQUIRE_VERSION => 7.05
+    } ) ){
+    return 0;
+  }
+
+  $Ureports->{UID} = $FORM{UID} || $LIST_PARAMS{UID};
+  my $report_type = $FORM{TYPE} || 0;
+  if ( $FORM{add} ){
+    if ( !$permissions{0}{1} ){
+      $html->message( 'err', $lang{ERROR}, "Access Deny" );
+      return 0;
+    }
+
+    if ( $report_type == 0 && (!$FORM{DESTINATION} || $FORM{DESTINATION} !~ /^(([^<>()[\]\\.,;:\s\@\"]+(\.[^<>()[\]\\.,;:\s\@\"]+)*)|(\".+\"))\@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/) ){
+      $html->message( 'err', $lang{ERROR}, $lang{ERR_WRONG_EMAIL} );
+    }
+    elsif($report_type == 1 && $conf{PHONE_FORMAT} && $FORM{DESTINATION} !~ /$conf{PHONE_FORMAT}/) {
+      _error_show({ errno => 21, errstr => 'ERR_WRONG_PHONE' });
+    }
+    else{
+      $Ureports->user_add( { %FORM } );
+      if ( !$Ureports->{errno} ){
+        $html->message( 'info', $lang{INFO}, $lang{ADDED} );
+      }
+    }
+  }
+  elsif ( $FORM{reset_date} ){
+    $Ureports->tp_user_reports_reset_date( { %FORM } );
+    if ( !$Ureports->{errno} ){
+      $html->message( 'info', $lang{INFO}, "$lang{RESETED}" );
+    }
+  }
+  elsif ( $FORM{set} ){
+    if ( !$permissions{0}{4} ){
+      $html->message( 'err', $lang{ERROR}, "Access Deny" );
+      return 0;
+    }
+
+    if ( $report_type == 0 && (!$FORM{DESTINATION} || $FORM{DESTINATION} !~ /^(([^<>()[\]\\.,;:\s\@\"]+(\.[^<>()[\]\\.,;:\s\@\"]+)*)|(\".+\"))\@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/) ){
+      $html->message( 'err', $lang{ERROR}, "$lang{ERR_WRONG_EMAIL}" );
+    }
+    elsif($report_type == 1 && $conf{PHONE_FORMAT} && $FORM{DESTINATION} !~ /$conf{PHONE_FORMAT}/) {
+      _error_show({ errno => 21, errstr => 'ERR_WRONG_PHONE' });
+    }
+    else{
+      $Ureports->user_change( { %FORM } );
+      $Ureports->{ACTIVATE} = $attr->{USER}->{ACTIVATE};
+
+      if ( !$Ureports->{errno} ){
+        $Ureports->tp_user_reports_change( { %FORM } );
+        if ( !$Ureports->{errno} ){
+          $html->message( 'info', $lang{INFO}, "$lang{CHANGED}" );
+        }
+      }
+      else{
+        $html->message( 'err', $lang{INFO}, "$lang{CHANGED}" );
+      }
+    }
+  }
+  #  elsif ($FORM{del}) {
+  #    $Ureports->del();
+  #    if (!$Ureports->{errno}) {
+  #      $html->message('info', $lang{INFO}, "$lang{DELETED}");
+  #    }
+  #  }
+
+  _error_show( $Ureports );
+
+  $Ureports->user_info( $Ureports->{UID} );
+
+  if ( $Ureports->{TOTAL} < 1 ){
+    $html->message( 'info', $lang{INFO}, $lang{NOT_ACTIVE} );
+    #    $Ureports->{TP_ID} = $html->form_select(
+    #      'TP_ID',
+    #      {
+    #        SELECTED  => $Ureports->{TP_ID},
+    #        SEL_LIST  => $tariffs->list({ MODULE => 'Ureports', COLS_NAME => 1 }),
+    #        SEL_KEY   => 'tp_id',
+    #        SEL_VALUE => 'name',
+    #        NO_ID     => 1
+    #      }
+    #    );
+    $Ureports->{ACTION} = 'add';
+    $Ureports->{LNG_ACTION} = $lang{ACTIVATE};
+  }
+  else{
+    $Ureports->{ACTION} = 'set';
+    $Ureports->{LNG_ACTION} = $lang{CHANGE};
+
+    my $table = $html->table(
+      {
+        width      => '100%',
+        caption    => "$lang{REPORTS}",
+        title      => [ '#', $lang{NAME}, $lang{VALUE}, $lang{PRICE}, $lang{SENDED} ],
+        cols_align => [ 'center', 'left', 'center', 'right', 'right' ],
+        qs         => $pages_qs,
+        ID         => 'REPORTS_TP'
+      }
+    );
+
+    my $list = $Ureports->tp_user_reports_list( {
+        %LIST_PARAMS,
+        COMMENTS  => '_SHOW',
+        TP_ID     => $Ureports->{TP_ID},
+        COLS_NAME => 1 } );
+
+    foreach my $line ( @{$list} ){
+      $table->addrow(
+        $html->form_input( "IDS", "$line->{report_id}",
+          { TYPE => 'checkbox', STATE => ($line->{date}) ? 1 : undef, OUTPUT2RETURN => 1 } ),
+        ($line->{comments}) ? $line->{comments} : $REPORTS{ $line->{report_id} },
+        $html->form_input( "VALUE_$line->{report_id}", (($line->{value}) ? $line->{value} : 0),
+          { OUTPUT2RETURN => 1, SIZE => 6 } ),
+        (($line->{msg_price}) ? $line->{msg_price} : '0.00'),
+        ($line->{date} || '') . (($line->{date} && $line->{date} ne '0000-00-00') ? $html->button( $lang{RESET},
+            "index=$index&UID=$line->{uid}&REPORT_ID=$line->{report_id}&reset_date=1",
+            { MESSAGE => "$lang{RESET}", class => 'del' } )                       : '')
+      );
+    }
+    $Ureports->{REPORTS_LIST} = $table->show( { OUTPUT2RETURN => 1 } )
+      . $html->form_input('set', $lang{SET}, { TYPE => 'submit', SUCCESS => 1 });
+  }
+
+  $Ureports->{TYPE_SEL} = $html->form_select(
+    'TYPE',
+    {
+      SELECTED     => $Ureports->{TYPE},
+      SEL_ARRAY    => \@service_type,
+      ARRAY_NUM_ID => 1
+    }
+  );
+
+  $Ureports->{STATUS_SEL} = $html->form_select(
+    'STATUS',
+    {
+      SELECTED     => $Ureports->{STATUS},
+      SEL_ARRAY    => \@service_status,
+      ARRAY_NUM_ID => 1
+    }
+  );
+
+  $Ureports->{TP_NAME} = '';
+  if ( $Ureports->{TP_ID} ){
+    $Ureports->{CHANGE_TP_BUTTON} = $html->button( $lang{TARIF_PLAN},
+      "TP_ID=$Ureports->{TP_ID}&index=" . get_function_index( 'ureports_tp' ), { class => 'change' } );
+  }
+
+  $Ureports->{TP_ID} = $html->form_select(
+    'TP_ID',
+    {
+      SELECTED  => $Ureports->{TP_ID},
+      SEL_LIST  => $tariffs->list( { MODULE => 'Ureports', COLS_NAME => 1 } ),
+      SEL_KEY   => 'tp_id',
+      SEL_VALUE => 'name',
+      NO_ID     => 1
+    }
+  );
+
+  $Ureports->{HISTORY_BTN} = $html->button($lang{LOG}, "UID=$FORM{UID}&index=". ($index+1), { class => 'btn bnt-default btn-success pull-right' });
+
+  $html->tpl_show( _include( 'ureports_user', 'Ureports' ), { %{$attr}, %{$Ureports} } );
+
+  return 1;
+}
+
+#**********************************************************
+=head2 form_tp()
+
+=cut
+#**********************************************************
+sub ureports_tp{
+
+  my $tarif_info = $tariffs->defaults();
+  $tarif_info->{LNG_ACTION} = $lang{ADD};
+  $tarif_info->{ACTION}     = 'ADD_TP';
+
+  my @Payment_Types = ($lang{PREPAID}, $lang{POSTPAID});
+
+  if ( $FORM{ADD_TP} ){
+    $Ureports->tp_add( { %FORM, MODULE => 'Ureports' } );
+    if ( !$Ureports->{errno} ){
+      $html->message( 'info', $lang{ADDED}, "$lang{ADDED} $Ureports->{TP_ID}" );
+    }
+  }
+  elsif ( $FORM{TP_ID} ){
+    $tarif_info = $Ureports->tp_info( $FORM{TP_ID} );
+
+    if (_error_show($Ureports)){
+      return 0;
+    }
+
+    $pages_qs .= "&TP_ID=$FORM{TP_ID}" . (($FORM{subf}) ? "&subf=$FORM{subf}" : '');
+    $LIST_PARAMS{TP} = $FORM{TP_ID};
+    $LIST_PARAMS{MODULE} = 'Ureports';
+    my %F_ARGS = (TP => $Ureports);
+
+    $FORM{add_form} = 1;
+
+    $tariffs->{NAME_SEL} = $html->form_main(
+      {
+        CONTENT => $html->form_select(
+          'TP_ID',
+          {
+            SELECTED  => $FORM{TP_ID},
+            SEL_LIST  => $tariffs->list( { %LIST_PARAMS, COLS_NAME => 1 } ),
+            SEL_KEY   => 'tp_id',
+            SEL_VALUE => 'name',
+            NO_ID     => 1
+          }
+        ),
+        HIDDEN => { index => $index },
+        SUBMIT => { show => $lang{SHOW} },
+        class  => 'navbar-form navbar-right',
+      }
+    );
+
+    func_menu(
+      {
+        $lang{NAME} => $tariffs->{NAME_SEL}
+      },
+      [
+        $lang{INFO} . ":TP_ID=$FORM{TP_ID}",
+        $lang{REPORTS} . ':' . get_function_index( 'ureports_tp_reports' ) . ":TP_ID=$FORM{TP_ID}",
+        $lang{USERS} . ':' . get_function_index( 'ureports_users_list' ) . ":TP_ID=$FORM{TP_ID}"
+      ],
+      { f_args => \%F_ARGS }
+    );
+
+    if ( $FORM{subf} && $FORM{subf} != $index ){
+      return 0;
+    }
+    elsif ( $FORM{change} ){
+      $Ureports->tp_change( $FORM{TP_ID}, { %FORM, MODULE => 'Ureports' } );
+
+      if ( !$Ureports->{errno} ){
+        $html->message( 'info', $lang{CHANGED}, "$lang{CHANGED} $FORM{TP_ID}" );
+      }
+    }
+
+    $tarif_info->{LNG_ACTION} = $lang{CHANGE};
+    $tarif_info->{ACTION} = 'change';
+  }
+  elsif ( defined( $FORM{del} ) && $FORM{COMMENTS} ){
+    $tariffs->del( $FORM{del} );
+
+    if ( !$tariffs->{errno} ){
+      $html->message( 'info', $lang{DELETED}, "$lang{DELETED} $FORM{del}" );
+    }
+  }
+
+  _error_show( $Ureports );
+
+  $tarif_info->{GROUPS_SEL} = $html->form_select(
+    'TP_GID',
+    {
+      SELECTED       => $tarif_info->{TP_GID},
+      SEL_LIST       => $tariffs->tp_group_list( { COLS_NAME => 1 } ),
+      MAIN_MENU      => get_function_index( 'form_tp_groups' ),
+      MAIN_MENU_ARGV => "chg=" . ($tarif_info->{TP_GID} || q{}),
+      SEL_OPTIONS    => { '' => '' },
+    }
+  );
+
+  $tarif_info->{REDUCTION_FEE} = ($tarif_info->{REDUCTION_FEE}) ? 'checked' : '';
+  $tarif_info->{POSTPAID_DAY_FEE} = ($tarif_info->{POSTPAID_DAY_FEE}) ? 'checked' : '';
+  $tarif_info->{POSTPAID_MONTH_FEE} = ($tarif_info->{POSTPAID_MONTH_FEE}) ? 'checked' : '';
+  $tarif_info->{ABON_DISTRIBUTION} = ($tarif_info->{ABON_DISTRIBUTION}) ? 'checked' : '';
+
+  if ( $conf{EXT_BILL_ACCOUNT} ){
+    my $checked = ($tarif_info->{EXT_BILL_ACCOUNT}) ? ' checked' : '';
+    $tarif_info->{EXT_BILL_ACCOUNT} = "<tr><td>$lang{EXTRA} $lang{BILL}:</td><td><input type='checkbox' name='EXT_BILL_ACCOUNT' value='1' $checked></td></tr>\n";
+  }
+  else{
+    $tarif_info->{EXT_BILL_ACCOUNT} = '';
+  }
+
+  if ( $FORM{add_form} ){
+    $html->tpl_show( _include( 'ureports_tp', 'Ureports' ), $tarif_info );
+  }
+
+  $LIST_PARAMS{NEW_MODEL_TP} = 1;
+  $LIST_PARAMS{MODULE} = 'Ureports';
+  $tariffs->{COL_NAMES_ARR} = undef;
+
+  my $base_fields = 2;
+  my Abills::HTML $table;
+  my $list;
+  ($table, $list) = result_former( {
+      INPUT_DATA        => $tariffs,
+        FUNCTION        => 'list',
+        BASE_FIELDS     => $base_fields,
+        DEFAULT_FIELDS  => 'ID,NAME,PAYMENT_TYPE,MONTH_FEE,TP_GROUP_NAME',
+        FUNCTION_FIELDS => '-, -, -',
+        EXT_TITLES      => {
+        id                   => 'id',
+        port                 => $lang{PORT},
+        filter_id            => 'Filter ID',
+        tp_name              => "$lang{TARIF_PLAN}",
+        num                  => $lang{NUM},
+        name                 => $lang{NAME},
+        payment_type         => $lang{PAYMENT_TYPE},
+        month_fee            => $lang{MONTH_FEE},
+        age                  => $lang{AGE},
+        tp_group_name        => $lang{GROUP},
+        reduction_fee        => $lang{REDUCTION},
+        postpaid_daily_fee   => "$lang{DAY_FEE} $lang{POSTPAID}",
+        postpaid_monthly_fee => "$lang{MONTH_FEE} $lang{POSTPAID}",
+        ext_bill_account     => "$lang{EXT_BILL_ACCOUNT}",
+        credit               => $lang{CREDIT},
+        abon_distribution    => $lang{ABON_DISTRIBUTION},
+        tp_id                => 'TP ID',
+        next_tp_id           => "$lang{TARIF_PLAN} $lang{NEXT_PERIOD}",
+        fees_method          => "$lang{FEES} $lang{TYPE}",
+      },
+        TABLE           => {
+        width      => '100%',
+        caption    => "$lang{REPORTS} - $lang{TARIF_PLANS}",
+        title      =>
+        [ '#', $lang{NAME}, $lang{PAYMENT_TYPE}, $lang{DAY_FEE}, $lang{MONTH_FEE}, $lang{GROUP}, '-', '-', '-' ],
+        cols_align =>
+        [ 'right', 'left', 'center', 'center', 'center', 'right', 'right', 'right', 'right', 'center:noprint',
+          'center:noprint', 'center:noprint' ],
+        ID         => 'UREPORTS_TARIF_PLANS',
+        MENU       => "$lang{ADD}:index=$index&add_form=1:add",
+      },
+    } );
+
+  foreach my $line ( @{$list} ){
+    my @fields_array = ();
+    for ( my $i = 0; $i < $base_fields + $tariffs->{SEARCH_FIELDS_COUNT}; $i++ ){
+      if ( $tariffs->{COL_NAMES_ARR}->[$i] eq 'id' ){
+        $line->{id} = $html->b( $line->{id} );
+      }
+      elsif ( $tariffs->{COL_NAMES_ARR}->[$i] eq 'name' ){
+        $line->{name} = $html->button( $line->{name}, "index=$index&TP_ID=$line->{tp_id}" ),
+      }
+      elsif ( $tariffs->{COL_NAMES_ARR}->[$i] eq 'payment_type' ){
+        $line->{payment_type} = $Payment_Types[ $line->{payment_type} ];
+      }
+      elsif ( $tariffs->{COL_NAMES_ARR}->[$i] =~ /time_tarifs|traf_tarifs/ ){
+        $line->{$tariffs->{COL_NAMES_ARR}->[$i]} = $bool_vals[ $line->{$tariffs->{COL_NAMES_ARR}->[$i]} ];
+      }
+
+      push @fields_array, $line->{$tariffs->{COL_NAMES_ARR}->[$i]};
+    }
+
+    my ($delete, $change);
+    if ( $permissions{4}{1} ){
+      $delete = $html->button( $lang{DEL}, "index=$index&del=$line->{tp_id}",
+        { MESSAGE => "$lang{DEL} $line->{tp_id}?", class => 'del' } );
+      $change = $html->button( $lang{CHANGE}, "index=$index&TP_ID=$line->{tp_id}", { class => 'change' } );
+    }
+
+    if ( $FORM{TP_ID} && $FORM{TP_ID} eq $line->{tp_id} ){
+      $table->{rowcolor} = 'bg-success';
+    }
+    else{
+      $table->{rowcolor} = undef;
+    }
+
+    $table->addrow( @fields_array,
+      $html->button( $lang{REPORTS},
+        "index=" . get_function_index( 'ureports_tp' ) . "&subf=" . get_function_index( 'ureports_tp_reports' ) . "&TP_ID=$line->{tp_id}"
+        , { BUTTON => 1 } ),
+      $change,
+      $delete
+    );
+  }
+
+  print $table->show();
+
+  $table = $html->table(
+    {
+      width      => '100%',
+      cols_align => [ 'right', 'right' ],
+      rows       => [ [ "$lang{TOTAL}:", $html->b( $tariffs->{TOTAL} ) ] ]
+    }
+  );
+
+  print $table->show();
+
+  return 1;
+}
+
+#**********************************************************
+=head2 ureports_session_detail()
+
+=cut
+#**********************************************************
+sub ureports_session_detail{
+
+  $Ureports->ureports_session_detail( $FORM{MSG_ID} );
+
+  $html->tpl_show( _include( 'ureports_session_detail', 'Ureports' ), $Ureports );
+
+  return 1;
+}
+
+#**********************************************************
+=head2 ureports_stats()
+
+=cut
+#**********************************************************
+sub ureports_stats{
+
+  if ( $FORM{del} && $FORM{is_js_confirmed} ){
+    $Ureports->log_del( { %FORM } );
+    if ( !$Ureports->{errno} ){
+      $html->message( 'info', $lang{INFO}, "$lang{DELETED} $lang{MESSAGE} [$FORM{MSG_ID}]" );
+    }
+  }
+  elsif ( $FORM{MSG_ID} ){
+    $pages_qs .= "&SESSION_ID=$FORM{MSG_ID}";
+    ureports_session_detail( { MSG_ID => $LIST_PARAMS{LOGIN} } );
+    return 0;
+  }
+
+  if ( _error_show( $Ureports ) ){
+    return 0;
+  }
+
+  if ( $FORM{rows} ){
+    $LIST_PARAMS{PAGE_ROWS} = $FORM{rows};
+    $conf{list_max_recs} = $FORM{rows};
+    $pages_qs .= "&rows=$conf{list_max_recs}";
+  }
+
+  if ( !$FORM{sort} ){
+    $LIST_PARAMS{SORT} = '1';
+    $LIST_PARAMS{DESC} = 'desc';
+  }
+
+  my @rows = (
+    "$lang{FROM}: ",
+    $html->date_fld2( 'FROM_DATE', { MONTHES => \@MONTHES, FORM_NAME => 'stats', WEEK_DAYS => \@WEEKDAYS } ),
+    "$lang{TO}: ",
+    $html->date_fld2( 'TO_DATE', { MONTHES => \@MONTHES, FORM_NAME => 'stats', WEEK_DAYS => \@WEEKDAYS } ),
+    "$lang{ROWS}: ",
+    $html->form_input( 'rows', int( $conf{list_max_recs} ), { SIZE => 4, OUTPUT2RETURN => 1 } ),
+    $html->form_input( 'show', $lang{SHOW}, { TYPE => 'submit', OUTPUT2RETURN => 1 } )
+  );
+
+  my $ROWS;
+  foreach my $val ( @rows ){
+    $ROWS .= $html->element( 'div', $val, { class => 'form-group', OUTPUT2RETURN => 1 } );
+  }
+
+  my $report_form = $html->element( 'div', $ROWS, {
+      class => 'well well-sm sticky',
+    } );
+
+  print $html->form_main(
+      {
+        CONTENT => $report_form,
+        HIDDEN  => {
+          sid   => ($sid || ''),
+          index => $index,
+          UID   => $FORM{UID},
+          UIDS  => ($FORM{UIDS} || '')
+        },
+        #NAME => 'stats',
+        #ID   => 'stats',
+        class   => 'form-inline',
+      }
+    );
+
+  #dv_stats_calculation($sessions);
+
+  if ( defined( $FORM{show} ) ){
+    $pages_qs .= "&show=1&FROM_DATE=$FORM{FROM_DATE}&TO_DATE=$FORM{TO_DATE}";
+    $LIST_PARAMS{INTERVAL} = "$FORM{FROM_DATE}/$FORM{TO_DATE}";
+  }
+  elsif ( defined( $FORM{PERIOD} ) ){
+    $LIST_PARAMS{PERIOD} = int( $FORM{PERIOD} );
+    $pages_qs .= "&PERIOD=$FORM{PERIOD}";
+  }
+
+  #Session List
+  my $list = $Ureports->log_list( { %LIST_PARAMS } );
+
+  my $table = $html->table(
+    {
+      width        => '100%',
+      caption      => "$lang{STATS}",
+      title        =>
+      [ "#", "$lang{USER}", "$lang{DATE}", "$lang{DESTINATION}", "$lang{TARIF_PLAN}", "$lang{REPORTS}", "$lang{STATUS}",
+        "-", "-" ],
+      cols_align   => [ 'right', 'left', 'right', 'left', 'left', 'center:noprint', 'center:noprint' ],
+      qs           => $pages_qs,
+      pages        => $Ureports->{TOTAL},
+      recs_on_page => $LIST_PARAMS{PAGE_ROWS},
+      ID           => 'REPORTS_LOG'
+    }
+  );
+
+  my $delete = '';
+
+  foreach my $line ( @{$list} ){
+    if ( $permissions{3}{1} && $LIST_PARAMS{UID} ){
+      $delete = $html->button( $lang{DEL}, "index=" . $index . "$pages_qs&del=$line->[0]&MSG_ID=$line->[0]",
+        { MESSAGE => "$lang{DEL} Session MSG_ID $line->[0]?", class => 'del' } );
+    }
+
+    $table->addrow( $line->[0], $html->button( "$line->[1]", "index=11&UID=$line->[7]" ), $line->[2], $line->[3],
+      $line->[4], $line->[5], $line->[6],
+      $html->button( "D", "index=$index&UID=$line->[7]&MSG_ID=$line->[0]",
+        { TITLE => "$lang{DETAIL}", class => 'show' } ). ' '. $delete );
+  }
+
+  print $table->show();
+
+  return 1;
+}
+
+#**********************************************************
+=head2 ureports_user_info();
+
+=cut
+#**********************************************************
+sub ureports_user_info{
+
+  my $report_type = $FORM{TYPE} || 0;
+
+  if ( $FORM{add} ){
+    if ( $report_type == 0 && $FORM{DESTINATION} !~ /^(([^<>()[\]\\.,;:\s\@\"]+(\.[^<>()[\]\\.,;:\s\@\"]+)*)|(\".+\"))\@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/ ){
+      $html->message( 'err', $lang{ERROR}, "$lang{ERR_WRONG_EMAIL}" );
+    }
+    elsif($report_type == 1 && $conf{PHONE_FORMAT} && $FORM{DESTINATION} !~ /$conf{PHONE_FORMAT}/) {
+      _error_show({ errno => 21, errstr => 'ERR_WRONG_PHONE' });
+    }
+    else{
+      $Ureports->user_add( { %FORM } );
+      if ( !$Ureports->{errno} ){
+        my $message = "$lang{ACTIVATE}\n";
+        if ( !($report_type == 1 && $conf{UREPORTS_SKIP_ACTIVATE_SMS}) ){
+          if ( ureports_send_reports( $report_type, $FORM{DESTINATION}, " $lang{SERVICE} $lang{REPORTS} $lang{ENABLE}",
+            { UID => $FORM{UID} } ) ){
+            $message .= "$lang{ACTIVATED_MSG_SENDED}";
+          }
+        }
+        $html->message( 'info', $lang{INFO}, $message );
+      }
+    }
+  }
+  elsif ( $FORM{set} ){
+    if ( ! $report_type && $FORM{DESTINATION} !~ /^(([^<>()[\]\\.,;:\s\@\"]+(\.[^<>()[\]\\.,;:\s\@\"]+)*)|(\".+\"))\@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/ ){
+      $html->message( 'err', $lang{ERROR}, "$lang{ERR_WRONG_EMAIL}" );
+    }
+    elsif($report_type == 1 && $conf{PHONE_FORMAT} && $FORM{DESTINATION} !~ /$conf{PHONE_FORMAT}/) {
+      _error_show({ errno => 21, errstr => 'ERR_WRONG_PHONE' });
+    }
+    else{
+      $Ureports->user_change( { %FORM, UID => $user->{UID} } );
+
+      if ( !$Ureports->{errno} ){
+        $Ureports->tp_user_reports_change( { %FORM, UID => $user->{UID} } );
+        if ( !$Ureports->{errno} ){
+          my $message = "$lang{CHANGED}\n";
+          if ( !($report_type == 1 && $conf{UREPORTS_SKIP_ACTIVATE_SMS}) ){
+            if ( ureports_send_reports( $report_type, $FORM{DESTINATION}, " $lang{SERVICE} $lang{REPORTS} $lang{CHANGED}"
+              , { UID => $user->{UID} } ) ){
+              $message .= "$lang{ACTIVATED_MSG_SENDED}";
+            }
+          }
+          $html->message( 'info', $lang{INFO}, $message );
+        }
+      }
+      else{
+        $html->message( 'err', $lang{INFO}, "$lang{CHANGED}" );
+      }
+    }
+  }
+
+  $Ureports->user_info( $LIST_PARAMS{UID} );
+  $FORM{UID} = $LIST_PARAMS{UID};
+
+  if ( $Ureports->{TOTAL} < 1 ){
+    $html->message( 'info', $lang{INFO}, $lang{NOT_ACTIVE} );
+    $Ureports->{ACTION} = 'add';
+    $Ureports->{LNG_ACTION} = $lang{ACTIVATE};
+    $Ureports->{TP_NAME} = '';
+  }
+  else{
+    if ($Ureports->{STATUS} && $Ureports->{STATUS} == 2 ){
+      $html->message( 'info', $lang{INFO}, "$lang{NOT_ACTIVE}" );
+      return 0;
+    }
+
+    $Ureports->{ACTION} = 'set';
+    $Ureports->{LNG_ACTION} = $lang{CHANGE};
+
+    my $table = $html->table(
+      {
+        width      => '100%',
+        caption    => $lang{REPORTS},
+        title      => [ "$lang{ENABLE}", "$lang{NAME}", "$lang{VALUE}", "$lang{PRICE}", "$lang{SENDED}" ],
+        cols_align => [ 'center', 'left', 'right', 'center', 'right' ],
+        qs         => $pages_qs,
+        ID         => 'TP_REPORTS'
+      }
+    );
+
+    my $list = $Ureports->tp_user_reports_list( {
+      %LIST_PARAMS,
+      COMMENTS  => '_SHOW',
+      TP_ID     => $Ureports->{TP_ID},
+      VISUAL    => '_SHOW',
+      COLS_NAME => 1
+    } );
+
+    foreach my $line ( @{$list} ){
+      next if($line->{visual});
+      $table->addrow(
+        $html->form_input( "IDS", "$line->{report_id}",
+          { TYPE => 'checkbox', STATE => ($line->{date}) ? 1 : undef, OUTPUT2RETURN => 1 } ),
+        ($line->{comments}) ? $line->{comments} : $REPORTS{ $line->{report_id} },
+        $html->form_input( "VALUE_$line->{report_id}", (($line->{value}) ? $line->{value} : 0),
+          { OUTPUT2RETURN => 1, SIZE => 6 } ),
+        (($line->{msg_price}) ? $line->{msg_price} : '0.00'),
+        $line->{date}
+      );
+    }
+
+    $Ureports->{REPORTS_LIST} = $table->show( { OUTPUT2RETURN => 1 } )
+     . $html->form_input('set', $lang{SET}, { TYPE => 'submit', SUCCESS => 1, OUTPUT2RETURN => 1 });
+  }
+
+  $Ureports->{TP_ID} = $html->form_select(
+    'TP_ID',
+    {
+      SELECTED => $Ureports->{TP_ID},
+      SEL_LIST => $tariffs->list( { MODULE => 'Ureports', COLS_NAME => 1 } ),
+      SEL_KEY  => 'tp_id',
+      NO_ID    => 1
+    }
+  );
+
+  $Ureports->{TYPE_SEL} = $html->form_select(
+    'TYPE',
+    {
+      SELECTED     => $Ureports->{TYPE},
+      SEL_ARRAY    => \@service_type,
+      ARRAY_NUM_ID => 1
+    }
+  );
+
+  $Ureports->{TP_NAME} = '';
+  $Ureports->{STATUS_SEL} = $html->form_select(
+    'STATUS',
+    {
+      SELECTED     => $Ureports->{STATUS},
+      SEL_ARRAY    => [ $service_status[0], $service_status[1] ],
+      ARRAY_NUM_ID => 1
+    }
+  );
+
+  $html->tpl_show( _include( 'ureports_user', 'Ureports' ), $Ureports );
+
+  return 1;
+}
+
+#**********************************************************
+=head2 ureports_send_reports($type, $destination, $message, $attr)
+
+  Arguments:
+    $type           - 0 Email, 1 - Sms
+    $destination    - Destination address
+    $message
+    $attr
+       REPORT_ID
+
+   Returns:
+     True or false
+
+=cut
+#**********************************************************
+sub ureports_send_reports{
+  my ($type, $destination, $message, $attr) = @_;
+
+  my $debug = 0;
+
+  if ( $attr->{REPORT_ID} ){
+    $message = $html->tpl_show( _include( 'ureports_report_' . $attr->{REPORT_ID}, 'Ureports' ), $attr,
+      { OUTPUT2RETURN => 1 } );
+  }
+
+  if ( $type == 0 ){
+    my $subject = $attr->{SUBJECT} || '';
+    if ( !sendmail( $conf{ADMIN_MAIL}, $destination, $subject, $message, $conf{MAIL_CHARSET} ) ){
+      return 0;
+    }
+  }
+  elsif ( $type == 1 ){
+    if ( in_array( 'Sms', \@MODULES ) ){
+      load_module( 'Sms', $html );
+      sms_send(
+        {
+          NUMBER      => $destination,
+            MESSAGE   => $message,
+            DEBUG     => $debug,
+            UID       => $attr->{UID},
+            PERRIODIC => 1
+        }
+      );
+    }
+    elsif ( $conf{UREPORTS_EXT_SENDER} ){
+      cmd( "$conf{UREPORTS_EXT_SENDER} $destination $message" );
+    }
+  }
+  elsif ( $type == 2 ){
+
+  }
+
+  if ( $attr->{DEBUG} && $attr->{DEBUG} == 1 ){
+    print "Sended report: $type to $destination\n";
+  }
+
+  return 1;
+}
+
+#**********************************************************
+=head2 ureports_daily_resets($attr) - reset send date
+
+=cut
+#**********************************************************
+sub ureports_daily_resets{
+  my ($attr) = @_;
+
+  my $debug = $attr->{DEBUG} || 0;
+  my $debug_output = '';
+
+  $debug_output = "Daily reports reset\n" if ($debug > 1);
+
+  $LIST_PARAMS{GID} = $attr->{GID} if ($attr->{GID});
+  $LIST_PARAMS{LOGIN} = $attr->{LOGIN} if ($attr->{LOGIN});
+  $Ureports->{debug} = 1 if ($debug > 6);
+
+  my $d = (split( /-/, $ADMIN_REPORT{DATE}, 3 ))[2];
+  if ( $d == 1 ){
+    my $list = $Ureports->tp_user_reports_list(
+      {
+        REPORT_ID => "13;14",
+        DATE      => '>0000-00-00',
+        %LIST_PARAMS,
+        COLS_NAME => 1,
+        PAGE_ROWS => 1000000
+      }
+    );
+
+    foreach my $line ( @{$list} ){
+      $debug_output .= "UID: $line->{uid} REPORT_ID: $line->{report_id} VALUE: $line->{value} DEPOSIT: $line->{deposit}\n" if ($debug > 1);
+      if ( $debug < 5 ){
+        $Ureports->tp_user_reports_reset_date(
+          {
+            REPORT_ID => $line->{report_id},
+            UID       => $line->{uid}
+          }
+        );
+      }
+    }
+  }
+
+  my $list = $Ureports->tp_user_reports_list(
+    {
+      RESET     => 1,
+      REPORT_ID => "1",
+      DATE      => '>0000-00-00',
+      %LIST_PARAMS,
+      COLS_NAME => 1,
+      PAGE_ROWS => 1000000
+    }
+  );
+
+  foreach my $line ( @{$list} ){
+    $debug_output .= "UID: $line->{uid} REPORT_ID: $line->{report_id} VALUE: $line->{value} DEPOSIT: $line->{deposit}\n" if ($debug > 1);
+    if ( $debug < 5 ){
+      $Ureports->tp_user_reports_reset_date(
+        {
+          REPORT_ID => $line->{report_id},
+          UID       => $line->{uid}
+        }
+      );
+    }
+  }
+
+  $DEBUG .= $debug_output;
+  return $debug_output;
+}
+
+#**********************************************************
+=head2 ureports_periodic_reports($attr)
+
+=cut
+#**********************************************************
+sub ureports_periodic_reports{
+  my ($attr) = @_;
+
+  my $debug = $attr->{DEBUG} || 0;
+  my $debug_output = '';
+
+  $debug_output .= "Ureports: Daily spool former\n" if ($debug > 1);
+  $LIST_PARAMS{MODULE} = 'Ureports';
+  $LIST_PARAMS{TP_ID} = $attr->{TP_ID} if ($attr->{TP_ID});
+
+  my %SERVICE_LIST_PARAMS = ();
+  $SERVICE_LIST_PARAMS{LOGIN} = $attr->{LOGIN} if ($attr->{LOGIN});
+
+  my $list = $tariffs->list( { %LIST_PARAMS } );
+  $ADMIN_REPORT{DATE} = $DATE if (!$ADMIN_REPORT{DATE});
+
+  foreach my $line ( @{$list} ){
+    my $TP_ID = $line->[0];
+    my %TP_INFO = ();
+    $TP_INFO{POSTPAID} = $line->[12];
+    $TP_INFO{REDUCTION} = $line->[11];
+
+    $debug_output .= "TP ID: $TP_ID DF: $line->[5] MF: $line->[6] POSTPAID: $TP_INFO{POSTPAID} REDUCTION: $TP_INFO{REDUCTION} EXT_BILL: $line->[13] CREDIT: $line->[14]\n" if ($debug > 1);
+
+    #Get users
+    my $ulist = $Ureports->tp_user_reports_list(
+      {
+        TP_ID     => $TP_ID,
+        SORT      => 1,
+        PAGE_ROWS => 1000000,
+        REPORT_ID => '_SHOW',
+        COLS_NAME => 1,
+        %SERVICE_LIST_PARAMS
+      }
+    );
+
+    foreach my $u ( @{$ulist} ){
+
+      #Check bill id and deposit
+      my %user = %{$u};
+
+      if ( $user{BILL_ID} > 0 && defined( $user{DEPOSIT} ) ){
+        if ( $user{REPORT_ID} == 0 ){
+
+          if ( $user{VALUE} > $user{DEPOSIT} ){
+            if ( $conf{MSG_PRICE} > 0 && $user{DEPOSIT} + $user{CREDIT} < 0 && $TP_INFO{POSTPAID} == 0 ){
+              $debug_output .= "UID: $user{UID} DEPOSIT: $user{DEPOSIT}/$user{CREDIT} Small Deposit\n" if ($debug > 0);
+              next;
+            }
+            ureports_send_reports(
+              $user{DESTINATION_TYPE},
+              $user{DESTINATION_ID},
+              "$lang{DEPOSIT}: $user{DEPOSIT}",
+              {
+                SUBJECT => "$lang{DEPOSIT_BELOW}",
+                UID     => $user{UID}
+              }
+            );
+
+            if ( $conf{MSG_PRICE} > 0 ){
+              my $sum = $conf{MSG_PRICE};
+              my %PARAMS = (
+                DESCRIBE => "$lang{REPORTS} ($user{REPORT_ID}) ",
+                DATE     => "$ADMIN_REPORT{DATE} $TIME",
+                METHOD   => 1
+              );
+
+              if ( $debug > 4 ){
+                $debug_output .= " UID: $user{UID} SUM: $sum REDUCTION: $user{REDUCTION}\n";
+              }
+              else{
+                $fees->take( \%user, $sum, { %PARAMS } );
+                if ( $fees->{errno} ){
+                  print "Error: [$fees->{errno}] $fees->{errstr} ";
+                  if ( $fees->{errno} == 14 ){
+                    print "[ $user{UID} ] $user{LOGIN} - Don't have money account (Ureport)";
+                  }
+                  print "\n";
+                }
+                elsif ( $debug > 0 ){
+                  $debug_output .= " $user{LOGIN}  UID: $user{UID} SUM: $sum REDUCTION: $user{REDUCTION}\n" if ($debug > 0);
+
+                  #$debug_output .= " UID: $user{UID} SUM: $sum REDUCTION: $user{REDUCTION}\n";
+                }
+              }
+
+            }
+            $debug_output .= "UID: $user{UID} TYPE: $user{DESTINATION_TYPE} DESTINATION: $user{DESTINATION_ID}" if ($debug > 0);
+
+            $Ureports->log_add(
+              {
+                DESTINATION => $user{DESTINATION_ID},
+                BODY        => '',
+                UID         => $user{UID},
+                TP_ID       => $user{TP_ID},
+                REPORT_ID   => $user{REPORT_ID},
+                STATUS      => 0
+              }
+            );
+          }
+        }
+      }
+      else{
+        print "[ $user{UID} ] $user{LOGIN} - Don't have money account\n";
+      }
+
+    }
+  }
+
+  $DEBUG .= $debug_output;
+  return $debug_output;
+}
+
+#***********************************************************
+=head2 ureports_sheduler($type, $action, $uid)
+
+=cut
+#***********************************************************
+sub ureports_sheduler{
+  #  my ($type, $action, $uid) = @_;
+
+  #$Ureports->info($uid);
+  #  if ($type eq 'tp') {
+  #    $Ureports->change(
+  #      {
+  #        UID   => $uid,
+  #        TP_ID => $action
+  #      }
+  #    );
+  #
+  #    if ($Ureports->{errno} && $Ureports->{errno} == 15) {
+  #      return $Ureports->{errno};
+  #    }
+  #  }
+
+  return 1;
+}
+
+##***********************************************************
+#=head2 ureports_report($type, $attr)
+#
+#=cut
+##***********************************************************
+#sub ureports_report {
+#  my ($type, $attr) = @_;
+#  my $REPORT = "Module: Ureports\n";
+#
+#  %LIST_PARAMS = %{ $attr->{LIST_PARAMS} } if (defined($attr->{LIST_PARAMS}));
+#
+#  if ($type eq 'daily') {
+#    $REPORT .= sprintf("%-14s| %5s| %9s| %9s| %10s| %9s|\n", $lang{LOGIN}, $lang{SESSIONS}, $lang{TRAFFIC}, "$lang{TRAFFIC} 2", $lang{DURATION}, $lang{SUM});
+#    $REPORT .= "---------------------------------------------------------\n";
+#
+#    my $list = $sessions->reports({%LIST_PARAMS});
+#    foreach my $line (@$list) {
+#      $REPORT .= sprintf("%-14s| %5d| %9s| %9s| %8s| %9.4f|\n", $line->[1], $line->[2], int2byte($line->[3]), int2byte($line->[4]), $line->[5], $line->[6]);
+#    }
+#
+#    $REPORT .= "---------------------------------------------------------\n";
+#    $REPORT .= sprintf(
+#      "%-14s| %20s|\n%-14s| %20s|\n%-14s| %20s|\n%-14s| %20s|\n%-14s| %20s|\n%-14s| %20s|\n",
+#      $lang{USERS}, $sessions->{USERS}, $lang{SESSIONS}, $sessions->{SESSIONS}, $lang{TRAFFIC}, int2byte($sessions->{TRAFFIC}),
+#      "$lang{TRAFFIC} 2", int2byte($sessions->{TRAFFIC_2}),
+#      $lang{DURATION}, $sessions->{DURATION}, $lang{SUM}, $sessions->{SUM}
+#    );
+#
+#  }
+#  elsif ($type eq 'monthly') {
+#    $REPORT .= sprintf(" %12s| %5s| %5s| %10s| %10s| %12s| %9s|\n", $lang{DATE}, $lang{USERS}, $lang{SESSIONS}, $lang{TRAFFIC}, "$lang{TRAFFIC} 2", $lang{DURATION}, $lang{SUM});
+#    $REPORT .= "---------------------------------------------------------\n";
+#
+#    my $list = $sessions->reports({%LIST_PARAMS});
+#
+#    foreach my $line (@$list) {
+#
+#      #   u.id, count(l.id), sum(l.sent + l.recv), sum(l.sent2 + l.recv2), sec_to_time(sum(l.duration)), sum(l.sum), l.id
+#      $REPORT .= sprintf(" %12s| %5s| %5s| %10s| %10s| %12s| %9.4f|\n", $line->[0], $line->[1], $line->[2], int2byte($line->[3]), int2byte($line->[4]), $line->[5], $line->[6]);
+#    }
+#
+#    $REPORT .= "---------------------------------------------------------\n";
+#    $REPORT .= sprintf(
+#      "%-14s| %20s|\n%-14s| %20s|\n%-14s| %20s|\n%-14s| %20s|\n%-14s| %20s|\n%-14s| %20s|\n",
+#      $lang{USERS}, $sessions->{USERS}, $lang{SESSIONS}, $sessions->{SESSIONS}, $lang{TRAFFIC}, int2byte($sessions->{TRAFFIC}),
+#      "$lang{TRAFFIC} 2", int2byte($sessions->{TRAFFIC_2}),
+#      $lang{DURATION}, $sessions->{DURATION}, $lang{SUM}, $sessions->{SUM}
+#    );
+#  }
+#
+#  return $REPORT;
+#}
+
+#**********************************************************
+=head2 ureports_extra_reports($attr)
+
+=cut
+#**********************************************************
+sub ureports_extra_reports {
+  #my ($attr) = @_;
+
+  my %reports = ();
+  my $mod_path    = '../../Abills/modules/Ureports/';
+
+  my $contents = _get_files_in($mod_path, { FILTER => '\.pm' });
+  foreach my $report_module (@$contents) {
+    require $mod_path . $report_module;
+    $report_module =~ s/\.pm//;
+    my $mod = "Ureports::$report_module";
+    my $report = $mod->new($db, $admin, \%conf);
+    if($report->{SYS_CONF}{REPORT_NAME}) {
+      $reports{$report_module} = $report->{SYS_CONF}{REPORT_NAME} . ' : '. ($report->{SYS_CONF}{COMMENTS} || q{});
+    }
+  }
+
+  return \%reports;
+}
+
+#**********************************************************
+=head2 ureports_tp_reports($attr)
+
+=cut
+#**********************************************************
+sub ureports_tp_reports{
+  my ($attr) = @_;
+
+  if ( defined( $attr->{TP} ) ){
+    my $tarif_plan = $attr->{TP};
+    $tarif_plan->{ACTION} = 'add';
+    $tarif_plan->{LNG_ACTION} = $lang{ADD};
+    if ( $FORM{change} ){
+      $Ureports->tp_reports_change( { %FORM } );
+
+      if ( !$Ureports->{errno} ){
+        $html->message( 'info', $lang{INFO}, "$lang{REPORTS} $lang{CHANGED} [$FORM{TP_ID}]" );
+      }
+    }
+
+    _error_show( $tarif_plan );
+
+    my %TP_REPORTS = ();
+    my $list = $Ureports->tp_reports_list( {
+      %LIST_PARAMS,
+      TP_ID     => $FORM{TP_ID},
+      COLS_NAME => 1
+    } );
+
+    foreach my $line ( @{$list} ){
+      $TP_REPORTS{ $line->{report_id} }{PRICE}    = $line->{msg_price};
+      $TP_REPORTS{ $line->{report_id} }{COMMENTS} = $line->{comments} || q{} ;
+      $TP_REPORTS{ $line->{report_id} }{MODULE}   = $line->{module} || q{} ;
+      $TP_REPORTS{ $line->{report_id} }{VISUAL}   = $line->{visual} || 0 ;
+    }
+
+    my $table = $html->table({
+      width      => '100%',
+      caption    => $lang{REPORTS},
+      title      => [ '#', $lang{NAME}, $lang{COMMENTS}, $lang{PRICE}, $lang{VISUAL} ], #"$lang{DEFAULT} $lang{VALUE}"],
+      qs         => $pages_qs,
+      ID         => 'TP_REPORTS'
+    });
+
+    #Get extra report
+    my $extra_reports = ureports_extra_reports();
+    my $next_id = 0;
+    foreach my $report_id ( sort { $a <=> $b } keys %REPORTS ){
+      my $visual = $html->form_select('VISUAL_'.$report_id, {
+        SEL_ARRAY => [$lang{YES}, $lang{NO}],
+        SELECTED  => ($TP_REPORTS{$report_id} && $TP_REPORTS{$report_id}{VISUAL}) ? $TP_REPORTS{$report_id} : undef,
+        ARRAY_NUM_ID => 1
+      });
+
+      $table->addrow($html->form_input( "IDS", $report_id,
+          { TYPE => 'checkbox', STATE => ($TP_REPORTS{$report_id}) ? 1 : undef } ) . $report_id,
+        $REPORTS{$report_id},
+        $html->form_input('COMMENTS_'. $report_id, $TP_REPORTS{$report_id}{COMMENTS}),
+        $html->form_input('PRICE_'. $report_id, (($TP_REPORTS{$report_id}) ? $TP_REPORTS{$report_id}{PRICE} : '0.00') ),
+        $visual
+      );
+      delete $TP_REPORTS{$report_id};
+      $next_id = $report_id;
+    }
+
+    foreach my $report_id ( sort { $a <=> $b } keys %TP_REPORTS ){
+      my $visual = $html->form_select('VISUAL_'.$report_id, {
+        SEL_ARRAY => [$lang{YES}, $lang{NO}],
+        SELECTED  => $TP_REPORTS{$report_id}{VISUAL},
+        ARRAY_NUM_ID => 1
+      });
+
+      my $report_sel = $html->form_select('MODULE_'.$report_id, {
+        SEL_HASH => $extra_reports,
+        SELECTED => $TP_REPORTS{$report_id}{MODULE}
+      });
+
+      $table->addrow( $html->form_input( "IDS", "$report_id",
+          { TYPE => 'checkbox', STATE => ($TP_REPORTS{$report_id}) ? 1 : undef } ) . $report_id,
+        $report_sel,
+        $html->form_input('COMMENTS_'. $report_id, $TP_REPORTS{$report_id}{COMMENTS}),
+        $html->form_input('PRICE_'. $report_id, (($TP_REPORTS{$report_id}{PRICE}) ? $TP_REPORTS{$report_id}{PRICE} : '0.00') ),
+        $visual
+      );
+      $next_id = $report_id;
+    }
+
+    $next_id++;
+    my $visual = $html->form_select('VISUAL_'.$next_id, {
+      SEL_ARRAY => [$lang{YES}, $lang{NO}],
+      SELECTED  => $TP_REPORTS{$next_id}{VISUAL},
+      ARRAY_NUM_ID => 1
+    });
+
+    my $report_sel = $html->form_select('MODULE_'.$next_id, {
+      SEL_HASH => $extra_reports
+    });
+
+    $table->addrow( $html->form_input("IDS", "$next_id", { TYPE => 'checkbox' }) . $next_id,
+      $report_sel,
+      $html->form_input('COMMENTS_'. $next_id, ''),
+      $html->form_input('PRICE_'. $next_id, '0.00'),
+      $visual
+    );
+
+    print $html->form_main(
+        {
+          CONTENT => $table->show({ OUTPUT2RETURN => 1 }),
+          HIDDEN  => {
+            index => $index,
+            subf  => $FORM{subf},
+            TP_ID => $FORM{TP_ID}
+          },
+          SUBMIT  => { change => $lang{CHANGE} }
+        }
+      );
+  }
+  elsif ( defined( $FORM{TP_ID} ) ){
+    $FORM{subf} = $index;
+    ureports_tp();
+    return 0;
+  }
+
+  return 1;
+}
+
+
+#**********************************************************
+=head2 ureports_payments_maked($attr)
+
+=cut
+#**********************************************************
+sub ureports_payments_maked{
+  my ($attr) = @_;
+
+  my Users $user;
+  if ( $attr->{USER_INFO} ){
+    $user = $attr->{USER_INFO};
+    if ( !$user->{UID} ){
+      return 0;
+    }
+  }
+  else{
+    return 0;
+  }
+
+  return '' if ($FORM{DISABLE} || $FORM{CREDIT});
+  return '' if (!$attr->{SUM} || int( $attr->{SUM} ) == 0);
+
+  $Ureports->tp_user_reports_list( {
+      UID              => $user->{UID} || '-',
+      REPORT_ID        => 12,
+      DESTINATION_TYPE => '_SHOW',
+      DESTINATION_ID   => '_SHOW',
+      COLS_NAME        => 1
+    } );
+
+  if ( $Ureports->{TOTAL} > 0 ){
+    my %info = ();
+    my $total_daily_fee = 0;
+
+    my $cross_modules_return = cross_modules_call( '_docs', {
+        FEES_INFO    => 1,
+        UID          => $user->{UID},
+        SKIP_MODULES => 'Ureports'
+    } );
+
+    foreach my $module ( sort keys %{$cross_modules_return} ){
+      if ( ref $cross_modules_return->{$module} eq 'HASH' ){
+        if ( $cross_modules_return->{$module}{day} ){
+          $total_daily_fee += $cross_modules_return->{$module}{day};
+          $info{RECOMMENDED_PAYMENT} += $cross_modules_return->{$module}{day} * 30;
+        }
+
+        if ( $cross_modules_return->{$module}{abon_distribution} ){
+          $total_daily_fee += ($cross_modules_return->{$module}{month} / 30);
+          $info{RECOMMENDED_PAYMENT} += $cross_modules_return->{$module}{month} || 0;
+        }
+      }
+    }
+
+    if ( $total_daily_fee ){
+      $info{EXPIRE_DAYS} = int( $user->{DEPOSIT} / $total_daily_fee );
+      $info{EXPIRE_DATE} = POSIX::strftime( "%Y-%m-%d", localtime( time + $info{EXPIRE_DAYS} * 86400 ) );
+    }
+    else {
+      $info{EXPIRE_DAYS} = '';
+    }
+
+    $lang{ALL_SERVICE_EXPIRE} =~ s/XX/ $info{EXPIRE_DAYS} /;
+    $info{MESSAGE} = $lang{ALL_SERVICE_EXPIRE};
+
+    if ( $user->{DEPOSIT} + $user->{CREDIT} > 0 ){
+      $info{RECOMMENDED_PAYMENT} = sprintf( "%.2f", ($info{RECOMMENDED_PAYMENT} || 0) - ($user->{DEPOSIT} + $user->{CREDIT}) );
+    }
+    else{
+      $info{RECOMMENDED_PAYMENT} += sprintf( "%.2f", abs( $user->{DEPOSIT} + $user->{CREDIT} ) );
+    }
+
+    $info{DEPOSIT} = sprintf( "%.2f", $user->{DEPOSIT} );
+
+    $user->pi( { UID => $user->{UID} } );
+    $info{DATE} = "$DATE $TIME";
+    $info{SUM} = sprintf( "%.2f", $attr->{SUM} );
+    my $recommended_payment = '';
+
+    if ( $recommended_payment ){
+      $info{MESSAGE} .= "\n $lang{RECOMMENDED_PAYMENT}:  $recommended_payment\n";
+    }
+
+    ureports_send_reports(
+      $Ureports->{list}->[0]->{destination_type},
+      $Ureports->{list}->[0]->{destination_id},
+      $html->tpl_show( _include( 'ureports_report_12', 'Ureports' ), { %{$user}, %info }, { OUTPUT2RETURN => 1 } ),
+      {
+        SUBJECT => "$lang{BALANCE_RECHARCHE}",
+        UID     => $user->{UID},
+      }
+    );
+    return 1;
+  }
+
+  return 1;
+}
+1
+

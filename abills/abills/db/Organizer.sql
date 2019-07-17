@@ -1,0 +1,13 @@
+CREATE TABLE IF NOT EXISTS `organizer_user_info` (
+  `id` INT(11) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `uid` INT(11) UNSIGNED NOT NULL DEFAULT '0',
+  `date` DATE NOT NULL DEFAULT '0000-00-00',
+  `light` INT UNSIGNED NOT NULL DEFAULT 0,
+  `gas` INT UNSIGNED NOT NULL DEFAULT 0,
+  `water` INT UNSIGNED NOT NULL DEFAULT 0,
+  `communal` DOUBLE(6, 2) UNSIGNED NOT NULL DEFAULT '0.00',
+  `comments` TEXT NOT NULL,
+  PRIMARY KEY (`uid`, `date`),
+  KEY `id` (`id`)
+)
+  COMMENT = 'Users data';

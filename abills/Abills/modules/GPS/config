@@ -1,0 +1,10 @@
+#Iner_ID : Main or Sub or if -1 user menu func list
+%FUNCTIONS_LIST = (
+  "1:0:GPS:gps_tracked_admins:"                                          => 6,
+  "2:1:$lang{NOT_REGISTERED} $lang{TRACKERS}:gps_unregistered_trackers:" => 6,
+  "3:0::gps_add_thumbnail:IN_MODAL"                                      => 6,
+  "4:0::gps_delete_thumbnail:IN_MODAL"                                   => 6,
+  "4:0:GPS:gps_report:"                                                  => 4,
+);
+
+1

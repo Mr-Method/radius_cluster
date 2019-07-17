@@ -1,0 +1,60 @@
+version: "3"
+services:
+        radius_worker_1:
+                build:
+                        context: ./radius_workers
+                        #volumes:
+                        #- ./raddb/*:/etc/freeradius/3.0/
+                        #- ./abills:/usr/abills/
+                networks:
+                        radius1:
+                                ipv4_address: 172.19.0.3
+
+                
+        radius_worker_2:
+                build:
+                        context: ./radius_workers
+                        #volumes:
+                        #- ./raddb/*:/etc/freeradius/3.0/
+                        #- ./abills:/usr/abills/
+                networks:
+                        radius1:
+                                ipv4_address: 172.19.0.4
+
+        radius_worker_3:
+                build:
+                        context: ./radius_workers
+                        #volumes:
+                        #- ./raddb/*:/etc/freeradius/3.0/
+                        #- ./abills:/usr/abills/
+                networks:
+                        radius1:
+                                ipv4_address: 172.19.0.5
+
+        radius_worker_4:
+                build:
+                        context: ./radius_workers
+                        #volumes:
+                        #- ./raddb/*:/etc/freeradius/3.0/
+                        #- ./abills:/usr/abills/
+                networks:
+                        radius1:
+                                ipv4_address: 172.19.0.6
+        radius_proxy:
+                build:
+                        context: ./radius_proxie
+                        #volumes:
+                        #- ./raddb_proxie/*:/etc/freeradius/3.0/
+                networks:
+                        radius1:
+                                ipv4_address: 172.19.0.2
+                ports:
+                        - "1818:1812/udp"
+
+networks:
+        radius1:
+                driver: bridge
+                ipam:
+                        config:
+                                - subnet: 172.19.0.0/24
+

@@ -1,0 +1,8 @@
+#Iner_ID : Main or Sub or if -1 user menu func list
+%FUNCTIONS_LIST = (
+  "1:0:Roskomnadzor:rkn_main:" => 8,
+);
+
+#%PERIODIC = (daily   => [ 'confcontrol_periodic_check' ] );
+
+1;

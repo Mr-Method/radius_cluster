@@ -1,0 +1,220 @@
+#!perl
+
+use warnings;
+use strict;
+use Price::Price;
+use Abills::Base qw/_bp sendmail/;
+
+our ($db,
+    $admin,
+    %conf,
+    $html,
+    %lang);
+
+my $Price = Price->new($db,
+                      $admin,
+                      \%conf);
+
+#**********************************************************
+=head2  price_registration()
+
+=cut
+#**********************************************************
+sub price_registration {
+
+  my %info               = ();
+  my $sum                = 0;
+  my $html_conteiner     = '';
+  my $service_html_block = '';
+  my $accept_page_html   = '';
+  my $masage_text        = '';
+  my $timeeqel           = $Price->show_services({COLS_NAME=>1});
+  my $people_money       = 0;
+
+  foreach my $myItem (@$timeeqel) {
+    my %base_info;
+
+    $base_info{NAME}     = $myItem->{name}     || 'Нет названия';
+    $base_info{PRICE}    = $myItem->{price}    || 'Нет цены';
+    $base_info{COMMENTS} = $myItem->{comments} || 'Нет описания';
+
+    $base_info{ID} = 'CHEK_' . $myItem->{id};
+    $base_info{CHECK} = exists $FORM{ "CHEK_" . $myItem->{id} } ? 'checked' : '';
+    if (($base_info{CHECK} eq 'checked') && (!$FORM{RES} || $FORM{RES} eq '')) {
+      $html_conteiner   .= $html->tpl_show(_include('price_services_cheker_all_ok', 'Price'), \%base_info, { OUTPUT2RETURN => 1 });
+      $accept_page_html .= $html->tpl_show(_include('price_accept_panel_add',       'Price'), \%base_info, { OUTPUT2RETURN => 1 });
+      $info{MAS}        .= $myItem->{id} . ':';
+    }
+    else {
+      $base_info{CHECK} = exists $FORM{ "CHEK_" . $myItem->{id} };
+      $service_html_block .= $html->tpl_show(_include('price_services_cheker_all_ok', 'Price'), \%base_info, { OUTPUT2RETURN => 1 });
+    }
+
+  }
+
+  foreach my $myItem (@$timeeqel) {
+    my %base_info_2;
+
+    if ($FORM{ 'CHEK_' . $myItem->{id} }) {
+      $sum += $base_info_2{PRICE} = $myItem->{price};
+    }
+
+  }
+
+  $info{CLIENT} = $FORM{SUMM};
+  # _bp('asd',\%info,{HEADER=>1});
+  if ($FORM{SUMM} && $FORM{SUMM} != 0) {
+    if (($FORM{SUMM} > 0) && ($FORM{SUMM} < 500)) {
+      $people_money = 100;
+    }
+    elsif (!($FORM{SUMM} % 500)) {
+      $people_money = ($FORM{SUMM} / 500) * 100;
+    }
+    else {
+      $people_money = (int($FORM{SUMM} / 500) * 100) + 100;
+    }
+  }
+  else {
+    $info{CLIENT} = 0;
+  }
+
+  $info{PEOPLE_MONY} = $people_money;
+  $info{SUMM}        = $sum + $people_money;
+  #1 client number; 2 money for client; 3 sum;
+  $info{SUMMNAME} = "$info{CLIENT}:$info{PEOPLE_MONY}:$info{SUMM}";
+
+  if ($html_conteiner ne '') {
+    $info{PANEL} = $html_conteiner;
+  }
+  else {
+    $info{SUMM}  = 0;
+    $info{PANEL} = $service_html_block;
+  }
+#Отзыв
+if ($FORM{MAIL_SEND_COMENT}) {
+     sendmail("$FORM{MAIL}",
+     "$conf{PRICE_EMAIL}",
+     "$FORM{MAIL} Предложеные",
+     "$FORM{COMENNT_OF_PERSON}",
+     "$conf{MAIL_CHARSET}",
+     "3",);
+}
+  if ($FORM{MAIL_SEND}) {
+    my @time_mas_1 = split(':', $FORM{CECKED_SUMM_NAME});
+    my $timeeqel_2;
+    my @time_mas = split(':', $FORM{CECKED_MAS_NAME});
+    foreach my $myItem (@$timeeqel) {
+      foreach my $myItem_2 (@time_mas) {
+        if ($myItem_2 eq $myItem->{id}) {
+          $masage_text .= "ID: $myItem->{id}\t\tНАЗВАНИЕ: $myItem->{name}\t\tЦЕНА: $myItem->{price}\$\n\n\t\t\tОПИСАНИЕ\n$myItem->{comments}\n\n";
+          $timeeqel_2 += $myItem->{price};
+        }
+      }
+    }
+    $masage_text .= "Дополнительные пользователи = $time_mas_1[0]\tЦЕНА: $time_mas_1[1]\$\n\nСума = $time_mas_1[2]\$\n";
+    sendmail("$FORM{MAIL}",
+     "$conf{PRICE_EMAIL}",
+     "$FORM{MAIL} ЗАКАЗ УСЛУГ",
+     "$masage_text",
+     "$conf{MAIL_CHARSET}",
+     "2 (High)");
+  }
+
+  if ($FORM{ACCEPT}) {
+    if ($info{PEOPLE_MONY} != 0) {
+      $info{SECOND_PANEL} = $html->tpl_show(_include('price_seccond_accept_panel', 'Price'), \%info, { OUTPUT2RETURN => 1 });
+    }
+    $info{PANEL} = $accept_page_html;
+    $html->tpl_show(_include('price_accept_form', 'Price'), \%info);
+
+  }
+
+  elsif ($FORM{MASSAGE_ADD} && $FORM{MASSAGE_ADD} == 1) {
+    $html->tpl_show(_include('price_table', 'Price'), \%info);
+  }
+  else {
+    $html->tpl_show(_include('price_table', 'Price'), \%info);
+  }
+
+  return 1;
+}
+
+
+#**********************************************************
+=head2  price_main()
+
+=cut
+#**********************************************************
+sub price_main {
+  my %info;
+  $info{BTN_ACTION} = "add";
+  $info{BTN_LNG}    = $lang{ADD};
+
+  if ($FORM{add}) {
+    $Price->add_service(
+      {
+        NAME     => $FORM{NAME},
+        PRICE    => $FORM{PRICE},
+        COMMENTS => $FORM{COMMENTS}
+      }
+    );
+  }
+  if ($FORM{del}) {
+    $Price->del_service({ ID => $FORM{del} });
+  }
+  if ($FORM{chg}) {
+    my $service_info = $Price->take_service_info({ ID => $FORM{chg} });
+    $info{NAME}       = $service_info->{NAME};
+    $info{PRICE}      = $service_info->{PRICE};
+    $info{COMMENTS}   = $service_info->{COMMENTS};
+    $info{BTN_ACTION} = "change";
+    $info{BTN_LNG}    = $lang{CHANGE};
+    $info{ID}         = $FORM{chg};
+  }
+
+  if ($FORM{change}) {
+    $Price->change_service(
+      {
+        ID       => $FORM{ID},
+        NAME     => $FORM{NAME},
+        PRICE    => $FORM{PRICE},
+        COMMENTS => $FORM{COMMENTS}
+      }
+    );
+  }
+
+  $html->tpl_show(_include('price_add_service_form', 'Price'), \%info);
+
+  result_former(
+    {
+      INPUT_DATA      => $Price,
+      FUNCTION        => 'show_services',
+      BASE_FIELDS     => 4,
+      DEFAULT_FIELDS  => 'NAME,PRICE,COMMENTS',
+      FUNCTION_FIELDS => 'del, change',
+      EXT_TITLES      => {
+        'id'       => "$lang{ID}",
+        'name'     => "$lang{NAME}",
+        'price'    => "$lang{PRICE}",
+        'comments' => "$lang{COMMENTS}"
+      },
+      TABLE => {
+        width  => '100%',
+        qs     => $pages_qs,
+        ID     => 'services_list_id',
+        header => '',
+        EXPORT => 1,
+        MENU   => "$lang{ADD}:index=" . get_function_index('price_main') . ':add' . ";",
+      },
+      MAKE_ROWS     => 1,
+      SEARCH_FORMER => 1,
+      MODULE        => 'Price',
+      TOTAL         => 1
+    }
+  );
+
+  return 1;
+}
+
+
+

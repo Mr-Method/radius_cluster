@@ -1,0 +1,8 @@
+#Iner_ID : Main or Sub or if -1 user menu func list
+%FUNCTIONS_LIST = (
+  "01:0:Information:modinfo_start_page_show:" => 9,
+);
+
+%USER_FUNCTION_LIST = ();
+
+1

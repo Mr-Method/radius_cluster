@@ -1,0 +1,54 @@
+#Iner_ID : Main or Sub or if -1 user menu func list
+%FUNCTIONS_LIST = (
+  #"01:0:Paysys:paysys_webmoney:UID"     => 2,
+  "02:0:Paysys:paysys_log:"                                 => 4,
+  "05:0:Import:paysys_import_payments:"                     => 2,
+  "06:0:Import:paysys_import_fees:"                         => 3,
+  "09:2:$lang{EXCHANGE_RATES}:null:"                        => 4,
+  "10:9:Privat 24:paysys_p24_ex_rates_print:"               => 4,
+  "11:9:$lang{NBU}:paysys_nbu_ex_rates_print:"              => 4,
+  "07:0:Paysys:null:"                                       => 5,
+  "14:7:$lang{SETTINGS}:paysys_settings:"                   => 5,
+  "15:14:$lang{SETTINGS}:paysys_settings_change:PAY_SYSTEM" => 5,
+  "16:7:$lang{EXTERNAL_COMMAND}:paysys_external_commands:"  => 5,
+);
+
+if ( $conf{PAYSYS_QIWI_TERMINAL_ID} ) {
+  $FUNCTIONS_LIST{"04:2:QIWI:paysys_qiwi_list:"} = 4;
+}
+
+if ( $conf{PAYSYS_BSS_CODE} ) {
+  $FUNCTIONS_LIST{"05:2:BSS:paysys_bss:"} = 4;
+}
+
+if ( $conf{PAYSYS_TYME_REPORTS} ){
+ $FUNCTIONS_LIST{"06:2:Tyme:paysys_tyme_reports:"} = 4; 
+}
+
+if ( $conf{PAYSYS_P24_MERCHANT_ID} ) {
+  $FUNCTIONS_LIST{"04:2:Privat 24:paysys_p24:"} = 4;
+}
+
+if ( $conf{PAYSYS_STRIPE_SECRET_KEY} ) {
+  $FUNCTIONS_LIST{"05:2:Stripe:paysys_stripe_report:"} = 4;
+}
+
+if ( $conf{PAYSYS_TERMINALS_ADD} ) {
+  $FUNCTIONS_LIST{"08:7:$lang{TERMINALS}:terminals_add:"} = 5;
+  $FUNCTIONS_LIST{"12:8:$lang{ADD} $lang{TYPE}:terminals_type_add:"} = 5;
+}
+
+%USER_FUNCTION_LIST = (
+  "01:0:$lang{BALANCE_RECHARCHE}:paysys_payment:" => 40,
+  "02:1:$lang{LOG}:paysys_user_log:"              => 40
+);
+
+%PERIODIC = (daily => [ 'paysys_periodic' ],
+  monthly          => [ 'paysys_monthly' ]
+);
+
+our %RESELLER_FUNCTION_LIST = (
+  "44:0:$lang{PAY_SYSTEM}:paysys_log:" => 20,
+);
+
+1

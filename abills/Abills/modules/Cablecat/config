@@ -1,0 +1,25 @@
+%FUNCTIONS_LIST = (
+  "01:0:Cablecat:cablecat_main:"                       => 5,
+  
+  "02:1:$lang{CABLES}:cablecat_cables:"                => 5,
+  "03:2:$lang{COLOR_SCHEMES}:cablecat_color_schemes:"  => 5,
+  "04:2:$lang{CABLE_TYPES}:cablecat_cable_types:"      => 5,
+  
+  "05:1:$lang{WELLS}:cablecat_wells:"                  => 5,
+  "06:5:$lang{WELLS} $lang{TYPE}:cablecat_well_types:" => 5,
+  "07:1:$lang{CONNECTERS}:cablecat_connecters:"        => 5,
+  "08:7:$lang{TYPES}:cablecat_connecter_types:"        => 5,
+  "09:1:$lang{SPLITTERS} :cablecat_splitters:"         => 5,
+  "10:9:$lang{TYPES}:cablecat_splitter_types:"         => 5,
+  
+  "11:1:$lang{COMMUTATIONS}:cablecat_commutations"     => 5,
+  "12:11:$lang{COMMUTATION}:cablecat_commutation::ID"  => 5,
+  "13:11::cablecat_maps_ajax:AJAX"                     => 5,
+  "14:2::cablecat_link_info:AJAX"                      => 5,
+  
+  
+  "40:0:Cablecat:null"                                 => 4,
+  "41:40:$lang{CABLES}:cablecat_cable_reports"         => 4,
+);
+
+1;

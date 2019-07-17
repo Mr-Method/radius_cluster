@@ -1,0 +1,1666 @@
+#!perl
+=head1 NAME
+
+  Employees
+
+=cut
+
+
+use warnings;
+use strict;
+use Abills::Base qw(in_array date_inc sec2time time2sec);
+
+our (
+  $db,
+  $admin,
+  %conf,
+  %lang,
+  $html,
+  @WEEKDAYS,
+  @MONTHES,
+  @status,
+  %permissions
+);
+
+require Abills::Misc;
+use Employees;
+
+my $Employees = Employees->new($db, $admin, \%conf);
+
+#**************************************************
+=head employees_main() -
+
+=cut
+#**************************************************
+sub employees_main {
+  if( in_array('Employees', \@MODULES) ){
+    load_module("Employees", $html);
+    $Employees = Employees->new($db, $admin, \%conf);
+  }
+
+  my $admin_form = Admins->new($db, \%conf);
+  $admin_form->{ACTION}     = 'add';
+  $admin_form->{LNG_ACTION} = $lang{ADD};
+  if ($FORM{AID}) {
+    $admin_form->info($FORM{AID});
+    _error_show($admin_form);
+    
+    if(! $FORM{DOMAIN_ID}) {
+      $FORM{DOMAIN_ID}  = $admin_form->{DOMAIN_ID} if($admin_form->{DOMAIN_ID});
+    }
+
+    $pages_qs         = "&AID=$admin_form->{AID}". (($FORM{subf}) ? "&subf=$FORM{subf}" : '');
+
+    my $A_LOGIN = $html->form_main({
+        CONTENT => $html->form_select(
+          'AID',
+          {
+            SELECTED  => $FORM{AID},
+            SEL_LIST  => $admin->list({%LIST_PARAMS, COLS_NAME => 1}),
+            SEL_KEY   => 'aid',
+            SEL_VALUE => 'login,name',
+          }
+        ),
+        HIDDEN => {
+          index => $index,
+          subf  => $FORM{subf}
+        },
+        SUBMIT => { show => $lang{SHOW} },
+        class  => 'navbar-form navbar-right',
+    });
+
+    $LIST_PARAMS{AID} = $admin_form->{AID};
+    my @admin_menu = (
+      $lang{INFO}       . "::AID=$admin_form->{AID}:change",
+      $lang{LOG}        . ':'. get_function_index('form_changes') . ":AID=$admin_form->{AID}:history",
+      $lang{FEES}       . ":3:AID=$admin_form->{AID}:fees",
+      $lang{PAYMENTS}   . ":2:AID=$admin_form->{AID}:payments",
+      $lang{PERMISSION} . ":52:AID=$admin_form->{AID}:permissions",
+      $lang{PASSWD}     . ":54:AID=$admin_form->{AID}:password",
+      $lang{GROUP}      . ":58:AID=$admin_form->{AID}:users",
+      $lang{ACCESS}     . ":59:AID=$admin_form->{AID}:",
+      'Paranoid'   . ':'. get_function_index('form_admins_full_log') .":AID=$admin_form->{AID}:",
+    );
+
+    if(in_array('Msgs', \@MODULES)) {
+      push @admin_menu, "$lang{MESSAGES}:".get_function_index('msgs_admin') .":AID=$admin_form->{AID}:msgs";
+    }
+
+    func_menu(
+      {
+        $lang{NAME} => $A_LOGIN
+      },
+      \@admin_menu,
+      { f_args => { ADMIN => $admin_form } }
+    );
+
+    form_passwd({ ADMIN => $admin_form }) if (defined($FORM{newpassword}));
+
+    if ($FORM{subf}) {
+      return 0;
+    }
+    elsif ($FORM{change}) {
+      $admin_form->{MAIN_SESSION_IP} = $admin->{SESSION_IP};
+      
+      # Check it was default password
+      if ($FORM{newpassword} && !$conf{DEFAULT_PASSWORD_CHANGED} && $FORM{AID} == 1 && $FORM{newpassword} ne 'abills'){
+        $Conf->config_add({ PARAM => 'DEFAULT_PASSWORD_CHANGED', VALUE => 1, REPLACE => 1});
+        _error_show($Conf);
+        $conf{DEFAULT_PASSWORD_CHANGED} = 1;
+      }
+      
+      $admin_form->change({%FORM});
+      if (!$admin_form->{errno}) {
+        $html->message('info', $lang{CHANGED}, "$lang{CHANGED} ");
+      }
+    }
+    $admin_form->{ACTION}     = 'change';
+    $admin_form->{LNG_ACTION} = $lang{CHANGE};
+  }
+  elsif ($FORM{add}) {
+    $admin_form->{AID} = $admin->{AID};
+    if (!$FORM{A_LOGIN}) {
+      $html->message('err', $lang{ERROR}, "$lang{ERR_WRONG_DATA} $lang{ADMIN} $lang{LOGIN}");
+    }
+    else {
+      $admin_form->add({ %FORM, DOMAIN_ID => $FORM{DOMAIN_ID} || $admin->{DOMAIN_ID} });
+      if (!$admin_form->{errno}) {
+        $html->message('info', $lang{INFO}, "$lang{ADDED}");
+      }
+    }
+  }
+  elsif ($FORM{del} && $FORM{COMMENTS}) {
+    if ($FORM{del} == $conf{SYSTEM_ADMIN_ID}) {
+      $html->message('err', $lang{ERROR}, "Can't delete system admin. Check " . '$conf{SYSTEM_ADMIN_ID}=1;');
+    }
+    else {
+      $admin_form->{AID} = $admin->{AID};
+      $admin_form->del($FORM{del});
+      if (!$admin_form->{errno}) {
+        $html->message('info', $lang{DELETED}, "$lang{DELETED}");
+      }
+    }
+  }
+  elsif($FORM{REGISTER_TELEGRAM}){
+    $admin_form->change({AID => $admin->{AID}, TELEGRAM_ID => $FORM{telegram_id}});
+    if(!$admin_form->{errno}){
+      $html->message("info", $lang{SUCCESS}, "Telegram ID $lang{ADDED}");
+      use Log;
+      my $Log      = Log->new(undef, \%conf, {LOG_FILE => "/usr/abills/var/log/abills.log", DEBUG_LEVEL => 1});
+      $Log->log_print('LOG_INFO', '', "New admin addded - $admin->{AID}",);
+    }
+    return 1;
+  }
+
+  _error_show($admin_form);
+
+  $admin_form->{PASPORT_DATE} = $html->date_fld2(
+    'PASPORT_DATE',
+    {
+      FORM_NAME => 'admin_form',
+      WEEK_DAYS => \@WEEKDAYS,
+      MONTHES   => \@MONTHES,
+      #DATE      => $user_pi->{PASPORT_DATE}
+    }
+  );
+
+  if( in_array('Employees', \@MODULES)){
+    $admin_form->{POSITIONS} = $html->form_select(
+      'POSITION',
+      {
+        SELECTED    => $FORM{POSITION} || $admin_form->{POSITION},
+        SEL_LIST    => $Employees->position_list({ COLS_NAME => 1 }),
+        SEL_KEY     => 'id',
+        SEL_VALUE   => 'position',
+        NO_ID       => 1,
+        SEL_OPTIONS => { '' => '--' },
+      }
+    );
+  }
+
+  $admin_form->{FULL_LOG}  = ($admin_form->{FULL_LOG}) ? 'checked' : '';
+  $admin_form->{DISABLE}   = ( defined($admin_form->{DISABLE}) && $admin_form->{DISABLE} > 0) ? 'checked' : '';
+  $admin_form->{GROUP_SEL} = sel_groups({ GID => $admin_form->{GID}, SKIP_MUULTISEL => 1 });
+
+  if ($admin->{DOMAIN_ID}) {
+    $admin_form->{DOMAIN_SEL} = $admin->{DOMAIN_NAME};
+  }
+  elsif (in_array('Multidoms', \@MODULES)) {
+    load_module('Multidoms', $html);
+    $admin_form->{DOMAIN_SEL} = multidoms_domains_sel({ SHOW_ID => 1 });
+  }
+  else {
+    $admin_form->{DOMAIN_SEL} = '';
+  }
+
+  #check if have GPS modules and position. If so, show a link to map
+  if (in_array('Maps', \@MODULES) && $admin_form->{GPS_IMEI} && $admin_form->{GPS_IMEI} ne ''){
+    my $maps_index = get_function_index('maps_show_poins');
+    my $link = "?index=$maps_index&show_gps=$admin_form->{AID}";
+    $admin_form->{GPS_ROUTE_BTN} = $html->button($html->element('span', '', { class=> 'glyphicon glyphicon-globe' }), undef , {
+         GLOBAL_URL => $link, 
+         target     => '_blank',
+         class      => 'btn btn-info', 
+         NO_LINK_FORMER => 1
+    });
+
+    $admin_form->{GPS_ICON_BTN} = $html->button($html->element('span', '', { class => 'glyphicon glyphicon-picture' }), undef , {
+         GLOBAL_URL     => $link,
+         class          => 'btn btn-default',
+         NO_LINK_FORMER => 1,
+         JAVASCRIPT     => '#',
+         ex_params      => qq/onclick='loadToModal("?get_index=gps_add_thumbnail&header=2&AID=$FORM{AID}")'/,
+         SKIP_HREF      => 1
+    });
+  }
+  $admin_form->{INDEX} = 50;
+  $html->tpl_show(templates('form_admin'), $admin_form);
+
+  my $list = $admin_form->admins_groups_list({ ALL => 1, COLS_NAME => 1 });
+  my %admin_groups = ();
+  foreach my $line (@$list) {
+    $admin_groups{ $line->{aid} } .= ", $line->{gid}:$line->{name}";
+  }
+
+  delete($LIST_PARAMS{AID});
+  delete $admin_form->{COL_NAMES_ARR};
+    
+  if(in_array('Employees', \@MODULES)){
+    $admin_form->{SHOW_EMPLOYEES} = 1;
+  }
+
+  my Abills::HTML $table;
+  my $admins_list;
+  ($table, $admins_list) = result_former({
+    INPUT_DATA      => $admin_form,
+    FUNCTION        => 'list',
+    BASE_FIELDS     => 4,
+    FUNCTION_FIELDS => 'permission,log,passwd,info,del',
+    SKIP_USER_TITLE => 1,
+    EXT_TITLES      => {
+      name           => $lang{FIO},
+      position       => $lang{POSITION},
+      regdate        => $lang{REGISTRATION},
+      disable        => $lang{STATUS},
+      aid            => '#',
+      g_name         => $lang{GROUPS},
+      domain_name    => 'Domain',
+      start_work     => $lang{BEGIN},
+      gps_imei       => 'GPS IMEI',
+      birthday       => $lang{BIRTHDAY},
+      api_key        => 'API_KEY',
+      telegram_id    => 'Telegram ID',
+    },
+    TABLE => {
+      width      => '100%',
+      caption    => $lang{ADMINS},
+      qs         => $pages_qs,
+      ID         => 'ADMINS_LIST',
+      MENU       => "$lang{SEARCH}:search_form=1&index=$index:search"
+    }
+  });
+
+  foreach my $line (@$admins_list) {
+    my @fields_array = ();
+    for (my $i = 0; $i < 4+$admin_form->{SEARCH_FIELDS_COUNT}; $i++) {
+      my $field_name = $admin_form->{COL_NAMES_ARR}->[$i] || '';
+
+      if ( $field_name eq 'disable' && $line->{disable} =~ /\d+/ ){
+        $line->{disable} = $status[ $line->{disable} ];
+      }
+      elsif($field_name eq 'gname') {
+        $line->{gname} .= $admin_groups{ $line->{aid} },
+      }
+
+      push @fields_array, $line->{$field_name};
+    }
+
+    my $geo_button = '';
+    if(in_array('Employees', \@MODULES)){
+      $geo_button = $html->button($lang{GEO}, "index=" . get_function_index('employees_geolocation') ."&eid=$line->{aid}")
+    }
+
+    $table->addrow(@fields_array,
+      $html->button($lang{PERMISSION}, "index=$index&subf=52&AID=$line->{aid}", { class => 'permissions' })
+      . $geo_button
+      . $html->button($lang{LOG},        "index=$index&subf=51&AID=$line->{aid}", { class => 'history' })
+      . $html->button($lang{PASSWD},     "index=$index&subf=54&AID=$line->{aid}", { class => 'password' })
+      . $html->button($lang{INFO},       "index=$index&AID=$line->{aid}",         { class => 'change' })
+      . $html->button($lang{DEL},        "index=$index&del=$line->{aid}", { MESSAGE => "$lang{DEL} $line->{aid}?", class => 'del' })
+    );
+  }
+
+  print $table->show();
+
+  $table = $html->table(
+    {
+      width      => '100%',
+      cols_align => [ 'right', 'right' ],
+      rows       => [ [ "$lang{TOTAL}:", $html->b($admin_form->{TOTAL}) ] ]
+    }
+  );
+  print $table->show();
+
+  system_info();
+
+  return 1;
+}
+
+#**************************************************
+=head employees_geolocation() - choose geo-data for employee
+
+=cut
+#**************************************************
+sub employees_geolocation{
+
+  my $geolist = $Employees->geo_list({EMPLOYEE_ID => $FORM{eid}, COLS_NAME => 1});
+
+  my @streets;
+  my @builds;
+  my @districts;
+
+  foreach my $data (@$geolist){
+    if($data->{street_id}){
+      push(@streets, $data->{street_id});
+    }
+    elsif($data->{build_id}){
+      push(@builds, $data->{build_id});
+    }
+    elsif($data->{district_id}){
+      push(@districts, $data->{district_id});
+    }
+  }
+
+  #my %address = ( 'street_id' => \@streets, 'build_id' => \@builds, 'district_id' => \@districts );
+
+  $html->tpl_show(_include('employees_geolocation_add', 'Employees'),{
+                  GEOLOCATION_TREE => address_list_tree_menu({ OUTPUT2RETURN => 1}),
+                  BTN_NAME         => $lang{CHANGE},
+                  index            => get_function_index('employees_main'),
+                  EID              => $FORM{eid},
+                  });
+
+  return 1;
+}
+
+#**************************************************
+=head employees_positions() - add, change or delete positions
+
+=cut
+#**************************************************
+sub employees_positions {
+
+  my $Employeer;
+  my $button_name = $lang{ADD};
+  my $action      = 'add';
+
+  # add position
+  if ($FORM{action} && $FORM{action} eq 'add') {
+    $Employees->add_position({%FORM});
+
+    if (!$Employees->{errno}) {
+      $html->message('info', $lang{POSITION}, "$lang{ADDED}");
+    }
+
+  }
+  # change position info
+  elsif ($FORM{action} && $FORM{action} eq 'change') {
+    $FORM{VACANCY}=$FORM{VACANCY}?1:0;
+    $Employees->position_change({ ID => $FORM{id}, %FORM });
+
+    if (!$Employees->{errno}) {
+      $html->message('info', $lang{POSITION}, "$lang{CHANGED}");
+    }
+  }
+  #del position
+  if ($FORM{del}) {
+    $Employees->del_position({ ID => $FORM{del} });
+
+    if (!$Employees->{errno}) {
+      $html->message('err', $lang{POSITION}, "$lang{DELETED}");
+    }
+  }
+
+  # add position info to template
+  if ($FORM{chg}) {
+    $action      = 'change';
+    $button_name = "$lang{CHANGE}";
+    $Employeer->{POSITION}      = $FORM{pos};
+    $Employeer->{SUBORDINATION} = $FORM{sub};;
+    $Employeer->{ID}            = $FORM{chg};
+    if($FORM{vac}){
+      $Employeer->{check}='checked';
+    }
+  }
+
+  # select for subordination
+  my $rule_select = $html->form_select(
+    'SUBORDINATION',
+    {
+      SELECTED    => $FORM{SUBORDINATION} || $Employeer->{SUBORDINATION},
+      SEL_LIST    =>translate_list($Employees->position_list({COLS_NAME => 1}),
+                                    'position'
+                                   ),
+      SEL_KEY     => 'id',
+      SEL_VALUE   => 'position',
+      NO_ID       => 1,
+      SEL_OPTIONS => { '' => '--' },
+    }
+  );
+
+  my $positions_list=$Employees->position_list({ COLS_NAME => 1 });
+  my Abills::HTML $table;
+  my $list;
+  #my $i = 0;
+  ($table, $list) = result_former({
+    INPUT_DATA      => $Employees,
+    FUNCTION        => 'position_list',
+    LIST            => $positions_list,
+    BASE_FIELDS     => 2,
+    SKIP_USER_TITLE => 1,
+    DEFAULT_FIELDS  => 'ID,POSITION,OPEN_VACANCY',
+    EXT_TITLES      => {
+      id            => 'Id',
+      position      => $lang{POSITION},
+      vacancy       => $lang{OPEN_VACANCY},
+      total         => ' ',
+      subordinated  => ' ',
+      subordination => ' ',
+    },
+    SKIP_PAGES      => 1,
+    TABLE           => {
+      width   => '100%',
+      caption => "$lang{POSITIONS}",
+      qs      => $pages_qs,
+      pages   => 500,
+      ID      => 'MAIN_POSITION_LIST',
+    },
+    MODULE          => 'Employees',
+  });
+
+  foreach my $line (@{$list}) {
+       my @fields_array = ();
+       #ID colum
+       push @fields_array, $line->{ id };
+       #POSITION colum
+       push @fields_array,$html->button(_translate($line->{ position }),
+                                        "index=" . get_function_index('employees_positions')
+                                        );
+       #TOTALL colum
+       push @fields_array,'';
+       #VACANCY colum
+       push @fields_array,$html->button($line->{ vacancy },
+                                        "index=" . get_function_index('profile_list_admin') . "&wtch_pos=$line->{id}&position_name=$line->{position}"
+                                        );
+       #BUTTON colum
+       push @fields_array,
+         ($html->button($lang{CHANGE}, "index=$index&chg=$line->{id}&pos=" . _translate($line->{position}) . "&vac=$line->{vacancy}&sub=$line->{subordination}", { class => 'change' }))
+         . " ". ($html->button($lang{DEL}, "index=$index&del=$line->{id}",
+         {MESSAGE => "$lang{DEL} $line->{id} " . _translate($line->{position}) . "?", class => 'del' }));
+         $table->addrow(@fields_array);
+     }
+
+
+  $html->tpl_show(
+    _include('employees_position_add', 'Employees'),
+    {
+      %{ ($Employeer) ? $Employeer : {}},
+      BUTTON_NAME   => $button_name,
+      ACTION        => $action,
+      SUBORDINATION => $rule_select,
+    }
+  );
+  print $table->show();
+
+  return 1;
+}
+
+#**********************************************************
+=head employees_positions_tree() - show positions in tree view
+
+=cut
+#**********************************************************
+sub employees_positions_tree {
+  my $positions_major_list =translate_list($Employees->position_list({ COLS_NAME => 1 }), 'position');
+  
+  foreach my $position (@$positions_major_list){
+    if($position->{subordination} == 0){
+      $position->{subordinated} = 0;
+    }
+  }
+
+  my $positions_tree = $html->tree_menu($positions_major_list, "$lang{SUBORDINATION_TREE}",
+   {
+    ID_KEY      => 'id',
+    PARENT_KEY  => 'subordination',
+    LABEL_KEY   => 'position',
+    # ROOT_VALUE => '0',
+    #CHECKBOX    => 1,
+    #NAME        => 'position_id',
+    COL_SIZE    => 6,
+  });
+
+  $html->tpl_show(_include('employees_position_tree', 'Employees'),{
+                  POSITION_TREE => $positions_tree,
+                  });
+
+  return 1;
+}
+
+
+#**********************************************************
+=head2  form_admins_time_sheet()
+
+=cut
+#**********************************************************
+sub form_admins_time_sheet {
+  if(! $permissions{4}) {
+    require Control::System;
+  }
+
+  if ($FORM{day}) {
+    $Employees->time_sheet_add(\%FORM);
+  }
+
+  #Week days : day hour
+  my ($day_load, $week_load) = (5, 8);
+  if ($conf{TIME_SHEET_WORK_LOAD}) {
+    ($day_load, $week_load) = split(/:/, $conf{TIME_SHEET_WORK_LOAD});
+  }
+
+  # button for print time sheet
+  my $print_btn = $html->button("$lang{PRINT}","qindex=" . get_function_index('employees_timesheet_print') . "&header=2&print=1&DATE=" . ($FORM{DATE} || $DATE), 
+    { 
+      target => '_new', 
+      class  => 'btn btn-default', 
+      ICON   => 'fa fa-print'
+    });
+
+  my @day_types = (
+    '',
+    $lang{VACATIONS},        #'�������',
+    $lang{HOSPITAL},         # ����������
+    $lang{BUSINESS_TRIP},    # '������������'
+    $lang{DAY_OFF},          # '��������',
+    $lang{SLACK},            # '�� �����',
+    $lang{DUTY},             # '���������'
+  );
+
+  my @day_types_icons = ( 
+'', 
+"<i class='fa fa-globe fa-lg' title='$lang{VACATIONS}' aria-hidden='true'></i>", # ������� 
+"<i class='fa fa-h-square fa-lg' title='$lang{HOSPITAL}' aria-hidden='true'></i>", # ���������� 
+"<i class='fa fa-plane fa-lg' title='$lang{BUSINESS_TRIP}' aria-hidden='true'></i>", # ������������ 
+"<i class='fa fa-close fa-lg' title='$lang{DAY_OFF}' aria-hidden='true'></i>", # �������� 
+"<i class='fa fa-thumbs-o-down fa-lg' title='$lang{SLACK}' aria-hidden='true'></i>", # �� ����� 
+"<i class='fa fa-flash fa-lg' title='$lang{DUTY}' aria-hidden='true'></i>", # ��������� 
+);
+
+  my ($start_y, $start_m, $start_d) = split(/-/, $FORM{DATE} || $DATE);
+  my $days_in_month = ($start_m != 2 ? (($start_m % 2) ^ ($start_m > 7)) + 30 : (!($start_y % 400) || !($start_y % 4) && ($start_y % 25) ? 29 : 28));
+
+  #holiday array for month in table
+  my @HOLLIDAY = holiday_array($start_m);
+
+  #$FORM{day}=$start_d if (! $FORM{day});
+
+  my $mtime = POSIX::mktime(0, 0, 0, 1, ($start_m - 1), ($start_y - 1900));
+  my $day_of_wk = POSIX::strftime("%u", localtime($mtime));
+  my @title_days = ('#', $lang{EMPLOYEES});
+
+  for (my $i = 1 ; $i <= $days_in_month ; $i++) {
+    push @title_days, $WEEKDAYS[$day_of_wk] . $html->br() . $html->button($i, "index=$index&day=$i" . (($FORM{DATE}) ? "&DATE=$FORM{DATE}" : ''));
+    $day_of_wk = ($day_of_wk == 7) ? 1 : $day_of_wk + 1;
+  }
+
+  my $PREV_MONTH = ($start_m == 1)  ? $start_y - 1 . '-12-01' : sprintf('%d-%02d-01', $start_y, ($start_m - 1));
+  my $NEXT_MONTH = ($start_m == 12) ? $start_y + 1 . '-01-01' : sprintf('%d-%02d-01', $start_y, ($start_m + 1));
+  my $JOB_DATE = ($FORM{day}) ? sprintf("%04d-%02d-%02d", $start_y, $start_m, $FORM{day}) : undef;
+
+  push @title_days, $lang{DAYS}, $lang{HOURS};
+
+  my $list = $admin->admins_groups_list({ ALL => 1, COLS_NAME => 1 });
+
+  my %admin_groups = ();
+  foreach my $line (@$list) {
+    $admin_groups{ $line->{aid} } .= ", $line->{gid}:$line->{name}";
+  }
+
+  $list = $Employees->time_sheet_list(
+    {
+      %LIST_PARAMS,
+      AID       => '>0',
+      DOMAIN_ID => $admin->{DOMAIN_ID},
+      COLS_NAME => 1
+    }
+  );
+
+  my %hours_hash     = ();
+  my %day_types_hash = ();
+  foreach my $line (@$list) {
+    $hours_hash{ $line->{aid} }{ $line->{date} }{work_time} = $line->{work_time} if ($line->{work_time});
+    $hours_hash{ $line->{aid} }{ $line->{date} }{overtime}  = $line->{overtime}  if ($line->{overtime});
+    $hours_hash{ $line->{aid} }{ $line->{date} }{extra_fee} = $line->{extra_fee} if ($line->{extra_fee});
+    if ($line->{day_type}) {
+      $hours_hash{ $line->{aid} }{ $line->{date} }{day_type} = $line->{day_type};
+      $day_types_hash{ $line->{day_type} } = 1;
+    }
+  }
+
+  my @day_types_title = keys %day_types_hash;
+  foreach my $id (@day_types_title) {
+    push @title_days, $day_types[$id];
+  }
+
+  push @title_days, '%';
+
+  my $table = $html->table(
+    {
+      width       => '100%',
+      caption     => $lang{TIME_SHEET},
+      title_plain => \@title_days,
+      class       => 'table table-hover table-condensed table-striped table-bordered',
+      ID          => 'ADMINS_WORKS_LIST',
+      header      => $html->button('', "index=$index&DATE=$PREV_MONTH", { class => 'btn btn-xs btn-default glyphicon glyphicon-arrow-left' })
+      . $html->button($MONTHES[ $start_m - 1 ], "index=$index", { class => 'btn btn-xs btn-primary' })
+      . $html->button('', "index=$index&DATE=$NEXT_MONTH", { class => 'btn btn-xs btn-default glyphicon glyphicon-arrow-right' })
+    }
+  );
+
+  $list = $admin->list(
+    {
+      %LIST_PARAMS,
+      DOMAIN_ID => $admin->{DOMAIN_ID},
+      COLS_NAME => 1,
+      WITH_POSITION => 1,
+      POSITION => $FORM{POSITION} || "",
+    }
+  );
+
+  foreach my $line (@$list) {
+    my $planing_days = 0;
+    $day_of_wk = POSIX::strftime("%u", localtime($mtime));
+    my ($total_work_days, $total_hours_work_time, $total_hours_overtime, $total_hours_extra_fee) = (0, 0, 0, 0);
+
+    my %type_days_summary = ();
+
+    my @rows = ($table->td($line->{aid}), $table->td($line->{name} . $html->br() . $html->button($line->{login}, "AID=$line->{aid}&index=" . get_function_index('employees_main'))));
+
+    for (my $i = 1 ; $i <= $days_in_month ; $i++) {
+      $day_of_wk = ($day_of_wk == 7) ? 1 : $day_of_wk + 1;
+
+      #if holiday same as day of month - mark as holiday
+      my $holiday;
+      foreach my $day (@HOLLIDAY) {
+        if ($day == $i) {
+          $holiday = $i;
+        }
+      }
+
+      my $class = '';
+      if ("$start_y-$start_m-$start_d" eq $DATE && $start_d == $i) {
+        $class = 'success';
+      }
+      elsif ($day_of_wk == 7 || $day_of_wk == 1 || $holiday) {
+        $class = 'danger';
+      }
+      else {
+        $planing_days++;
+      }
+
+      my $_date = sprintf("%04d-%02d-%02d", $start_y, $start_m, $i);
+
+      if ( $FORM{day} && $FORM{day} == $i) {
+        my $day_selet = $html->form_select(
+          $line->{aid} . '_DAY_TYPE',
+          {
+            SELECTED => $hours_hash{ $line->{aid} }{$_date}{day_type} || '',
+            SEL_ARRAY    => \@day_types,
+            ARRAY_NUM_ID => 1
+          }
+        );
+
+        push @rows,
+        $table->td(
+          $html->form_input('AIDS', $line->{aid}, { TYPE => 'hidden' })
+          . $html->form_input($line->{aid} . '_WORK_TIME', $hours_hash{ $line->{aid} }{$_date}{work_time}, { class => 'form-control input-sm', EX_PARAMS => "placeholder='$lang{WORK_TIME}'" })
+          . $html->br()
+          . $html->form_input($line->{aid} . '_OVERTIME', $hours_hash{ $line->{aid} }{$_date}{overtime}, { class => 'form-control input-sm', EX_PARAMS => "placeholder='$lang{OVERTIME}'" })
+          . $html->br()
+          . $html->form_input($line->{aid} . '_EXTRA_FEE', $hours_hash{ $line->{aid} }{$_date}{extra_fee}, { class => 'form-control input-sm', EX_PARAMS => "placeholder='$lang{EXTRA_FEE}' style='min-width:150px'" })
+          . $html->br()
+          . $day_selet,
+          { class => $class }
+        );
+      }
+      else {
+        push @rows,
+        $table->td(
+          ($hours_hash{ $line->{aid} }{$_date}{work_time} ? $hours_hash{ $line->{aid} }{$_date}{work_time} : '')
+          . $html->br()
+          . $html->color_mark($hours_hash{ $line->{aid} }{$_date}{overtime} || 0, 'FF0000')
+          . $html->br()
+          . $html->color_mark($hours_hash{ $line->{aid} }{$_date}{extra_fee} || 0, '0000FF')
+          . (($hours_hash{ $line->{aid} }{$_date}{day_type}) ? $html->br() . $day_types_icons[ $hours_hash{ $line->{aid} }{$_date}{day_type} ] : ''),
+          ,
+          { class => $class }
+        );
+      }
+
+      if ( $hours_hash{ $line->{aid} }{$_date}{work_time}
+        || $hours_hash{ $line->{aid} }{$_date}{overtime}
+        || $hours_hash{ $line->{aid} }{$_date}{extra_fee})
+      {
+        $total_work_days++;
+      }
+
+      $total_hours_work_time += $hours_hash{ $line->{aid} }{$_date}{work_time} || 0;
+      $total_hours_overtime  += $hours_hash{ $line->{aid} }{$_date}{overtime} || 0;
+      $total_hours_extra_fee += $hours_hash{ $line->{aid} }{$_date}{extra_fee} || 0;
+
+      $type_days_summary{ $hours_hash{ $line->{aid} }{$_date}{day_type} }++ if ($hours_hash{ $line->{aid} }{$_date}{day_type});
+    }
+
+    #Summary
+    push @rows, $table->td($total_work_days, { class => 'success' }),
+
+    $table->td($total_hours_work_time . $html->br() . $html->color_mark($total_hours_overtime, '#FF0000') . $html->br() . $html->color_mark($total_hours_extra_fee, '#0000FF'), { class => 'success' });
+
+    foreach my $id (@day_types_title) {
+      push @rows, $table->td($type_days_summary{$id});
+    }
+
+    push @rows, $table->td(sprintf("%.2f", ($total_hours_work_time + $total_hours_overtime + $total_hours_extra_fee) / ($planing_days * 8) * 100));
+    $table->addtd(@rows);
+  }
+
+  # button for add vacations in modal
+  my $load_to_modal_btn = $html->button( '', undef,
+    {
+      class          => 'btn  btn-default',
+      JAVASCRIPT     => '',
+      SKIP_HREF      => 1,
+      NO_LINK_FORMER => 1,
+      ex_params      => qq/onclick=loadToModal('?get_index=employees_vacations')/,
+      ICON           => 'fa fa-calendar-plus-o'
+    } );
+
+  # button for show charts for each admin
+  my $charts_btn = $html->button( '', "index=" . get_function_index('employees_time_sheet_charts') . "&DATE=" . ($FORM{DATE} ? $FORM{DATE} : $DATE),
+    {
+      class          => 'btn  btn-default',
+      target         => '_blank',
+      ICON           => 'fa fa-bar-chart'
+    } );
+
+  my $position_select = $html->form_select(
+    'POSITION',
+    {
+      SELECTED    => $FORM{POSITION} || $FORM{position_id},
+      SEL_LIST    => translate_list($Employees->position_list({ COLS_NAME => 1 }),'position'),
+      SEL_KEY     => 'id',
+      SEL_VALUE   => 'position',
+      NO_ID       => 1,
+      SEL_OPTIONS => { '' => '--' },
+      EX_PARAMS => "data-auto-submit='index=$index'"
+    }
+  );
+
+  print $html->form_main(
+    {
+      CONTENT => "$lang{POSITION}:$position_select" . $load_to_modal_btn . $charts_btn . $print_btn . "<hr>" . $table->show({ OUTPUT2RETURN => 1 }),
+      HIDDEN  => {
+        DATE  => $JOB_DATE,
+        index => $index,
+        day   => $FORM{day},
+      },
+      SUBMIT => { change => $lang{APPLY} }
+    }
+  );
+
+  return 1;
+}
+
+#**********************************************************
+=head2 sub question_show() -
+
+  Arguments:
+    ATTRIBUTES -
+  Returns:
+
+  Examples:
+
+=cut
+#**********************************************************
+sub question_show {
+  my %info = ();
+  my $sort_link=$FORM{SORT_POSITION_ID} ? '&SORT_POSITION_ID=' . $FORM{SORT_POSITION_ID}:'';
+  $info{BUTTON_NAME}='add';
+  $info{BUTTON_VALUE}=$lang{ADD}; 
+  $info{SORT_POSITION_ID}=$FORM{SORT_POSITION_ID};
+
+  if ($FORM{add}) {
+    $Employees->add_question(
+      {
+        QUESTION    => $FORM{QUESTION},
+        POSITION_ID => $FORM{POSITION}
+      }
+    );
+  }
+
+  elsif ($FORM{del}) {
+    $Employees->del_question({ ID => $FORM{del} });
+  }
+
+  elsif ($FORM{chg}) {
+    $info{BUTTON_NAME}  = 'chang';
+    $info{BUTTON_VALUE} = $lang{CHANGE};  
+    $info{QUESTION}=$FORM{question};
+    $info{CHANG_BUTTON_ID}=$FORM{chg};
+  }
+
+  elsif ($FORM{chang}) {
+    $Employees->question_change(
+      {
+        ID          => $FORM{CHANG_BUTTON_ID},
+        QUESTION    => $FORM{QUESTION},
+        POSITION_ID => $FORM{POSITION}
+      }
+    );
+  }
+
+  $info{POSITION_SELECT} = $html->form_select(
+    'POSITION',
+    {
+      SELECTED    => $FORM{SORT_POSITION_ID} || $FORM{position_id},
+      SEL_LIST    => translate_list($Employees->position_list({ COLS_NAME => 1 }),'position'),
+      SEL_KEY     => 'id',
+      SEL_VALUE   => 'position',
+      NO_ID       => 1,
+      SEL_OPTIONS => { '' => '--' },
+    }
+  );
+
+  my $questions = $Employees->questions_list(
+    {
+      POSITION_ID => $FORM{SORT_POSITION_ID},
+      COLS_NAME => 1
+    }
+  );
+
+  my $table = $html->table(
+    {
+      width   => '100%',
+      caption => "$lang{QUESTIONS}",
+      title   => [ "$lang{QUESTION}","$lang{POSITION}"],
+      qs      => $pages_qs,
+      ID      => 'TABLE_QUESTIONS',
+      export  => 1
+    }
+  );
+
+  foreach my $question (@$questions) {
+    $table->addrow($question->{question},
+                   _translate($question->{position}),
+                   $html->button($lang{CHANGE}, "index=$index&chg=$question->{id}&question=$question->{question}&position_id=$question->{position_id}".$sort_link, { class => 'change' })
+                   . $html->button($lang{DEL}, "index=$index&del=$question->{id}".$sort_link, { MESSAGE => "$lang{DEL} $question->{id} $question->{question}?", class => 'del' })
+                  );
+  }
+
+  $info{QUESTION_TABLE}=$table->show();
+  $html->tpl_show(_include('employees_question_add', 'Employees'), \%info);
+
+  return 1;
+
+}
+
+sub employees_registration {
+  my %Registration;
+
+  $Registration{BUTTON_NAME}='NEXT_BUTTON';
+  $Registration{BUTTON_VALUE}=$lang{NEXT};
+
+  if ($FORM{NEXT_BUTTON}) {
+    $Registration{BUTTON_NAME}='add';
+    $Registration{BUTTON_VALUE}=$lang{ADD};
+    $Registration{FIO}=$FORM{FIO};
+    $Registration{DATE}=$FORM{DATE};
+    $Registration{MAIL}=$FORM{MAIL};
+    $Registration{PHONE}=$FORM{PHONE};
+    $Registration{POSITION}=$FORM{POSITION};
+
+    my $que_list = $Employees->questions_list(
+        {  
+          POSITION_ID => $FORM{POSITION},
+          COLS_NAME   => 1
+        }
+    );
+
+    my $reply_mas;
+    my $question_sum = 1;
+    #Create panel bocks with question and input element 
+    foreach my $line (@$que_list) {
+      my %info;
+      $info{QUESTION_NUMBER} = $lang{QUESTION} . ' №' . $question_sum++;
+      $info{QUESTION}        = $line->{question};
+      $info{REPLY}           = 'QUESTION_' . $line->{id};
+      $reply_mas .= $html->tpl_show(_include('employees_question', 'Employees'), \%info, { OUTPUT2RETURN => 1 });
+    }
+     
+    $Registration{LIST_OF_QUESTION} = $reply_mas;
+
+    $html->tpl_show(_include('employees_question_list', 'Employees'), \%Registration);
+  }
+
+  elsif ($FORM{add}) {
+    $Employees->add_profile(
+      {
+        FIO           => $FORM{FIO},
+        DATE_OF_BIRTH => $FORM{DATE},
+        EMAIL         => $FORM{MAIL},
+        PHONE         => $FORM{PHONE},
+        POSITION_ID   => $FORM{POSITION}
+      }
+    );
+
+    my $resul_list = 0;
+    $resul_list = $Employees->questions_list(
+      {
+        POSITION_ID => $FORM{POSITION},
+        COLS_NAME   => 1
+      }
+    );
+   #Open last profil
+    my $last_profile = 0;
+    $last_profile = $Employees->profile_list(
+      {
+        COLS_NAME => 1,
+        DESC      => 'DESC',
+        PAGE_ROWS => 1,
+        SORT      => 'id',
+        ID        => '_SHOW'
+      }
+    );
+    #Take ID
+    my $profile_id;
+    foreach my $profil (@$last_profile) {
+      $profile_id = $profil->{id};
+    }
+    #Add reply in and ID of profile
+    foreach my $line (@$resul_list) {
+      if ($FORM{ 'QUESTION_' . $line->{id} }) {
+        $Employees->add_reply(
+          {
+            REPLY       => $FORM{ 'QUESTION_' . $line->{id} },
+            QUESTION_ID => $line->{id},
+            PROFILE_ID  => $profile_id
+          }
+        );
+      }
+    }
+  }
+
+  else {
+    my $day_selet = $html->form_select(
+    'POSITION',
+    {
+      SEL_LIST    =>translate_list($Employees->position_list({COLS_NAME => 1,VACANCY   => 1  }),
+                                    'position'
+                                   ),
+      SEL_VALUE   => 'position',
+      NO_ID       => 1,
+      SEL_OPTIONS => { ''=> '--' },
+    }
+  );   
+
+  $Registration{POSITIONS} = $day_selet;
+  $html->tpl_show(_include('employees_registration', 'Employees'), \%Registration);
+
+  }
+  return 1;
+}
+
+sub profile_list_admin {
+  my @rating = ('',
+                $lang{BAD},
+                $lang{UNSATISFACTORILY},
+                $lang{FINE},
+                $lang{GOOD},
+                $lang{IDEALLY}
+                );
+  my @rating_colors = ('',
+                       "#0000FF",
+                       $_COLORS[6],
+                       '#808080',
+                       '#009D00',
+                       '#FF8000'
+                      );
+
+  my %info;
+
+  if ($FORM{del}) {
+    $Employees->del_profile({ ID => $FORM{del} });
+  }
+
+  if ($FORM{wtch}) {
+   my $profile_of_person;
+   $info{wtch} = $FORM{wtch};
+
+    if ($FORM{add_rating}) {
+      $Employees->change_profile(
+        {
+          ID     => $FORM{wtch},
+          RATING => $FORM{RATING}
+        }
+      );
+    }
+
+    $profile_of_person = $Employees->profile_info(
+      {
+        ID        => $FORM{wtch},
+        COLS_NAME => 1,
+      }
+    );
+
+    my $table_profile_info = $html->table(
+      {
+        width  => '100%',
+        title  => [ "$lang{QUESTION}", "$lang{REPLY}" ],
+        qs     => $pages_qs,
+        ID     => 'TABLE_PROFILE_INFO',
+        export => 1
+      }
+    );
+
+    my $profile_rating;
+    $info{POSITION_NAME} = $FORM{position};
+
+    foreach my $profile_info ($profile_of_person) {
+      $info{FIO}           = $profile_of_person->{FIO};
+      $info{DATE_OF_BIRTH} = $profile_of_person->{DATE_OF_BIRTH};
+      $info{EMAIL}         = $profile_of_person->{EMAIL};
+      $info{PHONE}         = $profile_of_person->{PHONE};
+      $profile_rating      = $profile_of_person->{RATING};
+    }
+   $info{ADD_EMPLOYEE_REF}=$html->button(
+                             $lang{ADD_EMPLOYEE},
+                             "index=". get_function_index('employees_main') . "&wtch=7",
+                             {class=>'btn btn-primary'}
+                           );
+      if($profile_rating){
+        for (my $i=0; $i < 5; $i++) {
+         if($i<$profile_rating){
+          $info{rating_icons}.= "\n".$html->element( 'i', '', { class => 'fa fa-star text-yellow' } );
+        }
+        else{
+          $info{rating_icons}.= "\n".$html->element( 'i', '', { class => 'fa fa-star-o text-yellow' } );
+         }
+       }
+     } 
+
+    my $reply_list = $Employees->reply_list(
+      {
+        COLS_NAME  => 1,
+        PROFILE_ID => $FORM{wtch},
+      }
+    );
+
+    if($reply_list){
+      foreach my $reply (@$reply_list) {
+        $table_profile_info->addrow($reply->{question}, $reply->{reply}, "");
+      }
+
+      $info{QUESTION_TABLE} = $table_profile_info->show();
+    }
+
+    $info{RATING} = $html->form_select(
+      'RATING',
+      {
+        SELECTED     => $profile_rating,
+        SEL_ARRAY    => \@rating,
+        ARRAY_NUM_ID => 1,
+        STYLE        => \@rating_colors,
+        SEL_OPTIONS  => { '' => '' },
+
+      }
+    );
+    $html->tpl_show(_include('employees_profiles_list', 'Employees'), \%info);
+  }
+  elsif($FORM{wtch_pos}){
+
+    my $profiles_list = $Employees->profile_list(
+      {
+        COLS_NAME => 1,
+      }
+    );
+    
+    my Abills::HTML $table;
+    my $list;
+    my $i = 0;
+    my $position_name;
+      ($table, $list) = result_former({
+         INPUT_DATA      => $Employees,
+         FUNCTION        => 'profile_list',
+         LIST => $profiles_list,
+         BASE_FIELDS     => 3,
+          DEFAULT_FIELDS  => 'POSITION,STAFF_PROFILES',
+         EXT_TITLES      => {
+          id              => 'Id',
+          fio          => $lang{FIO},
+          rating        =>$lang{MARK},
+         },
+         SKIP_PAGES => 1,
+         TABLE => {
+           width      => '100%',
+           caption    => $lang{STAFF_PROFILES}.": "._translate($FORM{position_name}),
+           qs         => $pages_qs."&wtch_pos= $FORM{wtch_pos}",
+           pages      => 500,
+           ID         => 'TABLE_EMPLOYEE_PROFILE',
+          },
+         MODULE       => 'Employees',
+        });
+
+     foreach my $line (@{$list}) {
+      if($line->{ position_id }==$FORM{wtch_pos}){
+       my @fields_array = ();
+       #ID colum
+       push @fields_array, $line->{ id };
+       #FIO colum
+       push @fields_array,$html->button(_translate($line->{ fio }),
+                                        "index=$index&wtch=$line->{id}&position=$line->{position}"
+                                        );
+       for (my $i=0; $i < 5; $i++) {
+         if($i<$line->{rating}){
+          $info{rating_icons}.= "\n".$html->element( 'i', '', { class => 'fa fa-star text-yellow' } );
+        }
+        else{
+          $info{rating_icons}.= "\n".$html->element( 'i', '', { class => 'fa fa-star-o text-yellow' } );
+         }
+       } 
+      #RATING colum 
+      push @fields_array,$info{rating_icons};
+      #BUTTON colum
+      push @fields_array,
+      $html->button($lang{DEL}, "index=$index&wtch_pos=$line->{position_id}&del=$line->{id}", { MESSAGE => "$lang{DEL} $line->{id}?", class => 'del' });
+
+       $table->addrow(@fields_array);
+       delete $info{rating_icons};
+       $position_name=$line->{position};
+     }
+   }
+   $table->{HTML}->{FORM_INPUT}=1;
+    print $table->show();
+
+}
+  
+
+  elsif (!$FORM{wtch}) {
+    my $positions_list=$Employees->position_list({
+      COLS_NAME => 1
+    });
+    my Abills::HTML $table;
+    my $list;
+    my $i = 0;
+      ($table, $list) = result_former({
+         INPUT_DATA      => $Employees,
+         FUNCTION        => 'position_list',
+         LIST => $positions_list,
+         BASE_FIELDS     => 2,
+          DEFAULT_FIELDS  => 'POSITION,STAFF_PROFILES',
+         EXT_TITLES      => {
+          id       => 'Id',
+          position       => $lang{POSITION},
+          total          => $lang{STAFF_PROFILES},
+         },
+         SKIP_PAGES => 1,
+         TABLE => {
+           width      => '100%',
+           caption    => "$lang{POSITIONS}",
+           qs         => $pages_qs,
+           pages      => 500,
+           ID         => 'CATEGORI_POSITION_LIST',
+          },
+         MODULE       => 'Employees',
+        });
+
+     foreach my $line (@{$list}) {
+       my @fields_array = ();
+       #ID colum
+       push @fields_array, $line->{ id };
+       #POSITION colum
+       push @fields_array,$html->button(_translate($line->{ position }),
+                                        "index=" . get_function_index('employees_positions')
+                                        );
+       #TOTAL colum
+       push @fields_array,$html->button($line->{ total },
+                                        "index=" . get_function_index('profile_list_admin') . "&wtch_pos=$line->{id}&position_name=$line->{position}"
+                                        );
+       #BUTTON colum
+       push @fields_array,'';
+
+       $table->addrow(@fields_array);
+     }
+    print $table->show();
+  }
+  return 1;
+}
+
+#**********************************************************
+=head2 employees_rfid_log()
+
+=cut
+#**********************************************************
+sub employees_rfid_log {
+  
+  if ( $FORM{add} && $FORM{RFID} ) {
+    $FORM{AID} = _employees_get_aid_by_rfid($FORM{RFID});
+    # TODO: generate event about unrecognized admin found
+    
+    $Employees->rfid_log_add({ %FORM });
+    _error_show($Employees);
+  }
+  elsif ( $FORM{del} ) {
+    $Employees->rfid_log_del({ ID => $FORM{del} });
+    _error_show($Employees);
+  }
+  
+  my $rfid_log = $Employees->rfid_log_list({
+    ID       => '_SHOW',
+    DATETIME => '_SHOW',
+    RFID     => '_SHOW',
+    AID      => '_SHOW',
+    ADMIN    => '_SHOW',
+  });
+  _error_show($Employees);    
+  
+  if ( !$rfid_log || scalar @{$rfid_log} <= 0 ) {
+    $html->message('warn', $lang{NO_DATA});
+    return 1;
+  }
+  
+  my Abills::HTML $table = $html->table( {
+    width   => '100%',
+    caption => 'RFID',
+    border  => 1,
+    title   => [ '#', $lang{TIME}, 'RFID', $lang{ADMIN} ],
+    pages   => scalar @{$rfid_log},
+      qs => $pages_qs,
+      ID => 'RFID_LOG_ID'
+  } );
+  
+  foreach ( @{$rfid_log} ) {
+    $table->addrow($_->{id}, $_->{datetime}, $_->{rfid}, $_->{admin});
+  }
+  
+  print $table->show();
+  
+  return 1;
+}
+
+#**********************************************************
+=head2 _employees_get_aid_by_rfid($rfid)
+
+=cut
+#**********************************************************
+sub _employees_get_aid_by_rfid {
+  my ($rfid) = @_;
+  return 0 unless $rfid;
+  
+  my $admins_search_list = $admin->list({
+    GPS_IMEI => $rfid,
+    COLS_NAME => 1
+  });
+  
+  _error_show($admin);
+
+  return ($admin->{errno} || (!$admins_search_list || ref $admins_search_list ne 'ARRAY' || $admin->{TOTAL} <= 0))
+           ? 0
+           : $admins_search_list->[0]{aid};
+}
+
+#**********************************************************
+=head2 employees_vacations() -
+
+  Arguments:
+    $attr -
+  Returns:
+
+  Examples:
+
+=cut
+#**********************************************************
+sub employees_vacations {
+  my ($attr) = @_;
+
+  my $action = 'add';
+  my $button = "$lang{ADD}";
+
+  my $admins_list = $admin->list(
+    {
+      %LIST_PARAMS,
+      DOMAIN_ID => $admin->{DOMAIN_ID},
+      COLS_NAME => 1,
+      WITH_POSITION => 1
+    }
+  );
+    
+  my $admins_select = $html->form_select( 'ADMIN',
+    {
+      SELECTED    => $FORM{ADMIN} || q{},
+      SEL_LIST   => $admins_list,
+      NO_ID       => 1,
+      SEL_KEY     => 'aid',
+      SEL_VALUE   => 'name',
+      SEL_OPTIONS => { '' => '' },
+      # EX_PARAMS => "data-auto-submit='form'"
+    }
+  );
+
+  if($FORM{add}){
+    my @all_dates_vacations;
+    my $one_day = $FORM{DATE_START};
+    while ($one_day ne $FORM{DATE_END}){
+      $one_day = date_inc($one_day);
+
+      my %VACATION;
+      $VACATION{AIDS} = $FORM{ADMIN};
+      $VACATION{$FORM{ADMIN}.'_WORK_TIME'} = 0;
+      $VACATION{$FORM{ADMIN}.'_OVERTIME'} = 0;
+      $VACATION{$FORM{ADMIN}.'_EXTRA_FEE'} = 0;
+      $VACATION{$FORM{ADMIN}.'_DAY_TYPE'} = 1;
+      $VACATION{DATE}=$one_day;
+      $Employees->time_sheet_add(\%VACATION);
+    }
+  }
+  elsif($FORM{change}){
+  }
+  
+  if($FORM{del}){
+  }
+  
+  if($FORM{chg}){
+    $action = 'change';
+    $button = "$lang{CHANGE}";
+  }
+  
+  
+
+  $html->tpl_show(_include('employees_vacations_add', 'Employees'), {
+      ACTION_LANG  => $button,
+      ACTION       => $action,
+      ADMIN_SELECT => $admins_select,
+    });
+
+  return 1;
+}
+
+#**********************************************************
+=head2 date_decr() -
+
+  Arguments:
+    $attr -
+  Returns:
+
+  Examples:
+
+=cut
+#**********************************************************
+sub date_decr {
+  my ($num_of_days, $date_string) = @_;
+
+  return 0 if ($num_of_days < 0);
+  my ($year, $month, $day) = split( "-", $date_string );
+
+  while($num_of_days--){
+    $day--;
+    if ( $day == 0 ){
+      $month--;
+      if ( $month == 0 ){
+        $year--;
+        $month = 12;
+      }
+      $day = days_in_month( {DATE => "$year-$month-01"} );
+    }
+  }
+  return "$year" . "-" . ($month) . "-" . ($day  < 10 ? "0" . $day : $day);
+}
+  
+
+#**********************************************************
+=head2 employees_rfid_log_to_timesheet() -
+
+  Arguments:
+    $attr -
+  Returns:
+
+  Examples:
+
+=cut
+#**********************************************************
+sub employees_rfid_log_to_timesheet {
+  my ($attr) = @_;
+
+  my $date = $attr->{DATE} || $DATE;
+
+  my $day_before = date_decr(1, $date);
+
+  my $rfid_log = $Employees->rfid_log_list({
+    COLS_NAME => 1,
+    DATETIME  => '_SHOW',
+    # RFID      => '_SHOW',
+    AID       => '_SHOW',
+    ADMIN     => '_SHOW',
+    SORT      => 'datetime',
+    DESC      => 'desc',
+    DATE      => $day_before,
+  });
+
+  my %admins_times;
+
+  foreach my $each_admin_rfid_log (@$rfid_log){
+    push (@ {$admins_times{$each_admin_rfid_log->{admin_id}}}, $each_admin_rfid_log->{datetime});
+  }
+  
+  foreach my $key (keys %admins_times){
+    if ((scalar @{$admins_times{$key}}) > 1){
+
+      my $start = $admins_times{$key}[0];
+  
+      my $end   = $admins_times{$key}[scalar @{$admins_times{$key}} - 1];
+  
+      if($start && $end){
+        my (undef, $start_time) = split(' ',$start);
+        my (undef, $end_time) = split(' ',$end);
+        
+        my $start_time_in_sec = time2sec($start_time);
+        my $end_time_in_sec = time2sec($end_time);
+        # print "$end_time_in_sec - $start_time_in_sec\n";
+        my $time_on_work_in_sec = $end_time_in_sec - $start_time_in_sec;
+  
+        my ($seconds, $minutes, $hours, undef) = sec2time($time_on_work_in_sec);
+        if($attr->{DEBUG} && $attr->{DEBUG} == 1){
+          print "Admin ID: $key\nTime on work: $hours:$minutes:$seconds\n";
+        }
+  
+        my %VACATION;
+        $VACATION{AIDS} = $key;
+        $VACATION{$key.'_WORK_TIME'} = $hours;
+        $VACATION{$key.'_OVERTIME'} = 0;
+        $VACATION{$key.'_EXTRA_FEE'} = 0;
+        $VACATION{$key.'_DAY_TYPE'} = 0;
+        $VACATION{DATE}=$day_before;
+        $Employees->time_sheet_add(\%VACATION);
+      }
+    }
+  }
+
+  return 1;
+}
+
+#**********************************************************
+=head2 emploeeys_time_sheet_charts() -
+
+  Arguments:
+    $attr -
+  Returns:
+
+  Examples:
+
+=cut
+#**********************************************************
+sub employees_time_sheet_charts {
+  my ($attr) = @_;
+  # получаем список администраторов с должностью
+  my $admins_list = $admin->list(
+    {
+      %LIST_PARAMS,
+      DOMAIN_ID => $admin->{DOMAIN_ID},
+      COLS_NAME => 1,
+      WITH_POSITION => 1,
+      POSITION => $FORM{POSITION} || "",
+    }
+  );
+
+  my $admins_chart = '';  # пермеенная в которую складываем графики
+  my ($year, $month, $day) = split('-', $FORM{DATE});
+  my $date_start = "$year-$month-01"; # начало месяца
+  my $date_end   = "$year-$month-" . days_in_month({DATE => $FORM{DATE}}); # конец месяца
+  my @dates; # все даты в месяце
+
+  # перебираем и складываем в массив дат - все даты в месяце
+  my $one_day = $date_start;
+  push (@dates, $date_start);
+  while ($one_day ne $date_end){
+    $one_day = date_inc($one_day);
+    push(@dates, $one_day)
+  }
+
+  # проходимся по списку администраторов
+  foreach my $admin (@$admins_list){
+    my @work_time;
+    my @over_time;
+    my @extra_fee;
+    # вытягиваем их рабочее время
+    my $time_sheet_list = $Employees->time_sheet_list(
+      {
+        %LIST_PARAMS,
+        BY_AID     => $admin->{aid},
+        DOMAIN_ID  => $admin->{DOMAIN_ID},
+        DATE_START => $date_start,
+        DATE_END   => $date_end,
+        COLS_NAME  => 1
+      }
+    );
+    # в масив рабочего времени, экстар времени и доп. оплат складываем часы
+    foreach my $date ( @dates ){
+      my $date_work_time = 0;
+      my $date_over_time = 0;
+      my $date_extra_fee = 0;
+      foreach my $one_time_sheet ( @$time_sheet_list ){
+        if($one_time_sheet->{'date'} eq $date){
+          $date_work_time = $one_time_sheet->{work_time};
+          $date_over_time = $one_time_sheet->{overtime};
+          $date_extra_fee = $one_time_sheet->{extra_fee};
+        }
+      }
+      push(@work_time, $date_work_time);
+      push(@over_time, $date_over_time);
+      push(@extra_fee, $date_extra_fee);
+    }
+      
+    # рисуем графики с нашими данными
+    $admins_chart .= $html->make_charts2(
+    {
+      TRANSITION    => 1,
+      TYPES         => { "$lang{WORK_TIME}" => 'COLUMN', 
+                          $lang{OVERTIME}   => 'COLUMN', 
+                          $lang{EXTRA_FEE}  => 'COLUMN' },
+      X_TEXT        => \@dates,
+      DATA          => { "$lang{WORK_TIME}" => \@work_time, 
+                          $lang{OVERTIME}   => \@over_time, 
+                          $lang{EXTRA_FEE}  => \@extra_fee },
+      GRAPH_ID      => "ADMIN_$admin->{aid}",
+      TITLE         => $admin->{login},
+      OUTPUT2RETURN => 1,
+      # PERIOD => 'month',
+    });
+
+  }
+
+  print $admins_chart;
+    
+  return 1;
+}
+
+#**********************************************************
+=head2 employees_timesheet_print() -
+
+  Arguments:
+    $attr -
+  Returns:
+
+  Examples:
+
+=cut
+#**********************************************************
+sub employees_timesheet_print {
+  my ($attr) = @_;
+
+  my $date_start;
+  my $date_end;
+  my $all_days_in_month;
+  my $all_days_in_month_to_table;
+  my ($y, $m, $d);
+
+  if($FORM{DATE}){
+    ($y, $m, $d) = split('-', $FORM{DATE});
+
+    $all_days_in_month = days_in_month( {DATE => "$y-$m-01"} );
+
+    $date_start = "$y-$m-01";
+    $date_end   = "$y-$m-$all_days_in_month";
+
+    for(my $i=1; $i <= days_in_month( {DATE => "$y-$m-01"} ); $i++){
+      $all_days_in_month_to_table .= qq{<td width="20" align="center">$i</td>};
+    }
+  }
+
+  my $time_sheet_list = $Employees->time_sheet_list({ DATE_START => $date_start, 
+                                                      DATE_END   => $date_end,
+                                                      POSITION   => '_SHOW',
+                                                      COLS_NAME  => 1,});
+    
+  my %admins_work_time;
+  my %admins_positions;
+
+  foreach my $one_day (@$time_sheet_list){
+    $admins_work_time{$one_day->{name}}{$one_day->{date}} = $one_day->{work_time};
+    my $position_info = $Employees->position_info({ID => $one_day->{position}, COLS_NAME => 1,});
+      
+    if(!(exists $admins_positions{$one_day->{name}})){
+      $admins_positions{$one_day->{name}} = $position_info->{POSITION};
+    }
+  }
+
+  my $table_rows;
+
+  foreach my $fio_key ( keys %admins_work_time){
+    my $full_time;
+    $table_rows .= "<tr><td></td><td>$fio_key</td><td>$admins_positions{$fio_key}</td>";
+    for(my $i=1; $i <= days_in_month( {DATE => "$y-$m-01"} ); $i++){
+      if($i < 10){
+        $i = sprintf '%.2d', $i;
+      }
+
+      my $date_key = "$y-$m-$i";
+      if( defined $admins_work_time{$fio_key}{$date_key}){
+        $table_rows .= qq{<td align="center">$admins_work_time{$fio_key}{$date_key}</td>};
+        $full_time += $admins_work_time{$fio_key}{$date_key};
+      }
+      else{
+       $table_rows .= qq{<td align="center">0</td>}; 
+      }
+    }
+    $table_rows .= "<td>$full_time</td>";
+    $table_rows .= "</tr>";
+  }
+
+  my $table =  qq{<table width="100%" cellspacing="0" border="1">
+  <thead>
+     <tr>
+      <th rowspan="2">№ П/П</th>
+      <th rowspan="2" colspan="1">$lang{FIO}</th>
+      <th rowspan="2" colspan="1">$lang{POSITION}</th>
+      <th rowspan="1" colspan="$all_days_in_month">$lang{WORKED_HOURS_BY_MONTH}</th>
+      <th rowspan="2" colspan="1">$lang{TOTAL_WORKED_HOURS_BY_MONTH}</th>
+     </tr>
+     <tr>
+      $all_days_in_month_to_table
+     </tr>
+     </thead>
+     <tbody>
+     $table_rows
+     </tbody>
+     </table>};
+    
+
+  if($FORM{print} && $FORM{print} == 1){
+
+
+    $html->tpl_show(_include('employees_timesheet_print', 'Employees'),
+    {
+      TABLE => $table,
+      MONTH => $MONTHES[$m - 1]
+    });
+
+    return 1;
+  }
+
+
+  print $html->button("","qindex=" . get_function_index('employees_timesheet_print') . "&header=2&test=1", {target => '_new', class=> 'btn btn-default', ICON => 'fa fa-print'});
+
+  return 1;
+}
+  
+
+1

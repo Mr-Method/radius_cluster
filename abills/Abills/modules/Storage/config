@@ -1,0 +1,19 @@
+#Iner_ID : Main or Sub or if -1 user menu func list
+%FUNCTIONS_LIST = (
+  "01:0:$lang{STORAGE}:storage_main:"         => 5,
+  "02:1:$lang{LOG}:storage_log:"              => 5,
+  "03:1:$lang{OPTIONS}:storage_main:"         => 5,
+  "04:3:$lang{SUPPLIERS}:suppliers_main:"     => 5,
+  "05:3:$lang{ARTICLE}:storage_articles:"     => 5,
+  "06:3:$lang{TYPE}:storage_articles_types:"  => 5,
+  "07:3:$lang{STORAGES}:storage_storages:"    => 5,
+  "01:0:$lang{HARDWARE}:storage_hardware:UID" => 20,
+);
+
+%PERIODIC = (
+  monthly => [ 'storage_monthly_fees' ]
+);
+
+1
+
+

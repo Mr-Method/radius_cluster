@@ -1,0 +1,10 @@
+$lang{AUTO_DETECT}='Авто визначення';
+$lang{CALCULATOR} = 'Калькулятор';
+$lang{SUBNET_MASK} = 'Маска підмережі';
+$lang{NUMBER_OF_SUBNETS} = 'Кількість підмереж';
+$lang{HOSTS_PER_SUBNET} = 'Хостов в підмережі';
+$lang{SUBNET} = 'Підмережа';
+$lang{MASK} = 'Маска';
+$lang{EXTENDED} = 'Розширений';
+$lang{SCAN} = 'Сканування';
+$lang{DO_SCAN} = 'Сканувати';

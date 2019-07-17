@@ -1,0 +1,476 @@
+﻿#!perl
+
+=head1 NAME
+
+  Paysys System
+
+  Error ID: 17xx
+
+=cut
+
+use strict;
+use warnings;
+use Abills::Filters;
+use Abills::Base qw(in_array cfg2hash convert ip2int
+  mk_unique_value decode_base64 sendmail encode_base64 cmd load_pmodule);
+use Abills::Fetcher qw(web_request);
+use Finance;
+use Abills::Misc;
+
+if (form_purchase_module({
+	HEADER          => $user->{UID},
+	MODULE          => 'Paysys',
+	REQUIRE_VERSION => 7.15
+  })) {
+  exit;
+}
+
+our Users $user;
+our ($db,
+  %conf,
+  $admin,
+  $op_sid,
+  $html,
+  %lang,
+  $base_dir,
+  %ADMIN_REPORT,
+  %PAYSYS_PAYMENTS_METHODS,
+  @WEEKDAYS,
+  @MONTHES,
+  $PAYSYSTEM_NAME,
+  $PAYSYSTEM_IP,
+  $PAYSYSTEM_VERSION,
+  %PAYSYSTEM_CONF,
+  %FEES_METHODS,
+);
+
+my $payment_methods = get_payment_methods();
+#%PAYSYS_PAYMENTS_METHODS = %{ cfg2hash($conf{PAYSYS_PAYMENTS_METHODS}) };
+
+%PAYSYS_PAYMENTS_METHODS = %{ $payment_methods };
+
+our $Payments = Finance->payments($db, $admin, \%conf);
+our $Fees     = Finance->fees($db, $admin, \%conf);
+our $Paysys   = Paysys->new($db, $admin, \%conf);
+
+our @TERMINAL_STATUS = ("$lang{ENABLE}", "$lang{DISABLE}");
+
+our @status = ("$lang{UNKNOWN}", #0
+  "$lang{TRANSACTION_PROCESSING}", #1
+  "$lang{COMPLETE}", #2
+  "$lang{CANCELED}", #3
+  "$lang{EXPIRED}", #4
+  "$lang{INCORRECT_CHECKSUM}", #5
+  "$lang{PAYMENT_ERROR}", #6
+  "$lang{DUBLICATE}", #7
+  "$lang{USER_ERROR}", #8
+  "$lang{USER_NOT_EXIST}", #9
+  "$lang{SMALL_PAYMENT_SUM}", #10
+  'SQL_ERROR',                #11
+  'TEST',                     #12
+  'WAIT',                     #13
+  'REJECT',                   #14
+  'UNPAID',                   #15
+  'WRONG_SUM',                #16
+  'PAYMENT_SQL_ERROR',        #17
+);
+
+
+our @status_color = ('',
+  '#F1AD46',
+  '#008000',
+  '#FF0000',
+  '#FF00FF',
+  '#808080',
+  '#ff2318',
+  '#000080',
+  '#fff208',
+  '#00c5d0',
+  '#008080',
+  '#00FF00',
+  '#060800',
+  '#b0d000',
+  '#ff7418',
+  '#005800',
+  '#0a0068',
+  '#004a58');
+
+paysys_load('Paysys_Base');
+
+
+if($conf{PAYSYS_NEW_SCHEME}){
+  require Paysys::Configure;
+  require Paysys::User_portal;
+  require Paysys::Reports;
+}
+else{
+  require Paysys::PaysysOld;
+}
+
+#**********************************************************
+=head2 paysys_load($module,  $attr) - Load Paysys modules
+
+=cut
+#**********************************************************
+sub paysys_load {
+  my ($module)=@_;
+
+  if (! $module) {
+    return 0;
+  }
+
+  eval { require "Paysys/". $module .".pm" };
+  if ($@) {
+    print "Content-Type: text/html\n\n";
+
+    print "Error: load module '". $module .".pm' :: $!". $html->br();
+    print "Purchase module from http://abills.net.ua/". $html->br() . $html->br();
+
+    if ($conf{PAYSYS_DEBUG}) {
+      print "=======================================".$html->br();
+      print $@;
+      print $html->br(). "=======================================";
+    }
+
+    exit;
+  }
+
+  return 1;
+}
+
+#**********************************************************
+=head2 paysys_read_folder_systems()
+
+  Arguments:
+     -
+
+  Returns:
+
+=cut
+#**********************************************************
+sub _paysys_read_folder_systems {
+  my $paysys_folder = "$base_dir" . 'Abills/modules/Paysys/systems/';
+
+  my @systems = ();
+  # read all .pm in folder
+  opendir(my $folder, $paysys_folder);
+  while (my $filename = readdir $folder) {
+    if ($filename =~ /pm$/ && $filename ne 'Paysys_Base.pm') {
+      push(@systems, $filename);
+    }
+  }
+  closedir $folder;
+
+  return \@systems
+}
+
+#**********************************************************
+=head2 paysys_periodic()
+
+=cut
+#**********************************************************
+sub paysys_periodic_new {
+  my ($attr) = @_;
+
+  my $debug = $attr->{DEBUG} || 0;
+  my $debug_output = '';
+  $debug_output .= "Paysys: Daily periodic payments\n" if ($debug > 1);
+
+  my %PAYSYS_PAYMENT_METHODS = ();
+
+  if($conf{PAYSYS_PAYMENTS_METHODS}) {
+    %PAYSYS_PAYMENT_METHODS = %{ cfg2hash($conf{PAYSYS_PAYMENTS_METHODS}) };
+  }
+
+  if ($conf{PAYSYS_PORTMONE_PAYEE_ID}) {
+    paysys_load('Portmone');
+
+    #my $payment_system    = 'PM';
+    my $payment_system_id = 45;
+    my $status;
+
+    $ADMIN_REPORT{DATE} = $DATE if (!$ADMIN_REPORT{DATE});
+    my ($y, $m, $mday) = split(/-/, $ADMIN_REPORT{DATE});
+
+    #replace the parameters with your own values..
+    my $mon  = $m - 1;
+    my $year = $y - 1900;
+    my $timestamp = POSIX::mktime(0, 0, 0, $mday, $mon, $year, 0, 0, -1);
+    my $DATE      = POSIX::strftime('%Y-%m-%d', localtime($timestamp - 86400));
+    my $res_arr   = paysys_portmone_result(0, { DEBUG => $debug, DATE => $DATE });
+
+    if ( ref $res_arr ne 'ARRAY' || $#{$res_arr}  == 0){
+      return 0;
+    }
+
+    my %res_hash = ();
+    for (my $i = 0 ; $i <= $#{$res_arr} ; $i++) {
+      $res_hash{ 'PM:'.$res_arr->[$i]{ordernumber} } = $i;
+    }
+
+    my $list = $Paysys->list({ DATE           => $DATE,
+      PAYMENT_SYSTEM => $payment_system_id,
+      ID             => '_SHOW',
+      SUM            => '_SHOW',
+      TRANSACTION_ID => '_SHOW',
+      STATUS         => 1,
+      COLS_NAME      => 1,
+    });
+
+    my $users = Users->new($db, $admin, \%conf);
+    foreach my $line (@$list) {
+      #Add payments to abills
+      $debug_output .= "Unfinished payment ID: $line->{id}/$line->{transaction_id}\n" if ($debug > 2);
+      if (defined($res_hash{ $line->{transaction_id} })) {
+        my $uid       = $line->{uid};
+        my $sum       = $line->{sum};
+        my $order_num = $line->{transaction_id};
+        my $user_      = $users->info($uid);
+
+        if ($res_arr->[$res_hash{$line->{transaction_id}}]{approvalcode} > 0) {
+          $Payments->add(
+            $user_,
+            {
+              SUM          => $sum,
+              DESCRIBE     => 'PORTMONE',
+              METHOD       => ($conf{PAYSYS_PAYMENTS_METHODS} && $PAYSYS_PAYMENTS_METHODS{$payment_system_id}) ? $payment_system_id : '2',
+              EXT_ID       => "PM:$order_num",
+              CHECK_EXT_ID => "PM:$order_num"
+            }
+          );
+        }
+
+        #Exists
+        if ($Payments->{errno}) {
+          if ($Payments->{errno} == 7) {
+            $status = 8;
+          }
+          else {
+            $status = 4;
+          }
+        }
+        else {
+          $status = 0;
+          my $info   = '';
+          while(my($k, $v) = each %{ $res_arr->[$res_hash{$line->{transaction_id}}] } ) {
+            $info .= "$k, $v\n";
+          }
+
+          if ($res_arr->[$res_hash{$line->{transaction_id}}]{approvalcode} > 0) {
+            $status=2;
+            $debug_output .= "Add payments TRANSACTION_ID: $line->{transaction_id}\n" if ($debug > 0);
+          }
+          else {
+            $status=6;
+            $debug_output .= "Add payments Error: TRANSACTION_ID: $line->{transaction_id} / [$res_hash{$line->{transaction_id}}]{error_code} ([$res_hash{$line->{transaction_id}}]{error_message}) \n" if ($debug > 0);
+          }
+
+          $Paysys->change(
+            {
+              ID     => $line->{id},
+              INFO   => $info. ' (periodic)',
+              STATUS => $status
+            }
+          );
+          $status = 1;
+        }
+
+        if ($conf{PAYSYS_EMAIL_NOTICE}) {
+          my $message = "\n" . "System: Portmone\n" . "DATE: $DATE $TIME\n" . "LOGIN: $user->{LOGIN} [$uid]\n" . "\n" . "\n" . "ID: $line->{id}\n" . "SUM: $sum\n";
+          sendmail("$conf{ADMIN_MAIL}", "$conf{ADMIN_MAIL}", "Paysys Portmone Add", "$message", "$conf{MAIL_CHARSET}", "2 (High)");
+        }
+      }
+    }
+  }
+  elsif($conf{PAYSYS_ELECTRUM_URL}){
+    my $payment_system_id = 125;
+    my $payment_system = 'Electrum';
+
+    require Paysys::systems::Electrum;
+    Paysys::systems::Electrum->import();
+    my $Electrum = Paysys::systems::Electrum->new(\%conf);
+
+    my $list = $Paysys->list({
+      PAYMENT_SYSTEM => $payment_system_id,
+      ID             => '_SHOW',
+      SUM            => '_SHOW',
+      TRANSACTION_ID => '_SHOW',
+      STATUS         => 1,
+      LIST2HASH      => 'transaction_id,status'
+    });
+
+    my $list2hash = $Paysys->{list_hash};
+
+    my $list_requests = $Electrum->list_requests();
+
+    foreach my $request (@$list_requests) {
+      if ($list2hash->{"$payment_system:$request->{id}"}) {
+        if ($request->{status} eq 'Paid') {
+          my $paysys_status = paysys_pay(
+            {
+              PAYMENT_SYSTEM    => $payment_system,
+              PAYMENT_SYSTEM_ID => $payment_system_id,
+              #CHECK_FIELD       => $conf{PAYSYS_YANDEX_KASSA_ACCOUNT_KEY},
+              #USER_ID           => $FORM{customerNumber},
+              SUM               => ($request->{amount} / 100000000),
+              ORDER_ID          => "$payment_system:$request->{id}",
+              EXT_ID            => $request->{id},
+              # REGISTRATION_ONLY => 1,
+              DATA              => $request,
+              MK_LOG            => 1,
+              DEBUG             => 1,
+            }
+          );
+        }
+      }
+    }
+  }
+
+  if($conf{PAYSYS_PLATEGKA_MERCHANT_ID}){
+    my $payment_system_id = 126;
+    my $payment_system = 'Plategka';
+
+    require Paysys::systems::Plategka;
+    Paysys::systems::Plategka->import();
+    my $Plategka= Paysys::systems::Plategka->new(\%conf, \%FORM, $admin, $db, { HTML => $html });
+
+    $Plategka->periodic();
+  }
+
+  if ($conf{PAYSYS_P24_API_PERIODIC} && $conf{PAYSYS_P24_API_AUTO_INFO}) {
+    my @merchants = split(';', $conf{PAYSYS_P24_API_AUTO_INFO}); # list of merchants
+    my $url = "https://acp.privatbank.ua/api/proxy/transactions/today"; # url for api
+    my $success_payments = 0;
+    my $not_success_payments = 0;
+    my $already_exist_payments = 0;
+
+    foreach my $merchant (@merchants) {
+      my ($bill, $id, $token) = split(':', $merchant);
+
+      #request for transactions list
+      my $json_result = web_request($url, {
+          #      POST    => qq[{"sessionId":"$session_id"}],
+          DEBUG       => 0,
+          HEADERS     => [ "Content-Type: application/json; charset=utf8", "id: $id", "token: $token" ],
+          JSON_RETURN => 1,
+        });
+
+      # if there is no error
+      if ($json_result->{StatementsResponse}) {
+        # show error if something wrong
+        if (!$json_result->{StatementsResponse}->{statements} || ref $json_result->{StatementsResponse}->{statements} ne 'ARRAY') {
+          print "NOT ARRAY REF";
+          return 1;
+        }
+      }
+
+      #BPL_SUM - сумма платежа
+      #BPL_OSND - коментарий
+      #DATE_TIME_DAT_OD_TIM_P - дата время
+      #AUT_MY_NAM -
+      #BPL_PR_PR - статус(r - проведена)
+      #DATE_TIME_DAT_OD_TIM_P - дата
+
+      # get payments list for this system
+      my $payments_extid_list = 'P24_API:*';
+      my $payments_list = $Payments->list({ EXT_ID => $payments_extid_list,
+        DATETIME                                   => '_SHOW',
+        PAGE_ROWS                                  => 100000,
+        COLS_NAME                                  => 1,
+      });
+
+      # make hash with added payments
+      my %added_payments = ();
+      foreach my $line (@$payments_list) {
+        if ($line->{ext_id}) {
+          $line->{ext_id} =~ s/$payments_extid_list://;
+          $added_payments{ $line->{ext_id} } = "$line->{id}:" . "$line->{uid}:" . ($line->{login} || '') . ":$line->{datetime}";
+        }
+      }
+
+      my $transactions = $json_result->{StatementsResponse}{statements}[0]{$bill};
+      foreach my $transaction (@$transactions) {
+        my ($tran_id) = keys %$transaction;
+        my $transaction_info = $transaction->{$tran_id}; # get transaction info
+
+        my $amount = $transaction_info->{BPL_SUM};
+        my $comment = $transaction_info->{BPL_OSND};
+        use Encode;
+        $comment = decode_utf8($comment);
+        my $status = $transaction_info->{BPL_PR_PR};
+        my $date = $transaction_info->{DATE_TIME_DAT_OD_TIM_P};
+        $date =~ s/\./\-/g;
+        my ($user_identifier) = $comment =~ /$conf{PAYSYS_P24_API_PARSE}/;
+
+        if (exists $added_payments{$tran_id}) {
+          print "Payment $tran_id exist\n";
+          $already_exist_payments++;
+          next;
+        }
+        else {
+          if($conf{PAYSYS_P24_API_FILTER} && $comment =~ /$conf{PAYSYS_P24_API_FILTER}/){
+            next;
+          }
+
+          if ($status ne "r") {
+            print "Payment $tran_id not success in private";
+            $not_success_payments++;
+            next;
+          };
+
+          if (!$user_identifier || $user_identifier eq "") {
+            print "Payment $tran_id. User identifier is empty\n";
+            $not_success_payments++;
+            next;
+          };
+
+          # if payments is new - add it to base
+          require Paysys::systems::P24_api;
+          Paysys::systems::P24_api->import();
+          my $P24 = Paysys::systems::P24_api->new(\%conf);
+
+          my $payment_status = $P24->make_payment({
+            TRANSACTION_ID => $tran_id,
+            ACCOUNT_KEY    => $user_identifier,
+            SUM            => $amount,
+            #                      DATE           => $date || $DATE,
+            COMMENT        => $comment || '',
+          });
+
+          print "Payment $tran_id. User $user_identifier. Payment status $payment_status\n";
+          $success_payments++;
+        }
+      }
+    }
+
+    print "Sucecss payments - $success_payments\n";
+    print "Not sucecss payments - $not_success_payments\n";
+    print "Already exist payments - $already_exist_payments\n";
+  }
+
+  my $connected_systems_list = $Paysys->paysys_connect_system_list({
+    SHOW_ALL_COLUMNS => 1,
+    STATUS           => 1,
+    COLS_NAME        => 1,
+  });
+
+  use Users;
+  my $users = Users->new($db);
+
+  foreach my $connected_system (@$connected_systems_list){
+    my $module    = $connected_system->{module};
+    my $name      = $connected_system->{name};
+
+    my $Module = _configure_load_payment_module($module);
+    if ($Module->can('periodic')) {
+      my $PAYSYS_OBJECT = $Module->new($db, $admin, \%conf, {USER => $users, NAME => $name});
+      $PAYSYS_OBJECT->periodic({%$attr});
+    }
+  }
+
+  $DEBUG .= $debug_output;
+  return $debug_output;
+}
+
+1
+

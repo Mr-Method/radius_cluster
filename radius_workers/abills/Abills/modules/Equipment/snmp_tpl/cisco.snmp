@@ -1,0 +1,37 @@
+// Cisco base
+{
+"DEVICE":"Cisco",
+"FDB":"1",
+"FDB_MODE":"",
+"FDB_IGNORE_PORTS":"",
+
+"info" : {
+
+"SYSTEM_NAME" : {
+  "NAME" : "System name",
+  "OIDS" : ".1.3.6.1.2.1.1.5.0",
+  "PARSER" : ""
+},
+
+"UPTIME" : { 
+"NAME" : "Uptime",
+"OIDS" : ".1.3.6.1.2.1.1.3.0",
+"PARSER" : "sp_parse_raw"
+},
+
+"CPU_LOAD" : {
+  "NAME" : "CPU LOAD",
+  "OIDS" : ".1.3.6.1.4.1.9.2.1.56.0,.1.3.6.1.4.1.9.2.1.57.0,.1.3.6.1.4.1.9.2.1.58.0",
+  "PARSER" : ""
+},
+
+"RAM_FREE" : {
+  "NAME" : "RAM_FREE",
+  "OIDS" : ".1.3.6.1.4.1.9.2.1.8.0",
+  "PARSER" : "int2byte"
+}
+
+}
+
+}
+

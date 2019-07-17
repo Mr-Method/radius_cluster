@@ -1,0 +1,65 @@
+#!/usr/bin/perl
+#
+# Asterisk AGI for Abills hotspot module
+#
+
+use strict;
+use warnings;
+
+our (
+  %conf,
+  $DATE,
+  $TIME
+);
+
+BEGIN {
+  use FindBin '$Bin';
+  require $Bin . '/../../../libexec/config.pl';
+  unshift(@INC,
+    $Bin . '/../../../',
+    $Bin . '/../../../lib/',
+    $Bin . "/../../../Abills/$conf{dbtype}");
+
+}
+
+use Abills::SQL;
+
+use Asterisk::AGI;
+use Hotspot;
+
+my $sql = Abills::SQL->connect( @conf{qw/dbtype dbhost dbname dbuser dbpasswd/},
+  { CHARSET => $conf{dbcharset} });
+my $db = ($conf{VERSION} && $conf{VERSION} < 0.70) ? $sql->{db} : $sql;
+
+my $Hotspot = Hotspot->new( $db, undef, \%conf );
+my $agi  = Asterisk::AGI->new();
+my %input = $agi->ReadParse();
+
+my $caller_id  = $input{callerid};
+
+$agi->verbose("Answer on call $caller_id.");
+$agi->answer();
+
+my $hot_log = $Hotspot->log_list({
+        ACTION    => 11,
+        PHONE     => $caller_id,
+        CID       => '_SHOW',
+        COLS_NAME => 1,
+});
+
+if ($Hotspot->{TOTAL} < 1) {
+  $agi->verbose("Number unknown.");
+  $agi->set_variable('status', '0');
+}
+else {
+  $Hotspot->log_add({
+        CID      => $hot_log->[0]->{CID},
+        ACTION   => 12,
+        PHONE    => $caller_id,
+        COMMENTS => 'Phone confirmed.'
+  });
+  $agi->verbose("Number confirmed.");
+  $agi->set_variable('status', '1');
+}
+
+1
